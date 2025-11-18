@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { 
   ChevronLeft, 
   ChevronRight,
@@ -17,15 +17,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 export function AppSidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [userRole, setUserRole] = useState<string>("usuario");
-  const [userName, setUserName] = useState<string>("");
-  const [userEmail, setUserEmail] = useState<string>("");
+  const [userRole, setUserRole] = useState("usuario");
+  const [userName, setUserName] = useState("");
+  const [userEmail, setUserEmail] = useState("");
   
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname;
 
-  // Menu items
   const menuItems = [
     { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, roles: ["admin", "gestor", "usuario"] },
     { title: "Usuários", url: "/usuarios", icon: Users, roles: ["admin"] },
@@ -43,31 +42,31 @@ export function AppSidebar() {
 
   const loadUserData = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
 
       const { data: profile } = await supabase
         .from("profiles")
         .select("name, email")
-        .eq("id", user.id)
+        .eq("id", userData.user.id)
         .single();
 
       const { data: roleData } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", user.id)
+        .eq("user_id", userData.user.id)
         .single();
 
       if (profile) {
         setUserName(profile.name || "");
-        setUserEmail(profile.email || user.email || "");
+        setUserEmail(profile.email || userData.user.email || "");
       }
 
       if (roleData) {
         setUserRole(roleData.role || "usuario");
       }
     } catch (error) {
-      console.error("Error loading user data:", error);
+      console.error("Error:", error);
     }
   };
 
@@ -84,122 +83,236 @@ export function AppSidebar() {
   };
 
   const filteredMenuItems = menuItems.filter(item => 
-    !item.roles || item.roles.includes(userRole)
+    item.roles.includes(userRole)
   );
 
   const getUserInitials = () => {
     if (userName) {
-      return userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      const names = userName.split(' ');
+      return names.map(n => n[0]).join('').toUpperCase().slice(0, 2);
     }
     return userEmail.slice(0, 2).toUpperCase();
   };
 
+  const handleNavClick = (url: string) => {
+    navigate(url);
+  };
+
   return (
-    <aside className={`
-      hidden lg:flex flex-col h-screen bg-[#0a0a0a] border-r border-gray-800
-      transition-all duration-300 fixed left-0 top-0 z-40
-      ${isCollapsed ? 'w-16' : 'w-64'}
-    `}>
+    <aside 
+      className="hidden lg:flex flex-col h-screen border-r fixed left-0 top-0 z-40 transition-all duration-300"
+      style={{
+        width: isCollapsed ? '64px' : '256px',
+        backgroundColor: '#0a0a0a',
+        borderColor: '#1f1f1f'
+      }}
+    >
       
-      {/* Toggle Button */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-8 z-50 h-6 w-6 rounded-full 
-          bg-gray-900 border border-gray-700 hover:bg-gray-800
-          flex items-center justify-center text-gray-400 hover:text-white"
+        className="absolute z-50 flex items-center justify-center"
+        style={{
+          right: '-12px',
+          top: '32px',
+          width: '24px',
+          height: '24px',
+          borderRadius: '50%',
+          backgroundColor: '#1a1a1a',
+          border: '1px solid #2a2a2a',
+          color: '#888'
+        }}
       >
-        {isCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+        {isCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
       </button>
 
-      {/* Logo */}
-      <div className={`
-        flex items-center border-b border-gray-800 p-4
-        ${isCollapsed ? 'justify-center' : ''}
-      `}>
-        <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
-          <span className="text-white font-bold text-sm">V</span>
+      <div 
+        className="flex items-center border-b p-4"
+        style={{ 
+          borderColor: '#1f1f1f',
+          justifyContent: isCollapsed ? 'center' : 'flex-start'
+        }}
+      >
+        <div 
+          className="flex items-center justify-center flex-shrink-0"
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            backgroundColor: '#2563eb'
+          }}
+        >
+          <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>V</span>
         </div>
         {!isCollapsed && (
-          <span className="ml-3 font-bold text-lg text-white">
+          <span style={{ 
+            marginLeft: '12px', 
+            fontWeight: 'bold', 
+            fontSize: '18px', 
+            color: 'white' 
+          }}>
             Vetter Co.
           </span>
         )}
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4">
-        <div className={`space-y-1 ${isCollapsed ? 'px-2' : 'px-3'}`}>
+      <nav className="flex-1 overflow-y-auto py-4" style={{ padding: isCollapsed ? '16px 8px' : '16px 12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {filteredMenuItems.map((item) => {
             const active = isActive(item.url);
-            const Icon = item.icon;
+            const IconComponent = item.icon;
             
             return (
-              <NavLink
+              <button
                 key={item.title}
-                to={item.url}
-                className={`
-                  flex items-center gap-3 px-3 py-2.5 rounded-lg
-                  transition-all duration-200
-                  ${active
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                onClick={() => handleNavClick(item.url)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200"
+                style={{
+                  backgroundColor: active ? '#2563eb' : 'transparent',
+                  color: active ? 'white' : '#9ca3af',
+                  justifyContent: isCollapsed ? 'center' : 'flex-start',
+                  border: 'none',
+                  cursor: 'pointer',
+                  width: '100%'
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) {
+                    e.currentTarget.style.backgroundColor = '#1f1f1f';
+                    e.currentTarget.style.color = 'white';
                   }
-                  ${isCollapsed ? 'justify-center' : ''}
-                `}
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#9ca3af';
+                  }
+                }}
                 title={isCollapsed ? item.title : undefined}
               >
-                <Icon className="h-5 w-5 flex-shrink-0" />
+                <IconComponent size={20} style={{ flexShrink: 0 }} />
                 {!isCollapsed && (
-                  <span className="font-medium">{item.title}</span>
+                  <span style={{ fontWeight: 500 }}>{item.title}</span>
                 )}
-              </NavLink>
+              </button>
             );
           })}
         </div>
       </nav>
 
-      {/* User Info */}
-      <div className={`
-        border-t border-gray-800 p-4
-        ${isCollapsed ? 'flex flex-col items-center gap-2' : ''}
-      `}>
+      <div 
+        className="border-t p-4"
+        style={{ 
+          borderColor: '#1f1f1f',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: isCollapsed ? 'center' : 'stretch',
+          gap: isCollapsed ? '8px' : '0'
+        }}
+      >
         {isCollapsed ? (
           <>
-            <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
-              <span className="text-white font-semibold text-sm">
+            <div 
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                backgroundColor: '#2563eb',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <span style={{ color: 'white', fontWeight: 600, fontSize: '14px' }}>
                 {getUserInitials()}
               </span>
             </div>
             <button
               onClick={handleLogout}
-              className="h-10 w-10 flex items-center justify-center text-red-400 hover:bg-red-500/10 rounded-lg"
+              style={{
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ef4444',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
               title="Sair"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut size={16} />
             </button>
           </>
         ) : (
           <>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
-                <span className="text-white font-semibold text-sm">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <div 
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  backgroundColor: '#2563eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <span style={{ color: 'white', fontWeight: 600, fontSize: '14px' }}>
                   {getUserInitials()}
                 </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ 
+                  fontSize: '14px', 
+                  fontWeight: 500, 
+                  color: 'white',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
                   {userName || "Usuário"}
                 </p>
-                <p className="text-xs text-gray-400 truncate">
+                <p style={{ 
+                  fontSize: '12px', 
+                  color: '#9ca3af',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
                   {userEmail}
                 </p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg"
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 12px',
+                fontSize: '14px',
+                color: '#ef4444',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut size={16} />
               <span>Sair</span>
             </button>
           </>
