@@ -14,7 +14,6 @@ import {
   Users as UsersIcon,
   Shield,
   UserCheck,
-  User,
   MoreVertical,
   Edit,
   Trash2,
@@ -328,9 +327,6 @@ export default function Users() {
     total: usuarios.length,
     admins: usuarios.filter((u) => u.role === "admin").length,
     gestores: usuarios.filter((u) => u.role === "gestor").length,
-    usuarios: usuarios.filter((u) => u.role === "usuario").length,
-    ativos: usuarios.filter((u) => u.ativo).length,
-    inativos: usuarios.filter((u) => !u.ativo).length,
   };
 
   const getRoleBadge = (role: string) => {
@@ -403,7 +399,7 @@ export default function Users() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total</CardTitle>
@@ -431,36 +427,6 @@ export default function Users() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.gestores}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Usuários</CardTitle>
-              <User className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.usuarios}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ativos</CardTitle>
-              <div className="h-2 w-2 rounded-full bg-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.ativos}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Inativos</CardTitle>
-              <div className="h-2 w-2 rounded-full bg-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.inativos}</div>
             </CardContent>
           </Card>
         </div>
