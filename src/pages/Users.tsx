@@ -1,34 +1,9 @@
-// src/pages/Users.tsx
-import React, { useState, useEffect } from "react";
-import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Search,
-  Plus,
-  Users as UsersIcon,
-  Shield,
-  UserCheck,
-  User,
-  MoreVertical,
-  Edit,
-  Eye,
-  Trash2,
-  ChevronRight,
-  Filter,
-  Mail,
-  Phone,
-  Building2,
-  Calendar,
-  Lock,
-  Unlock,
-  RefreshCw
-} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -37,21 +12,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
   Table,
   TableBody,
   TableCell,
@@ -59,11 +19,39 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Textarea } from "@/components/ui/textarea";
-import { format } from "date-fns";
+import {
+  Search,
+  RefreshCw,
+  UserPlus,
+  Edit,
+  Trash2,
+  Building2,
+  Mail,
+  Phone,
+  Calendar,
+  Clock,
+} from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface Usuario {
@@ -73,14 +61,13 @@ interface Usuario {
   role: "admin" | "gestor" | "usuario";
   ativo: boolean;
   ultimo_acesso: string | null;
-  last_sign_in_at: string | null;
+  last_sign_in_at?: string | null;
   created_at: string;
   telefone: string | null;
   departamento: string | null;
   updated_at: string;
-  clientes_atribuidos?: any[];
-  clientes_acesso?: any[];
   total_clientes?: number;
+  clientes_acesso?: any[];
 }
 
 interface Cliente {
@@ -130,6 +117,8 @@ export default function Users() {
     email: "",
     password: "",
     role: "usuario",
+    telefone: "",
+    departamento: "",
   });
 
   useEffect(() => {
@@ -139,20 +128,22 @@ export default function Users() {
   }, []);
 
   const loadCurrentUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (user) {
-      const { data: profile } = await supabase
+      const { data: profile } = (await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
-        .single() as any;
+        .single()) as any;
 
       // Buscar role do usuário
-      const { data: userRole } = await supabase
+      const { data: userRole } = (await supabase
         .from("user_roles")
         .select("*")
         .eq("user_id", user.id)
-        .single() as any;
+        .single()) as any;
 
       setCurrentUser(profile);
       setIsAdmin(userRole?.role === "admin");
@@ -162,15 +153,83 @@ export default function Users() {
   const loadUsuarios = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.functions.invoke('list-users');
-      if (error) throw error;
-      const list = ((data as any)?.users) || [];
-      setUsuarios(list);
+
+      // Buscar perfis
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("name");
+
+      if (profilesError) throw profilesError;
+
+      // Buscar roles
+      const { data: roles, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("*");
+
+      if (rolesError) throw rolesError;
+
+      // Buscar contas para contar clientes por gestor
+      const { data: accounts, error: accountsError } = await supabase
+        .from("accounts")
+        .select("gestor_id, cliente_id");
+
+      if (accountsError) throw accountsError;
+
+      // Buscar total de clientes
+      const { data: clientesData, error: clientesError } = await supabase
+        .from("clientes")
+        .select("id");
+
+      if (clientesError) throw clientesError;
+
+      const totalClientes = clientesData?.length || 0;
+
+      // Contar clientes únicos por gestor
+      const clientCountByGestor: Record<string, Set<string>> = {};
+      (accounts || []).forEach((acc) => {
+        if (acc.gestor_id && acc.cliente_id) {
+          if (!clientCountByGestor[acc.gestor_id]) {
+            clientCountByGestor[acc.gestor_id] = new Set();
+          }
+          clientCountByGestor[acc.gestor_id].add(acc.cliente_id);
+        }
+      });
+
+      // Combinar dados
+      const usuarios: Usuario[] = (profiles || []).map((profile) => {
+        const userRole = roles?.find((r) => r.user_id === profile.id);
+        const role = userRole?.role || "usuario";
+
+        let total_clientes = 0;
+        if (role === "admin") {
+          total_clientes = totalClientes;
+        } else if (role === "gestor") {
+          total_clientes = clientCountByGestor[profile.id]?.size || 0;
+        }
+
+        return {
+          id: profile.id,
+          email: profile.email || "",
+          name: profile.name || null,
+          role: role,
+          ativo: profile.ativo ?? true,
+          ultimo_acesso: profile.ultimo_acesso || null,
+          created_at: profile.created_at,
+          telefone: profile.telefone || null,
+          departamento: profile.departamento || null,
+          updated_at: profile.updated_at,
+          total_clientes: total_clientes,
+        };
+      });
+
+      setUsuarios(usuarios);
     } catch (error: any) {
       console.error("Error loading users:", error);
       toast({
         title: "Erro ao carregar usuários",
-        description: error?.message || String(error) || "Não foi possível carregar a lista de usuários",
+        description:
+          error?.message || "Não foi possível carregar a lista de usuários",
         variant: "destructive",
       });
     } finally {
@@ -191,69 +250,137 @@ export default function Users() {
     }
   };
 
-  const updateRole = async (userId: string, newRole: string) => {
-    if (!isAdmin) {
+  const handleCreateUser = async () => {
+    if (!createForm.email || !createForm.password) {
       toast({
-        title: "Sem permissão",
-        description: "Apenas administradores podem alterar cargos",
+        title: "Campos obrigatórios",
+        description: "Email e senha são obrigatórios",
         variant: "destructive",
       });
       return;
     }
-    try {
-      // Deletar role antiga
-      await supabase
-        .from("user_roles")
-        .delete()
-        .eq("user_id", userId) as any;
 
-      // Inserir nova role
-      const { error } = await supabase
-        .from("user_roles")
-        .insert({ user_id: userId, role: newRole } as any) as any;
-      
-      if (error) throw error;
-      
+    setCreatingUser(true);
+    try {
+      // Criar usuário via Supabase Auth Admin
+      const { data: authData, error: authError } =
+        await supabase.auth.admin.createUser({
+          email: createForm.email,
+          password: createForm.password,
+          email_confirm: true,
+          user_metadata: {
+            name: createForm.name || createForm.email.split("@")[0],
+          },
+        });
+
+      if (authError) throw authError;
+
+      // Aguardar o trigger criar o perfil automaticamente
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Atualizar perfil com dados adicionais
+      if (createForm.telefone || createForm.departamento) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({
+            telefone: createForm.telefone || null,
+            departamento: createForm.departamento || null,
+          })
+          .eq("id", authData.user.id);
+
+        if (profileError) throw profileError;
+      }
+
+      // Inserir role
+      if (createForm.role !== "usuario") {
+        const { error: roleError } = await supabase
+          .from("user_roles")
+          .insert({
+            user_id: authData.user.id,
+            role: createForm.role as "admin" | "gestor" | "usuario",
+          });
+
+        if (roleError) throw roleError;
+      }
+
       toast({
-        title: "Cargo atualizado",
-        description: "O cargo do usuário foi atualizado com sucesso",
+        title: "Usuário criado com sucesso!",
+        description: `${createForm.name || createForm.email} foi criado`,
+      });
+
+      setShowCreateModal(false);
+      setCreateForm({
+        name: "",
+        email: "",
+        password: "",
+        role: "usuario",
+        telefone: "",
+        departamento: "",
       });
       loadUsuarios();
-    } catch (error) {
-      console.error("Error updating role:", error);
+    } catch (error: any) {
+      console.error("Error creating user:", error);
       toast({
-        title: "Erro ao atualizar cargo",
-        description: "Não foi possível atualizar o cargo do usuário",
+        title: "Erro ao criar usuário",
+        description: error.message || "Não foi possível criar o usuário",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
+  const handleEditUser = async () => {
+    if (!selectedUser) return;
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          name: editFormData.name,
+          telefone: editFormData.telefone,
+          departamento: editFormData.departamento,
+        })
+        .eq("id", selectedUser.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Usuário atualizado",
+        description: "Informações do usuário foram atualizadas com sucesso",
+      });
+
+      setShowEditModal(false);
+      loadUsuarios();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar",
+        description: error.message,
         variant: "destructive",
       });
     }
   };
 
-  const toggleStatus = async (userId: string, ativo: boolean) => {
-    if (!isAdmin) {
-      toast({
-        title: "Sem permissão",
-        description: "Apenas administradores podem alterar status",
-        variant: "destructive",
-      });
-      return;
-    }
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ ativo } as any)
-        .eq("id", userId) as any;
+      // Deletar usuário do auth (cascade vai deletar profile e roles)
+      const { error } = await supabase.auth.admin.deleteUser(selectedUser.id);
+
       if (error) throw error;
+
       toast({
-        title: "Status atualizado",
-        description: `Usuário ${ativo ? "ativado" : "desativado"} com sucesso`,
+        title: "Usuário removido",
+        description: "O usuário foi removido do sistema",
       });
+
+      setShowDeleteModal(false);
       loadUsuarios();
-    } catch (error) {
-      console.error("Error updating status:", error);
+    } catch (error: any) {
       toast({
-        title: "Erro ao atualizar status",
-        description: "Não foi possível atualizar o status do usuário",
+        title: "Erro ao remover",
+        description: error.message,
         variant: "destructive",
       });
     }
@@ -269,440 +396,400 @@ export default function Users() {
     setShowEditModal(true);
   };
 
-  const saveUserEdits = async () => {
-    if (!selectedUser) return;
-    try {
-      const { data: existingProfile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("id", selectedUser.id)
-        .single();
-
-      if (existingProfile) {
-        const { error } = await supabase
-          .from("profiles")
-          .update({
-            name: editFormData.name,
-            telefone: editFormData.telefone,
-            departamento: editFormData.departamento,
-            updated_at: new Date().toISOString(),
-          } as any)
-          .eq("id", selectedUser.id) as any;
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("profiles").insert({
-          id: selectedUser.id,
-          name: editFormData.name,
-          telefone: editFormData.telefone,
-          departamento: editFormData.departamento,
-          ativo: true,
-          updated_at: new Date().toISOString(),
-        } as any) as any;
-        if (error) throw error;
-      }
-
-      toast({
-        title: "Usuário atualizado",
-        description: "As informações foram salvas com sucesso",
-      });
-
-      setShowEditModal(false);
-      loadUsuarios();
-    } catch (error) {
-      console.error("Error saving user edits:", error);
-      toast({
-        title: "Erro ao salvar",
-        description: "Não foi possível salvar as alterações",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const deleteUser = async (user: Usuario) => {
+  const openDeleteModal = (user: Usuario) => {
     setSelectedUser(user);
     setShowDeleteModal(true);
   };
 
-  const confirmDelete = async () => {
-    if (!selectedUser) return;
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ ativo: false } as any)
-        .eq("id", selectedUser.id) as any;
-      if (error) throw error;
-      toast({
-        title: "Usuário desativado",
-        description: "O usuário foi desativado com sucesso",
-      });
-      setShowDeleteModal(false);
-      setSelectedUser(null);
-      loadUsuarios();
-    } catch (error) {
-      console.error("Error deleting user:", error);
-      toast({
-        title: "Erro ao desativar",
-        description: "Não foi possível desativar o usuário",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleCreateUser = async () => {
-    if (!isAdmin) {
-      toast({
-        title: "Sem permissão",
-        description: "Apenas administradores podem criar usuários",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!createForm.name.trim() || !createForm.email.trim()) {
-      toast({
-        title: "Dados inválidos",
-        description: "Nome e email são obrigatórios",
-      });
-      return;
-    }
-
-    try {
-      setCreatingUser(true);
-      const { data, error } = await supabase.functions.invoke('create-user', {
-        body: {
-          email: createForm.email.trim(),
-          name: createForm.name.trim(),
-          role: createForm.role,
-          password: createForm.password ? createForm.password : undefined,
-        },
-      });
-
-      if (error) {
-        const serverMsg = (data as any)?.error || error.message || 'Falha ao criar usuário';
-        throw new Error(serverMsg);
-      }
-
-      toast({ title: 'Usuário criado', description: 'Usuário criado com sucesso' });
-      setShowCreateModal(false);
-      setCreateForm({ name: '', email: '', password: '', role: 'usuario' });
-      loadUsuarios();
-    } catch (error: any) {
-      console.error('Error creating user:', error);
-      toast({ title: 'Erro ao criar usuário', description: error?.message || String(error), variant: 'destructive' });
-    } finally {
-      setCreatingUser(false);
-    }
+  const getRoleBadge = (role: string) => {
+    const styles = {
+      admin: "bg-red-500/10 text-red-500 border-red-500/20",
+      gestor: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+      usuario: "bg-gray-500/10 text-gray-500 border-gray-500/20",
+    };
+    const labels = {
+      admin: "Administrador",
+      gestor: "Gestor",
+      usuario: "Usuário",
+    };
+    return (
+      <Badge variant="outline" className={styles[role as keyof typeof styles]}>
+        {labels[role as keyof typeof labels]}
+      </Badge>
+    );
   };
 
   const filteredUsuarios = usuarios.filter((user) => {
-    const matchSearch =
+    const matchesSearch =
       !searchTerm ||
       user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchRole = filterRole === "todos" || user.role === filterRole;
-    const matchStatus =
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.telefone?.includes(searchTerm);
+
+    const matchesRole = filterRole === "todos" || user.role === filterRole;
+    const matchesStatus =
       filterStatus === "todos" ||
       (filterStatus === "ativo" && user.ativo) ||
       (filterStatus === "inativo" && !user.ativo);
-    return matchSearch && matchRole && matchStatus;
+
+    return matchesSearch && matchesRole && matchesStatus;
   });
-
-  const stats = {
-    total: usuarios.length,
-    admins: usuarios.filter((u) => u.role === "admin").length,
-    gestores: usuarios.filter((u) => u.role === "gestor").length,
-    usuarios: usuarios.filter((u) => u.role === "usuario").length,
-    ativos: usuarios.filter((u) => u.ativo).length,
-    inativos: usuarios.filter((u) => !u.ativo).length,
-  };
-
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case "admin":
-        return <Badge className="bg-purple-500 text-white">Admin</Badge>;
-      case "gestor":
-        return <Badge className="bg-blue-500 text-white">Gestor</Badge>;
-      default:
-        return <Badge>Usuário</Badge>;
-    }
-  };
-
-  const formatDate = (date: string | null) => {
-    if (!date) return "Nunca acessou";
-    return format(new Date(date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-  };
 
   if (loading) {
     return (
-      <AppLayout>
-        <div className="space-y-6">
-          <h1 className="text-3xl font-bold">Usuários</h1>
-          <div className="text-center py-8">Carregando usuários...</div>
-        </div>
-      </AppLayout>
+      <div className="flex items-center justify-center h-screen">
+        <RefreshCw className="w-8 h-8 animate-spin text-primary" />
+      </div>
     );
   }
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Usuários</h1>
-            <p className="text-muted-foreground mt-1">
-              Gerencie os usuários e suas permissões
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={loadUsuarios}>
-              <RefreshCw className="mr-2 h-4 w-4" /> Atualizar
-            </Button>
-            <Button onClick={() => setShowCreateModal(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Novo Usuário
-            </Button>
-          </div>
+    <div className="container mx-auto py-8 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Usuários</h1>
+          <p className="text-muted-foreground">
+            Gerencie os usuários e suas permissões
+          </p>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Lista de Usuários</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nome ou email"
-                  className="pl-9"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <Select value={filterRole} onValueChange={setFilterRole}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Cargo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os cargos</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="gestor">Gestor</SelectItem>
-                  <SelectItem value="usuario">Usuário</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="ativo">Ativos</SelectItem>
-                  <SelectItem value="inativo">Inativos</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Usuário</TableHead>
-                    <TableHead>Cargo</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Último acesso</TableHead>
-                    <TableHead>Criado em</TableHead>
-                    <TableHead className="text-right">Clientes</TableHead>
-                    <TableHead className="w-12" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsuarios.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback>
-                              {user.name?.[0]?.toUpperCase() || user.email[0]?.toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium">{user.name || 'Sem nome'}</div>
-                            <div className="text-xs text-muted-foreground">{user.email}</div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="min-w-[140px]">
-                        <Select value={user.role} onValueChange={(v) => updateRole(user.id, v)}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="gestor">Gestor</SelectItem>
-                            <SelectItem value="usuario">Usuário</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Switch checked={user.ativo} onCheckedChange={(v) => toggleStatus(user.id, v)} />
-                          <span className="text-xs text-muted-foreground">{user.ativo ? 'Ativo' : 'Inativo'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{formatDate(user.last_sign_in_at || user.ultimo_acesso)}</TableCell>
-                      <TableCell>{formatDate(user.created_at)}</TableCell>
-                      <TableCell className="text-right">{user.total_clientes ?? 0}</TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEditModal(user)}>
-                              <Edit className="mr-2 h-4 w-4" /> Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => deleteUser(user)}>
-                              <Trash2 className="mr-2 h-4 w-4" /> Desativar
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {filteredUsuarios.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                        Nenhum usuário encontrado
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Editar usuário</DialogTitle>
-              <DialogDescription>Atualize as informações do usuário</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid gap-2">
-                <Label>Nome</Label>
-                <Input
-                  value={editFormData.name}
-                  onChange={(e) => setEditFormData((p) => ({ ...p, name: e.target.value }))}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Telefone</Label>
-                <Input
-                  value={editFormData.telefone}
-                  onChange={(e) => setEditFormData((p) => ({ ...p, telefone: e.target.value }))}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Departamento</Label>
-                <Input
-                  value={editFormData.departamento}
-                  onChange={(e) => setEditFormData((p) => ({ ...p, departamento: e.target.value }))}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancelar</Button>
-              <Button onClick={saveUserEdits}>Salvar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Desativar usuário</DialogTitle>
-              <DialogDescription>Tem certeza que deseja desativar este usuário?</DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowDeleteModal(false)}>Cancelar</Button>
-              <Button variant="destructive" onClick={confirmDelete}>Desativar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Criar Novo Usuário</DialogTitle>
-              <DialogDescription>
-                Preencha os dados do novo usuário. Se a senha ficar em branco, será gerada automaticamente.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="create-name">Nome *</Label>
-                <Input
-                  id="create-name"
-                  value={createForm.name}
-                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                  placeholder="Nome completo"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="create-email">Email *</Label>
-                <Input
-                  id="create-email"
-                  type="email"
-                  value={createForm.email}
-                  onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                  placeholder="email@exemplo.com"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="create-password">Senha (opcional)</Label>
-                <Input
-                  id="create-password"
-                  type="password"
-                  value={createForm.password}
-                  onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
-                  placeholder="Deixe em branco para gerar automaticamente"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="create-role">Cargo *</Label>
-                <Select value={createForm.role} onValueChange={(v) => setCreateForm({ ...createForm, role: v })}>
-                  <SelectTrigger id="create-role">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="gestor">Gestor</SelectItem>
-                    <SelectItem value="usuario">Usuário</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setShowCreateModal(false);
-                  setCreateForm({ name: '', email: '', password: '', role: 'usuario' });
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                onClick={handleCreateUser}
-                disabled={creatingUser || !createForm.email || !createForm.name}
-              >
-                {creatingUser ? 'Criando...' : 'Criar Usuário'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={loadUsuarios}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Atualizar
+          </Button>
+          {isAdmin && (
+            <Button onClick={() => setShowCreateModal(true)}>
+              <UserPlus className="w-4 h-4 mr-2" />
+              Novo Usuário
+            </Button>
+          )}
+        </div>
       </div>
-    </AppLayout>
+
+      {/* Filtros */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome ou email"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <Select value={filterRole} onValueChange={setFilterRole}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os cargos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os cargos</SelectItem>
+                <SelectItem value="admin">Administrador</SelectItem>
+                <SelectItem value="gestor">Gestor</SelectItem>
+                <SelectItem value="usuario">Usuário</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="ativo">Ativos</SelectItem>
+                <SelectItem value="inativo">Inativos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Lista de Usuários */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Lista de Usuários</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {filteredUsuarios.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              Nenhum usuário encontrado
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Usuário</TableHead>
+                  <TableHead>Cargo</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Último acesso</TableHead>
+                  <TableHead>Criado em</TableHead>
+                  <TableHead>Clientes</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsuarios.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{user.name || "Sem nome"}</span>
+                        <span className="text-sm text-muted-foreground flex items-center gap-1">
+                          <Mail className="w-3 h-3" />
+                          {user.email}
+                        </span>
+                        {user.telefone && (
+                          <span className="text-sm text-muted-foreground flex items-center gap-1">
+                            <Phone className="w-3 h-3" />
+                            {user.telefone}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>{getRoleBadge(user.role)}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={
+                          user.ativo
+                            ? "bg-green-500/10 text-green-500"
+                            : "bg-gray-500/10 text-gray-500"
+                        }
+                      >
+                        {user.ativo ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {user.ultimo_acesso ? (
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Clock className="w-3 h-3" />
+                          {formatDistanceToNow(new Date(user.ultimo_acesso), {
+                            addSuffix: true,
+                            locale: ptBR,
+                          })}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">
+                          Nunca acessou
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Calendar className="w-3 h-3" />
+                        {new Date(user.created_at).toLocaleDateString("pt-BR")}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {user.role === "admin" || user.role === "gestor" ? (
+                        <div className="flex items-center gap-1">
+                          <Building2 className="w-4 h-4 text-muted-foreground" />
+                          <span className="font-medium">
+                            {user.total_clientes || 0}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {isAdmin && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditModal(user)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openDeleteModal(user)}
+                            >
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Modal Criar Usuário */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Criar Novo Usuário</DialogTitle>
+            <DialogDescription>
+              Preencha os dados do novo usuário
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="name">Nome</Label>
+              <Input
+                id="name"
+                value={createForm.name}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, name: e.target.value })
+                }
+                placeholder="Nome completo"
+              />
+            </div>
+            <div>
+              <Label htmlFor="email">Email *</Label>
+              <Input
+                id="email"
+                type="email"
+                value={createForm.email}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, email: e.target.value })
+                }
+                placeholder="email@exemplo.com"
+              />
+            </div>
+            <div>
+              <Label htmlFor="password">Senha *</Label>
+              <Input
+                id="password"
+                type="password"
+                value={createForm.password}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, password: e.target.value })
+                }
+                placeholder="Senha forte"
+              />
+            </div>
+            <div>
+              <Label htmlFor="role">Cargo</Label>
+              <Select
+                value={createForm.role}
+                onValueChange={(value) =>
+                  setCreateForm({ ...createForm, role: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="usuario">Usuário</SelectItem>
+                  <SelectItem value="gestor">Gestor</SelectItem>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="telefone">Telefone</Label>
+              <Input
+                id="telefone"
+                value={createForm.telefone}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, telefone: e.target.value })
+                }
+                placeholder="(00) 00000-0000"
+              />
+            </div>
+            <div>
+              <Label htmlFor="departamento">Departamento</Label>
+              <Input
+                id="departamento"
+                value={createForm.departamento}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, departamento: e.target.value })
+                }
+                placeholder="Marketing, Vendas, etc"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateModal(false)}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateUser} disabled={creatingUser}>
+              {creatingUser ? "Criando..." : "Criar Usuário"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Editar */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Usuário</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nome</Label>
+              <Input
+                value={editFormData.name}
+                onChange={(e) =>
+                  setEditFormData({ ...editFormData, name: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label>Telefone</Label>
+              <Input
+                value={editFormData.telefone}
+                onChange={(e) =>
+                  setEditFormData({ ...editFormData, telefone: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label>Departamento</Label>
+              <Input
+                value={editFormData.departamento}
+                onChange={(e) =>
+                  setEditFormData({
+                    ...editFormData,
+                    departamento: e.target.value,
+                  })
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditModal(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleEditUser}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Deletar */}
+      <AlertDialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar remoção</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover{" "}
+              <strong>{selectedUser?.name || selectedUser?.email}</strong>? Esta
+              ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteUser}>
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
