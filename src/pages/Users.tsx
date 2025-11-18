@@ -70,6 +70,7 @@ interface Usuario {
   created_at: string;
   telefone: string | null;
   departamento: string | null;
+  cargo: string | null;
   updated_at: string;
   total_clientes?: number;
 }
@@ -117,13 +118,14 @@ export default function Users() {
       
       setCurrentUser(user);
 
-      const { data: roles } = await supabase
+      // Buscar role do usuário
+      const { data: roleData } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-      const hasAdmin = roles?.some((r) => r.role === "admin");
-      setIsAdmin(!!hasAdmin);
+      setIsAdmin(roleData?.role === "admin");
     } catch (error) {
       console.error("Erro ao verificar usuário:", error);
     }
@@ -132,73 +134,28 @@ export default function Users() {
   const loadUsuarios = async () => {
     try {
       setLoading(true);
-
-      // Buscar usuários do auth
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
       
-      if (authError) {
-        console.error("Erro ao buscar usuários:", authError);
+      // Usar a Edge Function list-users que já faz tudo correto
+      const { data, error } = await supabase.functions.invoke('list-users');
+      
+      if (error) {
+        console.error("Erro ao buscar usuários:", error);
         toast({
           title: "Erro ao carregar usuários",
-          description: authError.message,
+          description: error.message || "Não foi possível carregar a lista de usuários",
           variant: "destructive",
         });
         return;
       }
 
-      // Buscar profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("*");
-
-      if (profilesError) {
-        console.error("Erro ao buscar profiles:", profilesError);
-      }
-
-      // Buscar roles
-      const { data: roles, error: rolesError } = await supabase
-        .from("user_roles")
-        .select("*");
-
-      if (rolesError) {
-        console.error("Erro ao buscar roles:", rolesError);
-      }
-
-      // Combinar dados
-      const usersWithData = authUsers.users.map((authUser) => {
-        const profile = profiles?.find((p) => p.id === authUser.id);
-        const userRoles = roles?.filter((r) => r.user_id === authUser.id) || [];
-        
-        // Determinar a role principal
-        let mainRole: "admin" | "gestor" | "usuario" = "usuario";
-        if (userRoles.some((r) => r.role === "admin")) {
-          mainRole = "admin";
-        } else if (userRoles.some((r) => r.role === "gestor")) {
-          mainRole = "gestor";
-        }
-
-        return {
-          id: authUser.id,
-          email: authUser.email || "",
-          name: profile?.name || authUser.user_metadata?.name || null,
-          role: mainRole,
-          ativo: !authUser.banned_until,
-          ultimo_acesso: authUser.last_sign_in_at,
-          last_sign_in_at: authUser.last_sign_in_at,
-          created_at: authUser.created_at,
-          telefone: profile?.telefone || null,
-          departamento: profile?.departamento || null,
-          updated_at: authUser.updated_at || authUser.created_at,
-          total_clientes: 0,
-        };
-      });
-
-      setUsuarios(usersWithData);
+      const usersList = (data as any)?.users || [];
+      setUsuarios(usersList);
+      
     } catch (error: any) {
       console.error("Erro ao carregar usuários:", error);
       toast({
         title: "Erro ao carregar usuários",
-        description: error.message,
+        description: error?.message || String(error),
         variant: "destructive",
       });
     } finally {
@@ -219,34 +176,19 @@ export default function Users() {
     try {
       setCreatingUser(true);
 
-      // Criar usuário via API do Supabase
-      const { data, error } = await supabase.auth.admin.createUser({
-        email: createForm.email,
-        password: createForm.password || undefined,
-        email_confirm: true,
-        user_metadata: {
+      // Usar a Edge Function create-user
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: createForm.email,
           name: createForm.name,
-        },
+          role: createForm.role,
+          password: createForm.password || undefined,
+        }
       });
 
       if (error) {
-        throw new Error(error.message);
-      }
-
-      if (!data.user) {
-        throw new Error("Usuário não foi criado");
-      }
-
-      // Criar role do usuário
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert({
-          user_id: data.user.id,
-          role: createForm.role,
-        });
-
-      if (roleError) {
-        console.error("Erro ao criar role:", roleError);
+        const serverMsg = (data as any)?.error || error.message || 'Falha ao criar usuário';
+        throw new Error(serverMsg);
       }
 
       toast({ 
@@ -283,6 +225,7 @@ export default function Users() {
     if (!selectedUser) return;
 
     try {
+      // Atualizar dados no profiles
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -294,7 +237,11 @@ export default function Users() {
 
       if (error) throw error;
 
-      toast({ title: "Usuário atualizado", description: "Dados salvos com sucesso" });
+      toast({ 
+        title: "Usuário atualizado", 
+        description: "Dados salvos com sucesso" 
+      });
+      
       setShowEditModal(false);
       loadUsuarios();
     } catch (error: any) {
@@ -315,14 +262,19 @@ export default function Users() {
     if (!selectedUser) return;
 
     try {
-      const { error } = await supabase.auth.admin.updateUserById(
-        selectedUser.id,
-        { ban_duration: "876000h" } // ~100 anos
-      );
+      // Desativar usuário no profiles
+      const { error } = await supabase
+        .from("profiles")
+        .update({ ativo: false })
+        .eq("id", selectedUser.id);
 
       if (error) throw error;
 
-      toast({ title: "Usuário desativado", description: "Usuário foi desativado com sucesso" });
+      toast({ 
+        title: "Usuário desativado", 
+        description: "Usuário foi desativado com sucesso" 
+      });
+      
       setShowDeleteModal(false);
       loadUsuarios();
     } catch (error: any) {
@@ -336,19 +288,13 @@ export default function Users() {
 
   const toggleUserStatus = async (user: Usuario) => {
     try {
-      if (user.ativo) {
-        // Desativar
-        await supabase.auth.admin.updateUserById(
-          user.id,
-          { ban_duration: "876000h" }
-        );
-      } else {
-        // Ativar (remover ban)
-        await supabase.auth.admin.updateUserById(
-          user.id,
-          { ban_duration: "none" }
-        );
-      }
+      // Alternar status no profiles (ativo/inativo)
+      const { error } = await supabase
+        .from("profiles")
+        .update({ ativo: !user.ativo })
+        .eq("id", user.id);
+
+      if (error) throw error;
 
       toast({
         title: user.ativo ? "Usuário desativado" : "Usuário ativado",
