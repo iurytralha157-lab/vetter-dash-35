@@ -5,10 +5,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { AppLayout } from "@/components/layout/AppLayout";
 import AuthPage from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Boards from "./pages/Boards";
-// ❌ REMOVIDO: import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
 import Accounts from "./pages/ContasCliente";
 import Clientes from "./pages/Clientes";
@@ -36,72 +36,100 @@ const App = () => (
             <Route path="/login" element={<Navigate to="/auth" replace />} />
             <Route path="/" element={
               <ProtectedRoute>
-                <Dashboard />
+                <AppLayout>
+                  <Dashboard />
+                </AppLayout>
               </ProtectedRoute>
             } />
             <Route path="/dashboard" element={
               <ProtectedRoute>
-                <Dashboard />
+                <AppLayout>
+                  <Dashboard />
+                </AppLayout>
               </ProtectedRoute>
             } />
             <Route path="/boards" element={
               <ProtectedRoute>
-                <Boards />
+                <AppLayout>
+                  <Boards />
+                </AppLayout>
               </ProtectedRoute>
             } />
             <Route path="/clientes" element={
               <ProtectedRoute>
-                <Clientes />
+                <AppLayout>
+                  <Clientes />
+                </AppLayout>
               </ProtectedRoute>
             } />
             <Route path="/clientes/:id" element={
               <ProtectedRoute>
-                <ClienteDetail />
+                <AppLayout>
+                  <ClienteDetail />
+                </AppLayout>
               </ProtectedRoute>
             } />
             <Route path="/clientes/:id/editar" element={
               <ProtectedRoute>
-                <ClienteEdit />
+                <AppLayout>
+                  <ClienteEdit />
+                </AppLayout>
               </ProtectedRoute>
             } />
             <Route path="/contas" element={
               <ProtectedRoute>
-                <Accounts />
+                <AppLayout>
+                  <Accounts />
+                </AppLayout>
               </ProtectedRoute>
             } />
             <Route path="/contas/:id" element={
               <ProtectedRoute>
-                <ClientDetail />
+                <AppLayout>
+                  <ClientDetail />
+                </AppLayout>
               </ProtectedRoute>
             } />
             <Route path="/capacitacao" element={
               <ProtectedRoute>
-                <Training />
+                <AppLayout>
+                  <Training />
+                </AppLayout>
               </ProtectedRoute>
             } />
             <Route path="/capacitacao/:id" element={
               <ProtectedRoute>
-                <TrainingDetail />
+                <AppLayout>
+                  <TrainingDetail />
+                </AppLayout>
               </ProtectedRoute>
             } />
             <Route path="/capacitacao/adicionar" element={
               <ProtectedRoute>
-                <AddTraining />
+                <AppLayout>
+                  <AddTraining />
+                </AppLayout>
               </ProtectedRoute>
             } />
             <Route path="/usuarios" element={
               <ProtectedRoute>
-                <Users />
+                <AppLayout>
+                  <Users />
+                </AppLayout>
               </ProtectedRoute>
             } />
             <Route path="/configuracao" element={
               <ProtectedRoute>
-                <Settings />
+                <AppLayout>
+                  <Settings />
+                </AppLayout>
               </ProtectedRoute>
             } />
             <Route path="/relatorio-n8n" element={
               <ProtectedRoute>
-                <RelatorioN8n />
+                <AppLayout>
+                  <RelatorioN8n />
+                </AppLayout>
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
