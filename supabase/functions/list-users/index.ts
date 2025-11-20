@@ -28,7 +28,7 @@ serve(async (req) => {
     const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Two clients: one with service role (for admin/list operations) and one with the caller JWT
+    // Two clients: one with service role and one with the caller JWT
     const supabaseService = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
     const supabaseUser = createClient(SUPABASE_URL, ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
@@ -37,6 +37,7 @@ serve(async (req) => {
     // Identify caller
     const { data: { user }, error: userErr } = await supabaseUser.auth.getUser();
     if (userErr || !user) {
+      console.error("Auth error:", userErr);
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -50,23 +51,29 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if ((roleErr && roleErr.message) || roleRow?.role !== "admin") {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
+    if (roleErr || roleRow?.role !== "admin") {
+      console.error("Not admin:", roleErr, roleRow);
+      return new Response(JSON.stringify({ error: "Forbidden - Admin access required" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Buscar profiles e roles diretamente (não usar auth.admin.listUsers)
+    console.log("Buscando profiles...");
+    // Buscar profiles diretamente
     const { data: profiles, error: profilesError } = await supabaseService
       .from("profiles")
-      .select("*");
+      .select("*")
+      .order("updated_at", { ascending: false });
 
     if (profilesError) {
       console.error("Erro ao buscar profiles:", profilesError);
       throw profilesError;
     }
 
+    console.log(`Encontrados ${profiles?.length || 0} profiles`);
+
+    console.log("Buscando roles...");
     const { data: roles, error: rolesError } = await supabaseService
       .from("user_roles")
       .select("*");
@@ -75,6 +82,8 @@ serve(async (req) => {
       console.error("Erro ao buscar roles:", rolesError);
       throw rolesError;
     }
+
+    console.log(`Encontrados ${roles?.length || 0} roles`);
 
     // Load accounts and clientes data
     const [accountsRes, clientesRes] = await Promise.all([
@@ -122,6 +131,8 @@ serve(async (req) => {
         total_clientes,
       };
     });
+
+    console.log(`Retornando ${users.length} usuários`);
 
     return new Response(JSON.stringify({ users }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
