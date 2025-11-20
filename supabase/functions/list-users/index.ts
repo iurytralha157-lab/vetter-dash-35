@@ -57,31 +57,31 @@ serve(async (req) => {
       });
     }
 
-    // List all auth users (service role required)
-    console.log("Tentando listar usuários...");
-    const { data: authData, error: authError } = await supabaseService.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000
-    });
-    
-    if (authError) {
-      console.error("Erro ao listar usuários:", authError);
-      throw authError;
-    }
-    
-    const authUsers = authData?.users || [];
-    console.log(`Encontrados ${authUsers.length} usuários`);
+    // Buscar profiles e roles diretamente (não usar auth.admin.listUsers)
+    const { data: profiles, error: profilesError } = await supabaseService
+      .from("profiles")
+      .select("*");
 
-    // Load complementary data
-    const [profilesRes, rolesRes, accountsRes, clientesRes] = await Promise.all([
-      supabaseService.from("profiles").select("*"),
-      supabaseService.from("user_roles").select("*"),
+    if (profilesError) {
+      console.error("Erro ao buscar profiles:", profilesError);
+      throw profilesError;
+    }
+
+    const { data: roles, error: rolesError } = await supabaseService
+      .from("user_roles")
+      .select("*");
+
+    if (rolesError) {
+      console.error("Erro ao buscar roles:", rolesError);
+      throw rolesError;
+    }
+
+    // Load accounts and clientes data
+    const [accountsRes, clientesRes] = await Promise.all([
       supabaseService.from("accounts").select("gestor_id, cliente_id"),
       supabaseService.from("clientes").select("id"),
     ]);
 
-    const profiles = profilesRes.data ?? [];
-    const roles = rolesRes.data ?? [];
     const accounts = accountsRes.data ?? [];
     const totalClientes = clientesRes.data?.length ?? 0;
 
@@ -96,30 +96,29 @@ serve(async (req) => {
       }
     });
 
-    const users = (authUsers ?? []).map((au: any) => {
-      const profile = profiles.find((p: any) => p.id === au.id);
-      const roleRow = roles.find((r: any) => r.user_id === au.id);
+    const users = (profiles ?? []).map((profile: any) => {
+      const roleRow = roles?.find((r: any) => r.user_id === profile.id);
       const role = roleRow?.role ?? "usuario";
 
       let total_clientes = 0;
       if (role === "admin") {
         total_clientes = totalClientes;
       } else if (role === "gestor") {
-        total_clientes = clientCountByGestor[au.id]?.size ?? 0;
+        total_clientes = clientCountByGestor[profile.id]?.size ?? 0;
       }
 
       return {
-        id: au.id,
-        email: au.email ?? "",
-        name: profile?.name ?? null,
+        id: profile.id,
+        email: profile.email ?? "",
+        name: profile.name ?? null,
         role,
-        ativo: profile?.ativo ?? true,
-        ultimo_acesso: profile?.ultimo_acesso ?? null,
-        last_sign_in_at: au.last_sign_in_at ?? null,
-        created_at: au.created_at,
-        telefone: profile?.telefone ?? null,
-        departamento: profile?.departamento ?? null,
-        updated_at: profile?.updated_at ?? au.updated_at,
+        ativo: profile.ativo ?? true,
+        ultimo_acesso: profile.ultimo_acesso ?? null,
+        last_sign_in_at: null,
+        created_at: profile.updated_at,
+        telefone: profile.telefone ?? null,
+        departamento: profile.departamento ?? null,
+        updated_at: profile.updated_at,
         total_clientes,
       };
     });
