@@ -31,34 +31,34 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sidebar - Desktop only */}
-      <div className="hidden lg:block">
-        <AppSidebar />
-      </div>
+      {/* Sidebar - Fixa no lado esquerdo */}
+      <AppSidebar />
       
-      {/* TopBar - Responsivo */}
+      {/* TopBar - Fixa no topo, ajustada conforme sidebar */}
       <TopBar />
       
-      {/* Main Content - Responsivo */}
+      {/* Main Content - Ajustado dinamicamente */}
       <main 
         className={`
-          transition-all duration-300 ease-in-out min-h-screen
-          pt-16 pb-20 lg:pb-6
-          lg:ml-64
+          transition-all duration-500 ease-in-out min-h-screen
+          lg:pt-16 pt-16
           ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}
         `}
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+        }}
       >
         <div className="h-full overflow-y-auto scrollbar-thin">
-          <div className="px-3 py-4 sm:px-4 sm:py-6 lg:px-6 lg:py-8 min-h-full">
-            <div className="max-w-screen-2xl mx-auto w-full">
+          <div className="p-4 sm:p-6 lg:p-8 min-h-full">
+            <div className="max-w-screen-2xl mx-auto">
               {children}
             </div>
           </div>
         </div>
       </main>
       
-      {/* Bottom Navigation - Mobile only */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 safe-area-bottom">
+      {/* Bottom Navigation - apenas mobile */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50">
         <BottomNavigation />
       </div>
     </div>

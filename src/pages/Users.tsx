@@ -154,10 +154,8 @@ export default function Users() {
     try {
       setLoading(true);
       
-      console.log("Chamando edge function list-users...");
+      // ✅ USAR A EDGE FUNCTION list-users (como estava funcionando)
       const { data, error } = await supabase.functions.invoke('list-users');
-      
-      console.log("Resposta da função:", { data, error });
       
       if (error) {
         console.error("Erro ao buscar usuários:", error);
@@ -170,13 +168,7 @@ export default function Users() {
       }
 
       const usersList = (data as any)?.users || [];
-      console.log("Usuários carregados:", usersList);
       setUsuarios(usersList);
-      
-      toast({
-        title: "Usuários carregados",
-        description: `${usersList.length} usuário(s) encontrado(s)`,
-      });
       
     } catch (error: any) {
       console.error("Erro ao carregar usuários:", error);

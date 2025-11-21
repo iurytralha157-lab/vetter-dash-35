@@ -241,11 +241,12 @@ export function ModernAccountForm({
   // 🔁 SINCRONIZAÇÃO: quando abrir o modal ou mudar initialData, preencher o form
   useEffect(() => {
     if (open) {
-      const newDefaults = makeDefaults(initialData);
-      form.reset(newDefaults);
+      form.reset(defaults);
+      // se quiser começar de uma etapa específica quando editar, ajuste aqui
       setStep(1);
     }
-  }, [open, initialData, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, defaults]);
 
   // Carregar selects
   useEffect(() => {

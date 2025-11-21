@@ -54,59 +54,17 @@ interface AccountData {
   created_at: string;
   updated_at: string;
 
-  // Gestor
-  gestor_id?: string;
-  
-  // Identificação
-  id_grupo?: string;
-  link_drive?: string;
-
   // Canais/IDs
   usa_meta_ads?: boolean;
   meta_account_id?: string;
-  meta_business_id?: string;
-  meta_page_id?: string;
   saldo_meta?: number;
   budget_mensal_meta?: number;
-  monitorar_saldo_meta?: boolean;
-  alerta_saldo_baixo?: number;
-  modo_saldo_meta?: string;
-  ativar_campanhas_meta?: boolean;
-  link_meta?: string;
-  utm_padrao?: string;
-  webhook_meta?: string;
-  pixel_meta?: string;
-  
   usa_google_ads?: boolean;
   google_ads_id?: string;
   budget_mensal_google?: number;
-  conversoes?: string[];
-  link_google?: string;
-  webhook_google?: string;
 
-  // Analytics
-  traqueamento_ativo?: boolean;
-  ga4_stream_id?: string;
-  gtm_id?: string;
-  typebot_ativo?: boolean;
-  typebot_url?: string;
-
-  // Financeiro
-  budget_mensal_global?: number;
-  forma_pagamento?: string;
-  centro_custo?: string;
-  contrato_inicio?: string;
-  contrato_renovacao?: string;
-
-  // Permissões
-  papel_padrao?: string;
-  usuarios_vinculados?: string[];
-  ocultar_ranking?: boolean;
-  somar_metricas?: boolean;
-  usa_crm_externo?: boolean;
-  url_crm?: string;
-
-  // Comunicação
+  // Outros
+  link_drive?: string;
   canal_relatorio?: string;
   horario_relatorio?: string;
 
@@ -753,41 +711,21 @@ export default function ContasCliente() {
                   ? {
                       cliente_id: editingAccount.cliente_id,
                       nome_cliente: editingAccount.nome_cliente,
+                      
                       telefone: editingAccount.telefone,
                       email: editingAccount.email || "",
-                      gestor_id: editingAccount.gestor_id || "",
                       status: editingAccount.status as "Ativo" | "Pausado" | "Arquivado",
                       observacoes: editingAccount.observacoes || "",
                       canais: editingAccount.canais || [],
                       canal_relatorio: (editingAccount.canal_relatorio as "WhatsApp" | "Email" | "Ambos") || "WhatsApp",
                       horario_relatorio: editingAccount.horario_relatorio || "09:00",
-                      link_drive: editingAccount.link_drive || "",
-                      id_grupo: editingAccount.id_grupo || "",
                       usa_meta_ads: editingAccount.usa_meta_ads || false,
                       meta_account_id: editingAccount.meta_account_id || "",
-                      meta_business_id: editingAccount.meta_business_id || "",
-                      meta_page_id: editingAccount.meta_page_id || "",
                       saldo_meta: editingAccount.saldo_meta || 0,
-                      budget_mensal_meta: editingAccount.budget_mensal_meta || 0,
                       usa_google_ads: editingAccount.usa_google_ads || false,
                       google_ads_id: editingAccount.google_ads_id || "",
+                      budget_mensal_meta: editingAccount.budget_mensal_meta || 0,
                       budget_mensal_google: editingAccount.budget_mensal_google || 0,
-                      traqueamento_ativo: editingAccount.traqueamento_ativo || false,
-                      ga4_stream_id: editingAccount.ga4_stream_id || "",
-                      gtm_id: editingAccount.gtm_id || "",
-                      typebot_ativo: editingAccount.typebot_ativo || false,
-                      typebot_url: editingAccount.typebot_url || "",
-                      budget_mensal_global: editingAccount.budget_mensal_global || 0,
-                      forma_pagamento: (editingAccount.forma_pagamento as any) || "Pix",
-                      centro_custo: editingAccount.centro_custo || "",
-                      contrato_inicio: editingAccount.contrato_inicio || "",
-                      contrato_renovacao: editingAccount.contrato_renovacao || "",
-                      papel_padrao: (editingAccount.papel_padrao as any) || "Usuário padrão",
-                      usuarios_vinculados: editingAccount.usuarios_vinculados || [],
-                      ocultar_ranking: editingAccount.ocultar_ranking || false,
-                      somar_metricas: editingAccount.somar_metricas !== false,
-                      usa_crm_externo: editingAccount.usa_crm_externo || false,
-                      url_crm: editingAccount.url_crm || "",
                     }
                   : undefined
               }
