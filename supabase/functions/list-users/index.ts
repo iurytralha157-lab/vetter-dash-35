@@ -2,7 +2,7 @@
 // Returns a combined list of users with profile, role and client counts
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,19 +58,8 @@ serve(async (req) => {
     }
 
     // List all auth users (service role required)
-    console.log("Tentando listar usuários...");
-    const { data: authData, error: authError } = await supabaseService.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000
-    });
-    
-    if (authError) {
-      console.error("Erro ao listar usuários:", authError);
-      throw authError;
-    }
-    
-    const authUsers = authData?.users || [];
-    console.log(`Encontrados ${authUsers.length} usuários`);
+    const { data: { users: authUsers }, error: authError } = await supabaseService.auth.admin.listUsers();
+    if (authError) throw authError;
 
     // Load complementary data
     const [profilesRes, rolesRes, accountsRes, clientesRes] = await Promise.all([

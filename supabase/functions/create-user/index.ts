@@ -101,7 +101,7 @@ serve(async (req) => {
     const newUser = created.user;
 
     // Upsert profile
-    const { error: profileError } = await supabaseService.from("profiles").upsert({
+    await supabaseService.from("profiles").upsert({
       id: newUser.id,
       email,
       name: name || null,
@@ -109,28 +109,9 @@ serve(async (req) => {
       updated_at: new Date().toISOString(),
     });
 
-    if (profileError) {
-      console.error('Profile upsert error:', profileError);
-      return new Response(JSON.stringify({ error: `Erro ao criar perfil: ${profileError.message}` }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     // Set role (replace existing if any)
     await supabaseService.from("user_roles").delete().eq("user_id", newUser.id);
-    const { error: roleError } = await supabaseService.from("user_roles").insert({ 
-      user_id: newUser.id, 
-      role: role as any
-    });
-
-    if (roleError) {
-      console.error('Role insert error:', roleError);
-      return new Response(JSON.stringify({ error: `Erro ao definir role: ${roleError.message}` }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    await supabaseService.from("user_roles").insert({ user_id: newUser.id, role });
 
     return new Response(
       JSON.stringify({

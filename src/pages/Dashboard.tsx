@@ -68,6 +68,7 @@ interface Alert {
 interface ContaSemLead {
   id: string;
   nome_cliente: string;
+  nome_empresa: string;
 }
 
 interface CampanhaSemLead {
@@ -176,6 +177,7 @@ export default function Dashboard() {
         .map((acc) => ({
           id: acc.id,
           nome_cliente: acc.nome_cliente,
+          nome_empresa: acc.nome_empresa,
         }));
 
       setContasSemLeads(semLeadsOntem);
@@ -602,6 +604,7 @@ export default function Dashboard() {
                     <div key={conta.id} className="flex justify-between items-center p-3 bg-card rounded-lg border">
                       <div>
                         <p className="font-medium">{conta.nome_cliente}</p>
+                        <p className="text-sm text-muted-foreground">{conta.nome_empresa}</p>
                       </div>
                     </div>
                   ))
