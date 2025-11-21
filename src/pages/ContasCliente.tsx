@@ -246,64 +246,7 @@ export default function ContasCliente() {
   };
 
   const handleEditAccount = (account: AccountData) => {
-    // Passar todos os dados necessários para o form
-    const editData: Partial<any> = {
-      cliente_id: account.cliente_id,
-      nome_cliente: account.nome_cliente,
-      telefone: account.telefone,
-      email: account.email || "",
-      gestor_id: account.gestor_id || "",
-      link_drive: account.link_drive || "",
-      id_grupo: account.id_grupo || "",
-      status: account.status,
-      observacoes: account.observacoes || "",
-      canais: account.canais || [],
-      canal_relatorio: account.canal_relatorio || "WhatsApp",
-      horario_relatorio: account.horario_relatorio || "09:00",
-      // Meta
-      usa_meta_ads: account.usa_meta_ads || false,
-      meta_account_id: account.meta_account_id || "",
-      meta_business_id: account.meta_business_id || "",
-      meta_page_id: account.meta_page_id || "",
-      budget_mensal_meta: account.budget_mensal_meta || 0,
-      saldo_meta: account.saldo_meta || 0,
-      monitorar_saldo_meta: account.monitorar_saldo_meta || false,
-      alerta_saldo_baixo: account.alerta_saldo_baixo || 100,
-      modo_saldo_meta: account.modo_saldo_meta || "Pix",
-      ativar_campanhas_meta: account.ativar_campanhas_meta || false,
-      link_meta: account.link_meta || "",
-      utm_padrao: account.utm_padrao || "",
-      webhook_meta: account.webhook_meta || "",
-      pixel_meta: account.pixel_meta || "",
-      // Google
-      usa_google_ads: account.usa_google_ads || false,
-      google_ads_id: account.google_ads_id || "",
-      budget_mensal_google: account.budget_mensal_google || 0,
-      conversoes: account.conversoes || [],
-      link_google: account.link_google || "",
-      webhook_google: account.webhook_google || "",
-      // Analytics
-      traqueamento_ativo: account.traqueamento_ativo || false,
-      ga4_stream_id: account.ga4_stream_id || "",
-      gtm_id: account.gtm_id || "",
-      typebot_ativo: account.typebot_ativo || false,
-      typebot_url: account.typebot_url || "",
-      // Financeiro
-      budget_mensal_global: account.budget_mensal_global || 0,
-      forma_pagamento: account.forma_pagamento || "Pix",
-      centro_custo: account.centro_custo || "",
-      contrato_inicio: account.contrato_inicio || "",
-      contrato_renovacao: account.contrato_renovacao || "",
-      // Permissões
-      papel_padrao: account.papel_padrao || "Usuário padrão",
-      usuarios_vinculados: account.usuarios_vinculados || [],
-      ocultar_ranking: account.ocultar_ranking || false,
-      somar_metricas: account.somar_metricas !== false,
-      usa_crm_externo: account.usa_crm_externo || false,
-      url_crm: account.url_crm || "",
-    };
-    
-    setEditingAccount({ ...account, ...editData } as any);
+    setEditingAccount(account);
     setShowModernForm(true);
   };
 
@@ -810,21 +753,41 @@ export default function ContasCliente() {
                   ? {
                       cliente_id: editingAccount.cliente_id,
                       nome_cliente: editingAccount.nome_cliente,
-                      
                       telefone: editingAccount.telefone,
                       email: editingAccount.email || "",
+                      gestor_id: editingAccount.gestor_id || "",
                       status: editingAccount.status as "Ativo" | "Pausado" | "Arquivado",
                       observacoes: editingAccount.observacoes || "",
                       canais: editingAccount.canais || [],
                       canal_relatorio: (editingAccount.canal_relatorio as "WhatsApp" | "Email" | "Ambos") || "WhatsApp",
                       horario_relatorio: editingAccount.horario_relatorio || "09:00",
+                      link_drive: editingAccount.link_drive || "",
+                      id_grupo: editingAccount.id_grupo || "",
                       usa_meta_ads: editingAccount.usa_meta_ads || false,
                       meta_account_id: editingAccount.meta_account_id || "",
+                      meta_business_id: editingAccount.meta_business_id || "",
+                      meta_page_id: editingAccount.meta_page_id || "",
                       saldo_meta: editingAccount.saldo_meta || 0,
+                      budget_mensal_meta: editingAccount.budget_mensal_meta || 0,
                       usa_google_ads: editingAccount.usa_google_ads || false,
                       google_ads_id: editingAccount.google_ads_id || "",
-                      budget_mensal_meta: editingAccount.budget_mensal_meta || 0,
                       budget_mensal_google: editingAccount.budget_mensal_google || 0,
+                      traqueamento_ativo: editingAccount.traqueamento_ativo || false,
+                      ga4_stream_id: editingAccount.ga4_stream_id || "",
+                      gtm_id: editingAccount.gtm_id || "",
+                      typebot_ativo: editingAccount.typebot_ativo || false,
+                      typebot_url: editingAccount.typebot_url || "",
+                      budget_mensal_global: editingAccount.budget_mensal_global || 0,
+                      forma_pagamento: (editingAccount.forma_pagamento as any) || "Pix",
+                      centro_custo: editingAccount.centro_custo || "",
+                      contrato_inicio: editingAccount.contrato_inicio || "",
+                      contrato_renovacao: editingAccount.contrato_renovacao || "",
+                      papel_padrao: (editingAccount.papel_padrao as any) || "Usuário padrão",
+                      usuarios_vinculados: editingAccount.usuarios_vinculados || [],
+                      ocultar_ranking: editingAccount.ocultar_ranking || false,
+                      somar_metricas: editingAccount.somar_metricas !== false,
+                      usa_crm_externo: editingAccount.usa_crm_externo || false,
+                      url_crm: editingAccount.url_crm || "",
                     }
                   : undefined
               }
