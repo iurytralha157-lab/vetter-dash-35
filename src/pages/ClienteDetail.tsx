@@ -110,7 +110,6 @@ interface Cliente {
 interface Account {
   id: string;
   nome_cliente: string;
-  nome_empresa: string;
   status: string;
   meta_account_id?: string | null;
   google_ads_id?: string | null;
@@ -919,13 +918,13 @@ export default function ClienteDetailCompleta() {
                         <div className="flex items-center gap-4">
                           <Avatar className="h-10 w-10">
                             <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                              {getInitials(account.nome_empresa || account.nome_cliente)}
+                              {getInitials(account.nome_cliente)}
                             </AvatarFallback>
                           </Avatar>
 
                           <div>
                             <h4 className="font-semibold text-foreground">
-                              {account.nome_empresa || account.nome_cliente}
+                              {account.nome_cliente}
                             </h4>
                             <div className="flex items-center gap-2 mt-1">
                               <Badge

@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       accounts: {
         Row: {
+          active_campaigns: number | null
           alerta_saldo_baixo: number | null
           ativar_campanhas_meta: boolean | null
           budget_mensal_global: number | null
@@ -29,6 +30,7 @@ export type Database = {
           contrato_renovacao: string | null
           conversoes: string[] | null
           created_at: string
+          dias_estimados_saldo: number | null
           email: string | null
           forma_pagamento: string | null
           ga4_stream_id: string | null
@@ -38,16 +40,17 @@ export type Database = {
           horario_relatorio: string | null
           id: string
           id_grupo: string | null
+          last_sync_meta: string | null
           link_drive: string | null
           link_google: string | null
           link_meta: string | null
+          media_gasto_diario: number | null
           meta_account_id: string | null
           meta_business_id: string | null
           meta_page_id: string | null
           modo_saldo_meta: string | null
           monitorar_saldo_meta: boolean | null
           nome_cliente: string
-          nome_empresa: string
           notificacao_erro_sync: boolean | null
           notificacao_leads_diarios: boolean | null
           notificacao_saldo_baixo: boolean | null
@@ -60,6 +63,8 @@ export type Database = {
           status: string
           telefone: string
           templates_padrao: string[] | null
+          total_campaigns: number | null
+          total_leads_30d: number | null
           traqueamento_ativo: boolean | null
           typebot_ativo: boolean | null
           typebot_url: string | null
@@ -75,6 +80,7 @@ export type Database = {
           webhook_meta: string | null
         }
         Insert: {
+          active_campaigns?: number | null
           alerta_saldo_baixo?: number | null
           ativar_campanhas_meta?: boolean | null
           budget_mensal_global?: number | null
@@ -88,6 +94,7 @@ export type Database = {
           contrato_renovacao?: string | null
           conversoes?: string[] | null
           created_at?: string
+          dias_estimados_saldo?: number | null
           email?: string | null
           forma_pagamento?: string | null
           ga4_stream_id?: string | null
@@ -97,16 +104,17 @@ export type Database = {
           horario_relatorio?: string | null
           id?: string
           id_grupo?: string | null
+          last_sync_meta?: string | null
           link_drive?: string | null
           link_google?: string | null
           link_meta?: string | null
+          media_gasto_diario?: number | null
           meta_account_id?: string | null
           meta_business_id?: string | null
           meta_page_id?: string | null
           modo_saldo_meta?: string | null
           monitorar_saldo_meta?: boolean | null
           nome_cliente: string
-          nome_empresa: string
           notificacao_erro_sync?: boolean | null
           notificacao_leads_diarios?: boolean | null
           notificacao_saldo_baixo?: boolean | null
@@ -119,6 +127,8 @@ export type Database = {
           status?: string
           telefone: string
           templates_padrao?: string[] | null
+          total_campaigns?: number | null
+          total_leads_30d?: number | null
           traqueamento_ativo?: boolean | null
           typebot_ativo?: boolean | null
           typebot_url?: string | null
@@ -134,6 +144,7 @@ export type Database = {
           webhook_meta?: string | null
         }
         Update: {
+          active_campaigns?: number | null
           alerta_saldo_baixo?: number | null
           ativar_campanhas_meta?: boolean | null
           budget_mensal_global?: number | null
@@ -147,6 +158,7 @@ export type Database = {
           contrato_renovacao?: string | null
           conversoes?: string[] | null
           created_at?: string
+          dias_estimados_saldo?: number | null
           email?: string | null
           forma_pagamento?: string | null
           ga4_stream_id?: string | null
@@ -156,16 +168,17 @@ export type Database = {
           horario_relatorio?: string | null
           id?: string
           id_grupo?: string | null
+          last_sync_meta?: string | null
           link_drive?: string | null
           link_google?: string | null
           link_meta?: string | null
+          media_gasto_diario?: number | null
           meta_account_id?: string | null
           meta_business_id?: string | null
           meta_page_id?: string | null
           modo_saldo_meta?: string | null
           monitorar_saldo_meta?: boolean | null
           nome_cliente?: string
-          nome_empresa?: string
           notificacao_erro_sync?: boolean | null
           notificacao_leads_diarios?: boolean | null
           notificacao_saldo_baixo?: boolean | null
@@ -178,6 +191,8 @@ export type Database = {
           status?: string
           telefone?: string
           templates_padrao?: string[] | null
+          total_campaigns?: number | null
+          total_leads_30d?: number | null
           traqueamento_ativo?: boolean | null
           typebot_ativo?: boolean | null
           typebot_url?: string | null
@@ -216,78 +231,457 @@ export type Database = {
           },
         ]
       }
-      campaign_creatives: {
+      ad_insights: {
         Row: {
           ad_id: string
+          clicks: number | null
+          conversions: number | null
+          cpc: number | null
+          cpl: number | null
+          cpm: number | null
+          created_at: string | null
+          ctr: number | null
+          date: string
+          frequency: number | null
+          id: string
+          impressions: number | null
+          leads: number | null
+          reach: number | null
+          spend: number | null
+          updated_at: string | null
+          video_p100_watched: number | null
+          video_p25_watched: number | null
+          video_p50_watched: number | null
+          video_p75_watched: number | null
+          video_views: number | null
+        }
+        Insert: {
+          ad_id: string
+          clicks?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpl?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date: string
+          frequency?: number | null
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          reach?: number | null
+          spend?: number | null
+          updated_at?: string | null
+          video_p100_watched?: number | null
+          video_p25_watched?: number | null
+          video_p50_watched?: number | null
+          video_p75_watched?: number | null
+          video_views?: number | null
+        }
+        Update: {
+          ad_id?: string
+          clicks?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpl?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date?: string
+          frequency?: number | null
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          reach?: number | null
+          spend?: number | null
+          updated_at?: string | null
+          video_p100_watched?: number | null
+          video_p25_watched?: number | null
+          video_p50_watched?: number | null
+          video_p75_watched?: number | null
+          video_views?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_insights_ad_id_fkey"
+            columns: ["ad_id"]
+            isOneToOne: false
+            referencedRelation: "meta_ads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      adset_insights: {
+        Row: {
+          adset_id: string
+          clicks: number | null
+          conversions: number | null
+          cpc: number | null
+          cpl: number | null
+          cpm: number | null
+          created_at: string | null
+          ctr: number | null
+          date: string
+          frequency: number | null
+          id: string
+          impressions: number | null
+          leads: number | null
+          reach: number | null
+          spend: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          adset_id: string
+          clicks?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpl?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date: string
+          frequency?: number | null
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          reach?: number | null
+          spend?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          adset_id?: string
+          clicks?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpl?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date?: string
+          frequency?: number | null
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          reach?: number | null
+          spend?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "adset_insights_adset_id_fkey"
+            columns: ["adset_id"]
+            isOneToOne: false
+            referencedRelation: "meta_adsets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_creatives: {
+        Row: {
+          account_currency: string | null
+          account_id: string | null
+          account_name: string | null
+          ad_creative_body: string | null
+          ad_creative_link_url: string | null
+          ad_creative_title: string | null
+          ad_id: string
+          ad_name: string | null
+          ad_status: string | null
+          adset_id: string | null
+          adset_name: string | null
+          adset_status: string | null
+          age_gender_breakdown: Json | null
           avg_cpl: number | null
           avg_ctr: number | null
           avg_hold_rate: number | null
           avg_hook_rate: number | null
+          buying_type: string | null
+          call_to_action_type: string | null
           campaign_id: string
+          campaign_name: string | null
+          campaign_status: string | null
+          catalog_segment_actions: Json | null
+          catalog_segment_value: Json | null
           client_id: string
+          conversion_rate_ranking: string | null
+          conversion_values: number | null
+          conversions: number | null
+          cost_per_conversion: number | null
+          cost_per_inline_link_click: number | null
+          cost_per_landing_page_view: number | null
+          cost_per_thruplay: number | null
+          cost_per_unique_click: number | null
+          cost_per_unique_outbound_click: number | null
+          cpm: number | null
+          cpp: number | null
           created_at: string | null
           creative_id: string
           creative_name: string | null
           creative_type: string | null
+          date_start: string | null
+          date_stop: string | null
           days_active: number | null
+          device_platform_breakdown: Json | null
+          engagement_rate_ranking: string | null
           first_seen_date: string | null
+          frequency: number | null
           id: string
+          instant_experience_clicks: number | null
+          instant_experience_outbound_clicks: number | null
+          landing_page_views: number | null
           last_active_date: string | null
+          link_clicks: number | null
+          messaging_conversations_started: number | null
+          mobile_app_installs: number | null
+          mobile_app_purchase_roas: number | null
+          objective: string | null
+          onsite_conversion_leads: number | null
+          onsite_conversion_messaging: number | null
+          outbound_clicks: number | null
+          page_engagement: number | null
+          page_likes: number | null
+          photo_views: number | null
+          placement_breakdown: Json | null
+          post_comments: number | null
+          post_engagement: number | null
+          post_reactions: number | null
+          post_saves: number | null
+          post_shares: number | null
+          purchase_roas: number | null
+          quality_ranking: string | null
+          reach: number | null
+          region_breakdown: Json | null
+          sync_date: string | null
           thumbnail_url: string | null
           total_clicks: number | null
           total_impressions: number | null
           total_leads: number | null
           total_spend: number | null
+          unique_clicks: number | null
+          unique_landing_page_views: number | null
+          unique_link_clicks: number | null
+          unique_outbound_clicks: number | null
           updated_at: string | null
+          video_avg_time_watched_seconds: number | null
+          video_continuous_2s_watched: number | null
+          video_p100_watched: number | null
+          video_p25_watched: number | null
+          video_p50_watched: number | null
+          video_p75_watched: number | null
+          video_p95_watched: number | null
+          video_plays: number | null
+          video_plays_10s: number | null
+          video_plays_15s: number | null
+          video_plays_3s: number | null
+          video_thruplay: number | null
           video_url: string | null
+          website_purchase_roas: number | null
+          website_purchases: number | null
+          website_purchases_value: number | null
         }
         Insert: {
+          account_currency?: string | null
+          account_id?: string | null
+          account_name?: string | null
+          ad_creative_body?: string | null
+          ad_creative_link_url?: string | null
+          ad_creative_title?: string | null
           ad_id: string
+          ad_name?: string | null
+          ad_status?: string | null
+          adset_id?: string | null
+          adset_name?: string | null
+          adset_status?: string | null
+          age_gender_breakdown?: Json | null
           avg_cpl?: number | null
           avg_ctr?: number | null
           avg_hold_rate?: number | null
           avg_hook_rate?: number | null
+          buying_type?: string | null
+          call_to_action_type?: string | null
           campaign_id: string
+          campaign_name?: string | null
+          campaign_status?: string | null
+          catalog_segment_actions?: Json | null
+          catalog_segment_value?: Json | null
           client_id: string
+          conversion_rate_ranking?: string | null
+          conversion_values?: number | null
+          conversions?: number | null
+          cost_per_conversion?: number | null
+          cost_per_inline_link_click?: number | null
+          cost_per_landing_page_view?: number | null
+          cost_per_thruplay?: number | null
+          cost_per_unique_click?: number | null
+          cost_per_unique_outbound_click?: number | null
+          cpm?: number | null
+          cpp?: number | null
           created_at?: string | null
           creative_id: string
           creative_name?: string | null
           creative_type?: string | null
+          date_start?: string | null
+          date_stop?: string | null
           days_active?: number | null
+          device_platform_breakdown?: Json | null
+          engagement_rate_ranking?: string | null
           first_seen_date?: string | null
+          frequency?: number | null
           id?: string
+          instant_experience_clicks?: number | null
+          instant_experience_outbound_clicks?: number | null
+          landing_page_views?: number | null
           last_active_date?: string | null
+          link_clicks?: number | null
+          messaging_conversations_started?: number | null
+          mobile_app_installs?: number | null
+          mobile_app_purchase_roas?: number | null
+          objective?: string | null
+          onsite_conversion_leads?: number | null
+          onsite_conversion_messaging?: number | null
+          outbound_clicks?: number | null
+          page_engagement?: number | null
+          page_likes?: number | null
+          photo_views?: number | null
+          placement_breakdown?: Json | null
+          post_comments?: number | null
+          post_engagement?: number | null
+          post_reactions?: number | null
+          post_saves?: number | null
+          post_shares?: number | null
+          purchase_roas?: number | null
+          quality_ranking?: string | null
+          reach?: number | null
+          region_breakdown?: Json | null
+          sync_date?: string | null
           thumbnail_url?: string | null
           total_clicks?: number | null
           total_impressions?: number | null
           total_leads?: number | null
           total_spend?: number | null
+          unique_clicks?: number | null
+          unique_landing_page_views?: number | null
+          unique_link_clicks?: number | null
+          unique_outbound_clicks?: number | null
           updated_at?: string | null
+          video_avg_time_watched_seconds?: number | null
+          video_continuous_2s_watched?: number | null
+          video_p100_watched?: number | null
+          video_p25_watched?: number | null
+          video_p50_watched?: number | null
+          video_p75_watched?: number | null
+          video_p95_watched?: number | null
+          video_plays?: number | null
+          video_plays_10s?: number | null
+          video_plays_15s?: number | null
+          video_plays_3s?: number | null
+          video_thruplay?: number | null
           video_url?: string | null
+          website_purchase_roas?: number | null
+          website_purchases?: number | null
+          website_purchases_value?: number | null
         }
         Update: {
+          account_currency?: string | null
+          account_id?: string | null
+          account_name?: string | null
+          ad_creative_body?: string | null
+          ad_creative_link_url?: string | null
+          ad_creative_title?: string | null
           ad_id?: string
+          ad_name?: string | null
+          ad_status?: string | null
+          adset_id?: string | null
+          adset_name?: string | null
+          adset_status?: string | null
+          age_gender_breakdown?: Json | null
           avg_cpl?: number | null
           avg_ctr?: number | null
           avg_hold_rate?: number | null
           avg_hook_rate?: number | null
+          buying_type?: string | null
+          call_to_action_type?: string | null
           campaign_id?: string
+          campaign_name?: string | null
+          campaign_status?: string | null
+          catalog_segment_actions?: Json | null
+          catalog_segment_value?: Json | null
           client_id?: string
+          conversion_rate_ranking?: string | null
+          conversion_values?: number | null
+          conversions?: number | null
+          cost_per_conversion?: number | null
+          cost_per_inline_link_click?: number | null
+          cost_per_landing_page_view?: number | null
+          cost_per_thruplay?: number | null
+          cost_per_unique_click?: number | null
+          cost_per_unique_outbound_click?: number | null
+          cpm?: number | null
+          cpp?: number | null
           created_at?: string | null
           creative_id?: string
           creative_name?: string | null
           creative_type?: string | null
+          date_start?: string | null
+          date_stop?: string | null
           days_active?: number | null
+          device_platform_breakdown?: Json | null
+          engagement_rate_ranking?: string | null
           first_seen_date?: string | null
+          frequency?: number | null
           id?: string
+          instant_experience_clicks?: number | null
+          instant_experience_outbound_clicks?: number | null
+          landing_page_views?: number | null
           last_active_date?: string | null
+          link_clicks?: number | null
+          messaging_conversations_started?: number | null
+          mobile_app_installs?: number | null
+          mobile_app_purchase_roas?: number | null
+          objective?: string | null
+          onsite_conversion_leads?: number | null
+          onsite_conversion_messaging?: number | null
+          outbound_clicks?: number | null
+          page_engagement?: number | null
+          page_likes?: number | null
+          photo_views?: number | null
+          placement_breakdown?: Json | null
+          post_comments?: number | null
+          post_engagement?: number | null
+          post_reactions?: number | null
+          post_saves?: number | null
+          post_shares?: number | null
+          purchase_roas?: number | null
+          quality_ranking?: string | null
+          reach?: number | null
+          region_breakdown?: Json | null
+          sync_date?: string | null
           thumbnail_url?: string | null
           total_clicks?: number | null
           total_impressions?: number | null
           total_leads?: number | null
           total_spend?: number | null
+          unique_clicks?: number | null
+          unique_landing_page_views?: number | null
+          unique_link_clicks?: number | null
+          unique_outbound_clicks?: number | null
           updated_at?: string | null
+          video_avg_time_watched_seconds?: number | null
+          video_continuous_2s_watched?: number | null
+          video_p100_watched?: number | null
+          video_p25_watched?: number | null
+          video_p50_watched?: number | null
+          video_p75_watched?: number | null
+          video_p95_watched?: number | null
+          video_plays?: number | null
+          video_plays_10s?: number | null
+          video_plays_15s?: number | null
+          video_plays_3s?: number | null
+          video_thruplay?: number | null
           video_url?: string | null
+          website_purchase_roas?: number | null
+          website_purchases?: number | null
+          website_purchases_value?: number | null
         }
         Relationships: [
           {
@@ -310,6 +704,78 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "relatorio_n8n_consolidated"
             referencedColumns: ["conta_id"]
+          },
+        ]
+      }
+      campaign_insights: {
+        Row: {
+          campaign_id: string
+          clicks: number | null
+          conversions: number | null
+          cpc: number | null
+          cpl: number | null
+          cpm: number | null
+          created_at: string | null
+          ctr: number | null
+          date: string
+          frequency: number | null
+          id: string
+          impressions: number | null
+          leads: number | null
+          reach: number | null
+          spend: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          campaign_id: string
+          clicks?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpl?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date: string
+          frequency?: number | null
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          reach?: number | null
+          spend?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          clicks?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpl?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date?: string
+          frequency?: number | null
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          reach?: number | null
+          spend?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_insights_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_performance_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_insights_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_campaigns"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -342,6 +808,7 @@ export type Database = {
           google_ads_cid: string | null
           horarios_contato: string | null
           id: string
+          id_grupo: string | null
           instagram_handle: string | null
           lgpd_consent: boolean | null
           meta_bm_id: string | null
@@ -400,6 +867,7 @@ export type Database = {
           google_ads_cid?: string | null
           horarios_contato?: string | null
           id?: string
+          id_grupo?: string | null
           instagram_handle?: string | null
           lgpd_consent?: boolean | null
           meta_bm_id?: string | null
@@ -458,6 +926,7 @@ export type Database = {
           google_ads_cid?: string | null
           horarios_contato?: string | null
           id?: string
+          id_grupo?: string | null
           instagram_handle?: string | null
           lgpd_consent?: boolean | null
           meta_bm_id?: string | null
@@ -514,7 +983,7 @@ export type Database = {
           email: string | null
           id: string
           interesse: string | null
-          ip_address: unknown | null
+          ip_address: unknown
           landing_page: string | null
           nome: string
           nota_qualificacao: number | null
@@ -547,7 +1016,7 @@ export type Database = {
           email?: string | null
           id?: string
           interesse?: string | null
-          ip_address?: unknown | null
+          ip_address?: unknown
           landing_page?: string | null
           nome: string
           nota_qualificacao?: number | null
@@ -580,7 +1049,7 @@ export type Database = {
           email?: string | null
           id?: string
           interesse?: string | null
-          ip_address?: unknown | null
+          ip_address?: unknown
           landing_page?: string | null
           nome?: string
           nota_qualificacao?: number | null
@@ -623,6 +1092,336 @@ export type Database = {
           {
             foreignKeyName: "leads_client_id_fkey"
             columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "relatorio_n8n_consolidated"
+            referencedColumns: ["conta_id"]
+          },
+        ]
+      }
+      meta_ads: {
+        Row: {
+          ad_id: string
+          ad_name: string
+          adset_id: string
+          clicks: number | null
+          conversions: number | null
+          cpc: number | null
+          cpl: number | null
+          cpm: number | null
+          created_at: string | null
+          created_time: string | null
+          creative_body: string | null
+          creative_call_to_action: string | null
+          creative_id: string | null
+          creative_link_url: string | null
+          creative_title: string | null
+          creative_type: string | null
+          ctr: number | null
+          id: string
+          impressions: number | null
+          last_synced_at: string | null
+          leads: number | null
+          preview_url: string | null
+          spend: number | null
+          status: string
+          thumbnail_url: string | null
+          updated_at: string | null
+          updated_time: string | null
+          video_avg_watch_time: number | null
+          video_p100_watched: number | null
+          video_p25_watched: number | null
+          video_p50_watched: number | null
+          video_p75_watched: number | null
+          video_views: number | null
+        }
+        Insert: {
+          ad_id: string
+          ad_name: string
+          adset_id: string
+          clicks?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpl?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          created_time?: string | null
+          creative_body?: string | null
+          creative_call_to_action?: string | null
+          creative_id?: string | null
+          creative_link_url?: string | null
+          creative_title?: string | null
+          creative_type?: string | null
+          ctr?: number | null
+          id?: string
+          impressions?: number | null
+          last_synced_at?: string | null
+          leads?: number | null
+          preview_url?: string | null
+          spend?: number | null
+          status: string
+          thumbnail_url?: string | null
+          updated_at?: string | null
+          updated_time?: string | null
+          video_avg_watch_time?: number | null
+          video_p100_watched?: number | null
+          video_p25_watched?: number | null
+          video_p50_watched?: number | null
+          video_p75_watched?: number | null
+          video_views?: number | null
+        }
+        Update: {
+          ad_id?: string
+          ad_name?: string
+          adset_id?: string
+          clicks?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpl?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          created_time?: string | null
+          creative_body?: string | null
+          creative_call_to_action?: string | null
+          creative_id?: string | null
+          creative_link_url?: string | null
+          creative_title?: string | null
+          creative_type?: string | null
+          ctr?: number | null
+          id?: string
+          impressions?: number | null
+          last_synced_at?: string | null
+          leads?: number | null
+          preview_url?: string | null
+          spend?: number | null
+          status?: string
+          thumbnail_url?: string | null
+          updated_at?: string | null
+          updated_time?: string | null
+          video_avg_watch_time?: number | null
+          video_p100_watched?: number | null
+          video_p25_watched?: number | null
+          video_p50_watched?: number | null
+          video_p75_watched?: number | null
+          video_views?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_ads_adset_id_fkey"
+            columns: ["adset_id"]
+            isOneToOne: false
+            referencedRelation: "meta_adsets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meta_adsets: {
+        Row: {
+          adset_id: string
+          adset_name: string
+          bid_amount: number | null
+          billing_event: string | null
+          budget_remaining: number | null
+          campaign_id: string
+          clicks: number | null
+          conversions: number | null
+          cpc: number | null
+          cpl: number | null
+          cpm: number | null
+          created_at: string | null
+          created_time: string | null
+          ctr: number | null
+          daily_budget: number | null
+          end_time: string | null
+          id: string
+          impressions: number | null
+          last_synced_at: string | null
+          leads: number | null
+          lifetime_budget: number | null
+          optimization_goal: string | null
+          spend: number | null
+          start_time: string | null
+          status: string
+          targeting: Json | null
+          updated_at: string | null
+          updated_time: string | null
+        }
+        Insert: {
+          adset_id: string
+          adset_name: string
+          bid_amount?: number | null
+          billing_event?: string | null
+          budget_remaining?: number | null
+          campaign_id: string
+          clicks?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpl?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          created_time?: string | null
+          ctr?: number | null
+          daily_budget?: number | null
+          end_time?: string | null
+          id?: string
+          impressions?: number | null
+          last_synced_at?: string | null
+          leads?: number | null
+          lifetime_budget?: number | null
+          optimization_goal?: string | null
+          spend?: number | null
+          start_time?: string | null
+          status: string
+          targeting?: Json | null
+          updated_at?: string | null
+          updated_time?: string | null
+        }
+        Update: {
+          adset_id?: string
+          adset_name?: string
+          bid_amount?: number | null
+          billing_event?: string | null
+          budget_remaining?: number | null
+          campaign_id?: string
+          clicks?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpl?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          created_time?: string | null
+          ctr?: number | null
+          daily_budget?: number | null
+          end_time?: string | null
+          id?: string
+          impressions?: number | null
+          last_synced_at?: string | null
+          leads?: number | null
+          lifetime_budget?: number | null
+          optimization_goal?: string | null
+          spend?: number | null
+          start_time?: string | null
+          status?: string
+          targeting?: Json | null
+          updated_at?: string | null
+          updated_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_adsets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_performance_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_adsets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meta_campaigns: {
+        Row: {
+          account_id: string
+          budget_remaining: number | null
+          campaign_id: string
+          campaign_name: string
+          clicks: number | null
+          conversions: number | null
+          cpc: number | null
+          cpl: number | null
+          cpm: number | null
+          created_at: string | null
+          created_time: string | null
+          ctr: number | null
+          daily_budget: number | null
+          id: string
+          impressions: number | null
+          last_synced_at: string | null
+          leads: number | null
+          lifetime_budget: number | null
+          objective: string | null
+          spend: number | null
+          start_time: string | null
+          status: string
+          stop_time: string | null
+          updated_at: string | null
+          updated_time: string | null
+        }
+        Insert: {
+          account_id: string
+          budget_remaining?: number | null
+          campaign_id: string
+          campaign_name: string
+          clicks?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpl?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          created_time?: string | null
+          ctr?: number | null
+          daily_budget?: number | null
+          id?: string
+          impressions?: number | null
+          last_synced_at?: string | null
+          leads?: number | null
+          lifetime_budget?: number | null
+          objective?: string | null
+          spend?: number | null
+          start_time?: string | null
+          status: string
+          stop_time?: string | null
+          updated_at?: string | null
+          updated_time?: string | null
+        }
+        Update: {
+          account_id?: string
+          budget_remaining?: number | null
+          campaign_id?: string
+          campaign_name?: string
+          clicks?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpl?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          created_time?: string | null
+          ctr?: number | null
+          daily_budget?: number | null
+          id?: string
+          impressions?: number | null
+          last_synced_at?: string | null
+          leads?: number | null
+          lifetime_budget?: number | null
+          objective?: string | null
+          spend?: number | null
+          start_time?: string | null
+          status?: string
+          stop_time?: string | null
+          updated_at?: string | null
+          updated_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_campaigns_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_campaigns_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "leads_stats"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_campaigns_account_id_fkey"
+            columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "relatorio_n8n_consolidated"
             referencedColumns: ["conta_id"]
@@ -691,6 +1490,130 @@ export type Database = {
           {
             foreignKeyName: "meta_sync_logs_triggered_by_fkey"
             columns: ["triggered_by"]
+            isOneToOne: false
+            referencedRelation: "users_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      performance_alerts: {
+        Row: {
+          account_id: string
+          ad_id: string | null
+          adset_id: string | null
+          alert_type: string
+          campaign_id: string | null
+          created_at: string | null
+          dismissed_at: string | null
+          dismissed_by: string | null
+          id: string
+          message: string
+          metadata: Json | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          status: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          ad_id?: string | null
+          adset_id?: string | null
+          alert_type: string
+          campaign_id?: string | null
+          created_at?: string | null
+          dismissed_at?: string | null
+          dismissed_by?: string | null
+          id?: string
+          message: string
+          metadata?: Json | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity: string
+          status?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          ad_id?: string | null
+          adset_id?: string | null
+          alert_type?: string
+          campaign_id?: string | null
+          created_at?: string | null
+          dismissed_at?: string | null
+          dismissed_by?: string | null
+          id?: string
+          message?: string
+          metadata?: Json | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_alerts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_alerts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "leads_stats"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "performance_alerts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "relatorio_n8n_consolidated"
+            referencedColumns: ["conta_id"]
+          },
+          {
+            foreignKeyName: "performance_alerts_ad_id_fkey"
+            columns: ["ad_id"]
+            isOneToOne: false
+            referencedRelation: "meta_ads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_alerts_adset_id_fkey"
+            columns: ["adset_id"]
+            isOneToOne: false
+            referencedRelation: "meta_adsets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_alerts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_performance_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_alerts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_alerts_dismissed_by_fkey"
+            columns: ["dismissed_by"]
+            isOneToOne: false
+            referencedRelation: "users_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_alerts_resolved_by_fkey"
+            columns: ["resolved_by"]
             isOneToOne: false
             referencedRelation: "users_view"
             referencedColumns: ["id"]
@@ -891,6 +1814,47 @@ export type Database = {
       }
     }
     Views: {
+      campaign_performance_summary: {
+        Row: {
+          account_id: string | null
+          adsets_avg_cpl: number | null
+          adsets_total_leads: number | null
+          campaign_id: string | null
+          campaign_name: string | null
+          cpl: number | null
+          ctr: number | null
+          id: string | null
+          leads: number | null
+          objective: string | null
+          spend: number | null
+          status: string | null
+          total_ads: number | null
+          total_adsets: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_campaigns_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_campaigns_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "leads_stats"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_campaigns_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "relatorio_n8n_consolidated"
+            referencedColumns: ["conta_id"]
+          },
+        ]
+      }
       leads_stats: {
         Row: {
           client_id: string | null
@@ -967,7 +1931,7 @@ export type Database = {
         Returns: Json
       }
       get_accounts_performance_summary: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           account_id: string
           active_campaigns_count: number
@@ -1012,14 +1976,8 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_admin: {
-        Args: { _user_id: string }
-        Returns: boolean
-      }
-      is_gestor: {
-        Args: { _user_id: string }
-        Returns: boolean
-      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_gestor: { Args: { _user_id: string }; Returns: boolean }
       user_has_client_access: {
         Args: { _cliente_id: string; _user_id: string }
         Returns: boolean
