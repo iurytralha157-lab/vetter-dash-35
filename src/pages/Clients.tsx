@@ -50,7 +50,6 @@ import { Label } from "@/components/ui/label";
 interface ClientData {
   id: string;
   nome_cliente: string;
-  nome_empresa: string;
   telefone: string;
   email: string | null;
   canais: string[];
@@ -247,7 +246,6 @@ export default function Clients() {
 
   const filteredClients = clients.filter(client => {
     const matchesSearch = client.nome_cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         client.nome_empresa.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          client.telefone.includes(searchTerm) ||
                          client.email?.toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -503,10 +501,6 @@ export default function Clients() {
                       </div>
                       
                       <div className="flex items-center gap-4 text-sm text-text-secondary">
-                        <div className="flex items-center gap-1">
-                          <Building2 className="h-3 w-3" />
-                          {client.nome_empresa}
-                        </div>
                         <div className="flex items-center gap-1">
                           <Phone className="h-3 w-3" />
                           {client.telefone}

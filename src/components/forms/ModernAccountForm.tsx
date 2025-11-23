@@ -55,7 +55,6 @@ const contaSchema = z.object({
   // Dados Básicos
   cliente_id: z.string().min(1, "Selecione um cliente"),
   nome_cliente: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
-  nome_empresa: z.string().min(2, "Nome da empresa é obrigatório"),
   telefone: z.string().min(10, "Telefone é obrigatório"),
   email: z.string().email("Email inválido").optional().or(z.literal("")),
   gestor_id: z.string().min(1, "Selecione um gestor"),
@@ -152,7 +151,6 @@ const makeDefaults = (d?: Partial<ContaFormData>): ContaFormData => ({
   // Básicos
   cliente_id: d?.cliente_id ?? "",
   nome_cliente: d?.nome_cliente ?? "",
-  nome_empresa: d?.nome_empresa ?? "",
   telefone: d?.telefone ?? "",
   email: d?.email ?? "",
   gestor_id: d?.gestor_id ?? "",
@@ -378,30 +376,18 @@ export function ModernAccountForm({
                       )}
                     />
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="nome_cliente"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Nome da Conta *</FormLabel>
-                            <FormControl><Input placeholder="Ex: Roca - São Carlos - Locação" {...field} /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="nome_empresa"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Nome da Empresa *</FormLabel>
-                            <FormControl><Input placeholder="Ex: Roca Imóveis Ltda" {...field} /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                    <FormField
+                      control={form.control}
+                      name="nome_cliente"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome da Conta *</FormLabel>
+                          <FormControl><Input placeholder="Ex: Roca - São Carlos - Locação" {...field} /></FormControl>
+                          <FormDescription>Nome único para identificar esta conta</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
