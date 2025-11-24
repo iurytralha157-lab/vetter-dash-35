@@ -974,6 +974,84 @@ export type Database = {
           },
         ]
       }
+      daily_account_checks: {
+        Row: {
+          account_id: string
+          check_date: string
+          checked_google: boolean | null
+          checked_meta: boolean | null
+          created_at: string | null
+          google_checked_at: string | null
+          google_checked_by: string | null
+          id: string
+          meta_checked_at: string | null
+          meta_checked_by: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          check_date?: string
+          checked_google?: boolean | null
+          checked_meta?: boolean | null
+          created_at?: string | null
+          google_checked_at?: string | null
+          google_checked_by?: string | null
+          id?: string
+          meta_checked_at?: string | null
+          meta_checked_by?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          check_date?: string
+          checked_google?: boolean | null
+          checked_meta?: boolean | null
+          created_at?: string | null
+          google_checked_at?: string | null
+          google_checked_by?: string | null
+          id?: string
+          meta_checked_at?: string | null
+          meta_checked_by?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_account_checks_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_account_checks_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "leads_stats"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "daily_account_checks_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "relatorio_n8n_consolidated"
+            referencedColumns: ["conta_id"]
+          },
+          {
+            foreignKeyName: "daily_account_checks_google_checked_by_fkey"
+            columns: ["google_checked_by"]
+            isOneToOne: false
+            referencedRelation: "users_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_account_checks_meta_checked_by_fkey"
+            columns: ["meta_checked_by"]
+            isOneToOne: false
+            referencedRelation: "users_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           campanha: string | null

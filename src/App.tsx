@@ -20,6 +20,7 @@ import AddTraining from "./pages/AddTraining";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import RelatorioN8n from "./pages/RelatorioN8n";
+import ChecklistDiario from "./pages/ChecklistDiario";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -102,6 +103,11 @@ const App = () => (
             <Route path="/relatorio-n8n" element={
               <ProtectedRoute>
                 <RelatorioN8n />
+              </ProtectedRoute>
+            } />
+            <Route path="/checklist-diario" element={
+              <ProtectedRoute>
+                <ChecklistDiario />
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
