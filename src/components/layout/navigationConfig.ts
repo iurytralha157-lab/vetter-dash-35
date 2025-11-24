@@ -8,7 +8,8 @@ import {
   Briefcase, 
   ShieldCheck, 
   MessageSquare,
-  Webhook
+  Webhook,
+  ClipboardCheck
 } from "lucide-react";
 import { pt } from "@/i18n/pt";
 import { UserRole } from "@/hooks/useUserRole";
@@ -24,6 +25,7 @@ export const navigationItems: NavigationItem[] = [
   { title: pt.nav.dashboard, url: "/dashboard", icon: LayoutDashboard },
   { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Contas", url: "/contas", icon: Building2 },
+  { title: "Checklist Diário", url: "/checklist-diario", icon: ClipboardCheck },
   { title: pt.nav.training, url: "/capacitacao", icon: GraduationCap, roles: ['admin'] },
   { title: pt.nav.users, url: "/usuarios", icon: ShieldCheck, roles: ['admin'] },
   { title: pt.nav.reportN8n, url: "/relatorio-n8n", icon: Webhook, roles: ['admin'] },
