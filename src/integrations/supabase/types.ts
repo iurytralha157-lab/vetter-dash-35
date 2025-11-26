@@ -40,6 +40,8 @@ export type Database = {
           horario_relatorio: string | null
           id: string
           id_grupo: string | null
+          last_balance_check_google: string | null
+          last_balance_check_meta: string | null
           last_sync_meta: string | null
           link_drive: string | null
           link_google: string | null
@@ -104,6 +106,8 @@ export type Database = {
           horario_relatorio?: string | null
           id?: string
           id_grupo?: string | null
+          last_balance_check_google?: string | null
+          last_balance_check_meta?: string | null
           last_sync_meta?: string | null
           link_drive?: string | null
           link_google?: string | null
@@ -168,6 +172,8 @@ export type Database = {
           horario_relatorio?: string | null
           id?: string
           id_grupo?: string | null
+          last_balance_check_google?: string | null
+          last_balance_check_meta?: string | null
           last_sync_meta?: string | null
           link_drive?: string | null
           link_google?: string | null
@@ -372,6 +378,68 @@ export type Database = {
             columns: ["adset_id"]
             isOneToOne: false
             referencedRelation: "meta_adsets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      balance_history: {
+        Row: {
+          account_id: string
+          balance_amount: number
+          balance_type: string
+          created_at: string | null
+          id: string
+          notes: string | null
+          recorded_at: string
+          recorded_by: string | null
+        }
+        Insert: {
+          account_id: string
+          balance_amount: number
+          balance_type: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          recorded_at?: string
+          recorded_by?: string | null
+        }
+        Update: {
+          account_id?: string
+          balance_amount?: number
+          balance_type?: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          recorded_at?: string
+          recorded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "balance_history_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "balance_history_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "leads_stats"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "balance_history_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "relatorio_n8n_consolidated"
+            referencedColumns: ["conta_id"]
+          },
+          {
+            foreignKeyName: "balance_history_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "users_view"
             referencedColumns: ["id"]
           },
         ]
