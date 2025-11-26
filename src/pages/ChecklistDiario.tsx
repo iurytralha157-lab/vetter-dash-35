@@ -3,9 +3,11 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Circle, Facebook, Chrome, Calendar } from "lucide-react";
+import { CheckCircle2, Circle, Facebook, Chrome, Calendar, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -23,12 +25,17 @@ interface AccountCheck {
   google_checked_by: string | null;
   google_checked_at: string | null;
   check_id: string | null;
+  saldo_meta: number | null;
+  last_balance_check_meta: string | null;
+  last_balance_check_google: string | null;
+  alerta_saldo_baixo: number | null;
 }
 
 export default function ChecklistDiario() {
   const [accounts, setAccounts] = useState<AccountCheck[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [balanceInputs, setBalanceInputs] = useState<Record<string, { meta: string; google: string }>>({});
   const { toast } = useToast();
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -49,7 +56,18 @@ export default function ChecklistDiario() {
       // Buscar todas as contas ativas
       const { data: accountsData, error: accountsError } = await supabase
         .from("accounts")
-        .select("id, nome_cliente, usa_meta_ads, usa_google_ads, meta_account_id, google_ads_id")
+        .select(`
+          id, 
+          nome_cliente, 
+          usa_meta_ads, 
+          usa_google_ads, 
+          meta_account_id, 
+          google_ads_id,
+          saldo_meta,
+          last_balance_check_meta,
+          last_balance_check_google,
+          alerta_saldo_baixo
+        `)
         .eq("status", "Ativo")
         .order("nome_cliente");
 
@@ -82,6 +100,10 @@ export default function ChecklistDiario() {
           google_checked_by: check?.google_checked_by || null,
           google_checked_at: check?.google_checked_at || null,
           check_id: check?.id || null,
+          saldo_meta: acc.saldo_meta,
+          last_balance_check_meta: acc.last_balance_check_meta,
+          last_balance_check_google: acc.last_balance_check_google,
+          alerta_saldo_baixo: acc.alerta_saldo_baixo,
         };
       });
 
@@ -102,6 +124,67 @@ export default function ChecklistDiario() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBalanceUpdate = async (accountId: string, type: 'meta' | 'google') => {
+    const amount = balanceInputs[accountId]?.[type];
+    if (!amount || !currentUserId) return;
+
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount)) {
+      toast({
+        title: "Erro",
+        description: "Por favor, insira um valor numérico válido",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Insert into balance_history
+      const { error: historyError } = await supabase
+        .from("balance_history")
+        .insert({
+          account_id: accountId,
+          balance_type: type,
+          balance_amount: numericAmount,
+          recorded_by: currentUserId,
+        });
+
+      if (historyError) throw historyError;
+
+      // Update last_balance_check timestamp in accounts
+      const updateField = type === 'meta' ? 'last_balance_check_meta' : 'last_balance_check_google';
+      const { error: accountError } = await supabase
+        .from("accounts")
+        .update({ 
+          [updateField]: new Date().toISOString(),
+          ...(type === 'meta' && { saldo_meta: numericAmount })
+        })
+        .eq("id", accountId);
+
+      if (accountError) throw accountError;
+
+      toast({
+        title: "Saldo atualizado",
+        description: `Saldo ${type === 'meta' ? 'Meta' : 'Google Ads'} atualizado com sucesso`,
+      });
+
+      // Clear input
+      setBalanceInputs(prev => ({
+        ...prev,
+        [accountId]: { ...prev[accountId], [type]: '' }
+      }));
+
+      loadAccounts();
+    } catch (error: any) {
+      console.error("Erro ao atualizar saldo:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar o saldo",
+        variant: "destructive",
+      });
     }
   };
 
@@ -183,6 +266,19 @@ export default function ChecklistDiario() {
     }
   };
 
+  const needsBalanceUpdate = (account: AccountCheck, type: 'meta' | 'google') => {
+    const lastCheck = type === 'meta' ? account.last_balance_check_meta : account.last_balance_check_google;
+    if (!lastCheck) return true;
+    
+    const daysSinceCheck = Math.floor((Date.now() - new Date(lastCheck).getTime()) / (1000 * 60 * 60 * 24));
+    return daysSinceCheck > 3;
+  };
+
+  const isBalanceLow = (account: AccountCheck) => {
+    if (!account.saldo_meta || !account.alerta_saldo_baixo) return false;
+    return account.saldo_meta <= account.alerta_saldo_baixo;
+  };
+
   return (
     <AppLayout>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
@@ -217,97 +313,199 @@ export default function ChecklistDiario() {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {accounts.map((account) => (
-              <Card key={account.id} className="surface-elevated">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>{account.nome_cliente}</span>
-                    <div className="flex gap-2">
-                      {account.usa_meta_ads && account.meta_account_id && (
-                        <Badge variant={account.checked_meta ? "default" : "outline"}>
-                          <Facebook className="h-3 w-3 mr-1" />
-                          Meta
-                        </Badge>
-                      )}
-                      {account.usa_google_ads && account.google_ads_id && (
-                        <Badge variant={account.checked_google ? "default" : "outline"}>
-                          <Chrome className="h-3 w-3 mr-1" />
-                          Google
-                        </Badge>
-                      )}
-                    </div>
-                  </CardTitle>
-                  <CardDescription>
-                    {account.meta_account_id && `Meta: ${account.meta_account_id}`}
-                    {account.meta_account_id && account.google_ads_id && " | "}
-                    {account.google_ads_id && `Google: ${account.google_ads_id}`}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    {account.usa_meta_ads && account.meta_account_id && (
-                      <div className="flex items-center gap-3 p-3 rounded-lg border border-border flex-1">
-                        <Checkbox
-                          id={`meta-${account.id}`}
-                          checked={account.checked_meta}
-                          onCheckedChange={() => handleCheck(account.id, 'meta', account.checked_meta)}
-                          className="h-5 w-5"
-                        />
-                        <label
-                          htmlFor={`meta-${account.id}`}
-                          className="flex-1 cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Facebook className="h-4 w-4 text-blue-600" />
-                            <span className="font-medium">Verificar Meta</span>
-                          </div>
-                          {account.checked_meta && account.meta_checked_at && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Verificado às {format(new Date(account.meta_checked_at), "HH:mm")}
-                            </p>
-                          )}
-                        </label>
-                        {account.checked_meta ? (
-                          <CheckCircle2 className="h-5 w-5 text-green-500" />
-                        ) : (
-                          <Circle className="h-5 w-5 text-muted-foreground" />
+            {accounts.map((account) => {
+              const metaNeedsUpdate = account.usa_meta_ads && needsBalanceUpdate(account, 'meta');
+              const googleNeedsUpdate = account.usa_google_ads && needsBalanceUpdate(account, 'google');
+              const lowBalance = isBalanceLow(account);
+              
+              return (
+                <Card 
+                  key={account.id} 
+                  className={`surface-elevated ${(metaNeedsUpdate || googleNeedsUpdate || lowBalance) ? 'border-amber-500 border-2' : ''}`}
+                >
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span>{account.nome_cliente}</span>
+                      <div className="flex gap-2">
+                        {account.usa_meta_ads && account.meta_account_id && (
+                          <Badge variant={account.checked_meta ? "default" : "outline"}>
+                            <Facebook className="h-3 w-3 mr-1" />
+                            Meta
+                          </Badge>
                         )}
+                        {account.usa_google_ads && account.google_ads_id && (
+                          <Badge variant={account.checked_google ? "default" : "outline"}>
+                            <Chrome className="h-3 w-3 mr-1" />
+                            Google
+                          </Badge>
+                        )}
+                      </div>
+                    </CardTitle>
+                    <CardDescription>
+                      {account.meta_account_id && `Meta: ${account.meta_account_id}`}
+                      {account.meta_account_id && account.google_ads_id && " | "}
+                      {account.google_ads_id && `Google: ${account.google_ads_id}`}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {/* Balance Status Alerts */}
+                    {(metaNeedsUpdate || googleNeedsUpdate || lowBalance) && (
+                      <div className="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                        <div className="space-y-1">
+                          {lowBalance && (
+                            <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+                              <AlertCircle className="h-4 w-4" />
+                              <span>Saldo Meta abaixo do alerta (R$ {account.saldo_meta?.toFixed(2)})</span>
+                            </div>
+                          )}
+                          {metaNeedsUpdate && (
+                            <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+                              <AlertCircle className="h-4 w-4" />
+                              <span>Saldo Meta não atualizado há mais de 3 dias</span>
+                            </div>
+                          )}
+                          {googleNeedsUpdate && (
+                            <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+                              <AlertCircle className="h-4 w-4" />
+                              <span>Saldo Google não atualizado há mais de 3 dias</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
 
-                    {account.usa_google_ads && account.google_ads_id && (
-                      <div className="flex items-center gap-3 p-3 rounded-lg border border-border flex-1">
-                        <Checkbox
-                          id={`google-${account.id}`}
-                          checked={account.checked_google}
-                          onCheckedChange={() => handleCheck(account.id, 'google', account.checked_google)}
-                          className="h-5 w-5"
-                        />
-                        <label
-                          htmlFor={`google-${account.id}`}
-                          className="flex-1 cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Chrome className="h-4 w-4 text-blue-500" />
-                            <span className="font-medium">Verificar Google</span>
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      {account.usa_meta_ads && account.meta_account_id && (
+                        <div className="flex-1 space-y-3 p-3 rounded-lg border border-border">
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              id={`meta-${account.id}`}
+                              checked={account.checked_meta}
+                              onCheckedChange={() => handleCheck(account.id, 'meta', account.checked_meta)}
+                              className="h-5 w-5"
+                            />
+                            <label
+                              htmlFor={`meta-${account.id}`}
+                              className="flex-1 cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Facebook className="h-4 w-4 text-blue-600" />
+                                <span className="font-medium">Verificar Meta</span>
+                              </div>
+                              {account.checked_meta && account.meta_checked_at && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Verificado às {format(new Date(account.meta_checked_at), "HH:mm")}
+                                </p>
+                              )}
+                            </label>
+                            {account.checked_meta ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-500" />
+                            ) : (
+                              <Circle className="h-5 w-5 text-muted-foreground" />
+                            )}
                           </div>
-                          {account.checked_google && account.google_checked_at && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Verificado às {format(new Date(account.google_checked_at), "HH:mm")}
-                            </p>
-                          )}
-                        </label>
-                        {account.checked_google ? (
-                          <CheckCircle2 className="h-5 w-5 text-green-500" />
-                        ) : (
-                          <Circle className="h-5 w-5 text-muted-foreground" />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+
+                          {/* Balance Section */}
+                          <div className="pt-2 border-t space-y-2">
+                            {account.last_balance_check_meta && (
+                              <div className="text-xs text-muted-foreground">
+                                <div>Último saldo: R$ {account.saldo_meta?.toFixed(2) || '0,00'}</div>
+                                <div>Atualizado: {format(new Date(account.last_balance_check_meta), "dd/MM/yyyy")}</div>
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="Novo saldo"
+                                value={balanceInputs[account.id]?.meta || ''}
+                                onChange={(e) => setBalanceInputs(prev => ({
+                                  ...prev,
+                                  [account.id]: { ...prev[account.id], meta: e.target.value }
+                                }))}
+                                className="h-8 text-sm"
+                              />
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => handleBalanceUpdate(account.id, 'meta')}
+                                disabled={!balanceInputs[account.id]?.meta}
+                                className="h-8 px-3"
+                              >
+                                Salvar
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {account.usa_google_ads && account.google_ads_id && (
+                        <div className="flex-1 space-y-3 p-3 rounded-lg border border-border">
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              id={`google-${account.id}`}
+                              checked={account.checked_google}
+                              onCheckedChange={() => handleCheck(account.id, 'google', account.checked_google)}
+                              className="h-5 w-5"
+                            />
+                            <label
+                              htmlFor={`google-${account.id}`}
+                              className="flex-1 cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Chrome className="h-4 w-4 text-blue-500" />
+                                <span className="font-medium">Verificar Google</span>
+                              </div>
+                              {account.checked_google && account.google_checked_at && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Verificado às {format(new Date(account.google_checked_at), "HH:mm")}
+                                </p>
+                              )}
+                            </label>
+                            {account.checked_google ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-500" />
+                            ) : (
+                              <Circle className="h-5 w-5 text-muted-foreground" />
+                            )}
+                          </div>
+
+                          {/* Balance Section */}
+                          <div className="pt-2 border-t space-y-2">
+                            {account.last_balance_check_google && (
+                              <div className="text-xs text-muted-foreground">
+                                <div>Atualizado: {format(new Date(account.last_balance_check_google), "dd/MM/yyyy")}</div>
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="Novo saldo"
+                                value={balanceInputs[account.id]?.google || ''}
+                                onChange={(e) => setBalanceInputs(prev => ({
+                                  ...prev,
+                                  [account.id]: { ...prev[account.id], google: e.target.value }
+                                }))}
+                                className="h-8 text-sm"
+                              />
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => handleBalanceUpdate(account.id, 'google')}
+                                disabled={!balanceInputs[account.id]?.google}
+                                className="h-8 px-3"
+                              >
+                                Salvar
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
