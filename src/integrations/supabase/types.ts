@@ -775,6 +775,85 @@ export type Database = {
           },
         ]
       }
+      campaign_history: {
+        Row: {
+          account_id: string
+          campaign_id: string
+          campaign_name: string
+          campaign_type: string | null
+          clicks: number | null
+          cpc: number | null
+          cpl: number | null
+          created_at: string | null
+          ctr: number | null
+          date: string
+          id: string
+          impressions: number | null
+          leads: number | null
+          spend: number | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          campaign_id: string
+          campaign_name: string
+          campaign_type?: string | null
+          clicks?: number | null
+          cpc?: number | null
+          cpl?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date: string
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          spend?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          campaign_id?: string
+          campaign_name?: string
+          campaign_type?: string | null
+          clicks?: number | null
+          cpc?: number | null
+          cpl?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date?: string
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          spend?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_history_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_history_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "leads_stats"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_history_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "relatorio_n8n_consolidated"
+            referencedColumns: ["conta_id"]
+          },
+        ]
+      }
       campaign_insights: {
         Row: {
           campaign_id: string
@@ -1170,6 +1249,61 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users_view"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      cpl_settings: {
+        Row: {
+          account_id: string | null
+          cpl_alto: number | null
+          cpl_mcmv: number | null
+          cpl_medio: number | null
+          created_at: string | null
+          id: string
+          margem_amarelo: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          cpl_alto?: number | null
+          cpl_mcmv?: number | null
+          cpl_medio?: number | null
+          created_at?: string | null
+          id?: string
+          margem_amarelo?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          cpl_alto?: number | null
+          cpl_mcmv?: number | null
+          cpl_medio?: number | null
+          created_at?: string | null
+          id?: string
+          margem_amarelo?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cpl_settings_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cpl_settings_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "leads_stats"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "cpl_settings_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "relatorio_n8n_consolidated"
+            referencedColumns: ["conta_id"]
           },
         ]
       }
