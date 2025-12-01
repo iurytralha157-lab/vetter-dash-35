@@ -847,6 +847,137 @@ export type Database = {
           },
         ]
       }
+      client_onboarding: {
+        Row: {
+          automacoes_desejadas: string[] | null
+          cidades_atuacao: string[] | null
+          cliente_id: string | null
+          created_at: string
+          crm_utilizado: string | null
+          email_integracoes: string | null
+          email_principal: string
+          emails_adicionais_relatorios: string | null
+          etapas_funil: string | null
+          facebook: string | null
+          horario_atendimento: string | null
+          horario_relatorios: string | null
+          horario_reuniao_semanal: string | null
+          id: string
+          instagram: string | null
+          link_drive_administrativo: string | null
+          link_drive_criativos: string | null
+          link_drive_criativos_acesso: string | null
+          link_identidade_visual: string | null
+          login_crm: string | null
+          nome_imobiliaria: string
+          nome_responsavel: string
+          objetivo_principal: string | null
+          observacoes: string | null
+          pasta_fotos_videos: string | null
+          possui_automacoes: boolean | null
+          possui_banco_criativos: boolean | null
+          possui_sdr: boolean | null
+          qtd_corretores: number | null
+          regioes_prioritarias: string | null
+          senha_crm: string | null
+          site: string | null
+          status: string | null
+          telefone_responsavel: string
+          tipo_atuacao: string | null
+          tipos_imoveis: string[] | null
+          updated_at: string
+          whatsapp_leads: string
+        }
+        Insert: {
+          automacoes_desejadas?: string[] | null
+          cidades_atuacao?: string[] | null
+          cliente_id?: string | null
+          created_at?: string
+          crm_utilizado?: string | null
+          email_integracoes?: string | null
+          email_principal: string
+          emails_adicionais_relatorios?: string | null
+          etapas_funil?: string | null
+          facebook?: string | null
+          horario_atendimento?: string | null
+          horario_relatorios?: string | null
+          horario_reuniao_semanal?: string | null
+          id?: string
+          instagram?: string | null
+          link_drive_administrativo?: string | null
+          link_drive_criativos?: string | null
+          link_drive_criativos_acesso?: string | null
+          link_identidade_visual?: string | null
+          login_crm?: string | null
+          nome_imobiliaria: string
+          nome_responsavel: string
+          objetivo_principal?: string | null
+          observacoes?: string | null
+          pasta_fotos_videos?: string | null
+          possui_automacoes?: boolean | null
+          possui_banco_criativos?: boolean | null
+          possui_sdr?: boolean | null
+          qtd_corretores?: number | null
+          regioes_prioritarias?: string | null
+          senha_crm?: string | null
+          site?: string | null
+          status?: string | null
+          telefone_responsavel: string
+          tipo_atuacao?: string | null
+          tipos_imoveis?: string[] | null
+          updated_at?: string
+          whatsapp_leads: string
+        }
+        Update: {
+          automacoes_desejadas?: string[] | null
+          cidades_atuacao?: string[] | null
+          cliente_id?: string | null
+          created_at?: string
+          crm_utilizado?: string | null
+          email_integracoes?: string | null
+          email_principal?: string
+          emails_adicionais_relatorios?: string | null
+          etapas_funil?: string | null
+          facebook?: string | null
+          horario_atendimento?: string | null
+          horario_relatorios?: string | null
+          horario_reuniao_semanal?: string | null
+          id?: string
+          instagram?: string | null
+          link_drive_administrativo?: string | null
+          link_drive_criativos?: string | null
+          link_drive_criativos_acesso?: string | null
+          link_identidade_visual?: string | null
+          login_crm?: string | null
+          nome_imobiliaria?: string
+          nome_responsavel?: string
+          objetivo_principal?: string | null
+          observacoes?: string | null
+          pasta_fotos_videos?: string | null
+          possui_automacoes?: boolean | null
+          possui_banco_criativos?: boolean | null
+          possui_sdr?: boolean | null
+          qtd_corretores?: number | null
+          regioes_prioritarias?: string | null
+          senha_crm?: string | null
+          site?: string | null
+          status?: string | null
+          telefone_responsavel?: string
+          tipo_atuacao?: string | null
+          tipos_imoveis?: string[] | null
+          updated_at?: string
+          whatsapp_leads?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_onboarding_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           approved_at: string | null
