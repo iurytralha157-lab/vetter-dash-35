@@ -7,7 +7,6 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import AuthPage from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-import Boards from "./pages/Boards";
 // ❌ REMOVIDO: import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
 import Accounts from "./pages/ContasCliente";
@@ -43,11 +42,6 @@ const App = () => (
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <Dashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/boards" element={
-              <ProtectedRoute>
-                <Boards />
               </ProtectedRoute>
             } />
             <Route path="/clientes" element={
