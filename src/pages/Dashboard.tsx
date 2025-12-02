@@ -35,9 +35,9 @@ export default function Dashboard() {
   }, [period]);
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'BRL',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
@@ -51,7 +51,7 @@ export default function Dashboard() {
           <div>
             <h1 className="text-3xl font-bold">Dashboard</h1>
             <p className="text-muted-foreground mt-1">
-              Overview of your advertising performance
+              Visão geral do desempenho de suas campanhas
             </p>
           </div>
           <PeriodSelector value={period} onValueChange={setPeriod} />
@@ -69,43 +69,43 @@ export default function Dashboard() {
             kpiData && (
               <>
                 <KPICard
-                  title="Active Clients (Meta)"
+                  title="Clientes Ativos (Meta)"
                   value={kpiData.activeClientsMeta}
                   icon={Users}
-                  description="Clients with active Meta campaigns"
+                  description="Clientes com campanhas Meta ativas"
                 />
                 <KPICard
-                  title="Active Clients (Google)"
+                  title="Clientes Ativos (Google)"
                   value={kpiData.activeClientsGoogle}
                   icon={Users}
-                  description="Clients with active Google campaigns"
+                  description="Clientes com campanhas Google ativas"
                 />
                 <KPICard
-                  title="Total Spend"
+                  title="Investimento Total"
                   value={formatCurrency(kpiData.totalSpend)}
                   icon={DollarSign}
-                  description={`${period === '30d' ? 'This month' : `Last ${period.replace('d', ' days')}`}`}
+                  description={`${period === '30d' ? 'Este mês' : `Últimos ${period.replace('d', ' dias')}`}`}
                   trend={{ value: 12.5, isPositive: true }}
                 />
                 <KPICard
-                  title="Leads Generated"
+                  title="Leads Gerados"
                   value={kpiData.leads.toLocaleString()}
                   icon={Target}
-                  description={`${period === '30d' ? 'This month' : `Last ${period.replace('d', ' days')}`}`}
+                  description={`${period === '30d' ? 'Este mês' : `Últimos ${period.replace('d', ' dias')}`}`}
                   trend={{ value: 8.2, isPositive: true }}
                 />
                 <KPICard
-                  title="Average CTR"
+                  title="CTR Médio"
                   value={`${kpiData.avgCTR.toFixed(2)}%`}
                   icon={TrendingUp}
-                  description="Click-through rate across all campaigns"
+                  description="Taxa de cliques em todas as campanhas"
                   trend={{ value: 1.4, isPositive: true }}
                 />
                 <KPICard
-                  title="Average CPL"
+                  title="CPL Médio"
                   value={formatCurrency(kpiData.avgCPL)}
                   icon={BarChart3}
-                  description="Cost per lead across all campaigns"
+                  description="Custo por lead em todas as campanhas"
                   trend={{ value: 3.2, isPositive: false }}
                 />
               </>
@@ -120,7 +120,7 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Target className="h-5 w-5 text-primary" />
-                Leads Over Time
+                Leads ao Longo do Tempo
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -161,7 +161,7 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-primary" />
-                Daily Spend
+                Investimento Diário
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -202,22 +202,22 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Zap className="h-5 w-5 text-primary" />
-                Automation Stats
+                Estatísticas de Automação
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">WhatsApp Sends</span>
-                  <span className="font-medium">2,340</span>
+                  <span className="text-muted-foreground">Envios WhatsApp</span>
+                  <span className="font-medium">2.340</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Reports Sent</span>
+                  <span className="text-muted-foreground">Relatórios Enviados</span>
                   <span className="font-medium">156</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Leads Synced</span>
-                  <span className="font-medium">1,890</span>
+                  <span className="text-muted-foreground">Leads Sincronizados</span>
+                  <span className="font-medium">1.890</span>
                 </div>
               </div>
             </CardContent>
@@ -225,14 +225,14 @@ export default function Dashboard() {
 
           <Card className="surface-elevated lg:col-span-2">
             <CardHeader>
-              <CardTitle>Best Performing Creatives</CardTitle>
+              <CardTitle>Criativos com Melhor Performance</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {[
-                  { name: "Spring Sale Video", ctr: 4.2, hookRate: 78.5 },
-                  { name: "Product Demo Carousel", ctr: 3.8, hookRate: 72.1 },
-                  { name: "Testimonial Story", ctr: 3.5, hookRate: 69.8 }
+                  { name: "Vídeo Promoção Primavera", ctr: 4.2, hookRate: 78.5 },
+                  { name: "Carrossel Demo Produto", ctr: 3.8, hookRate: 72.1 },
+                  { name: "Story Depoimento", ctr: 3.5, hookRate: 69.8 }
                 ].map((creative, index) => (
                   <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-secondary/30">
                     <span className="font-medium">{creative.name}</span>
@@ -241,7 +241,7 @@ export default function Dashboard() {
                         CTR: <span className="text-foreground font-medium">{creative.ctr}%</span>
                       </span>
                       <span className="text-muted-foreground">
-                        Hook Rate: <span className="text-foreground font-medium">{creative.hookRate}%</span>
+                        Taxa de Gancho: <span className="text-foreground font-medium">{creative.hookRate}%</span>
                       </span>
                     </div>
                   </div>
