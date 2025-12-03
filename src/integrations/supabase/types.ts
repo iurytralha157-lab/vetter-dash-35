@@ -1385,6 +1385,90 @@ export type Database = {
           },
         ]
       }
+      demandas: {
+        Row: {
+          account_id: string
+          created_at: string
+          criado_por: string | null
+          data_entrega: string | null
+          descricao: string | null
+          gestor_responsavel_id: string | null
+          id: string
+          link_criativos: string | null
+          orcamento: number | null
+          prioridade: string
+          status: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          criado_por?: string | null
+          data_entrega?: string | null
+          descricao?: string | null
+          gestor_responsavel_id?: string | null
+          id?: string
+          link_criativos?: string | null
+          orcamento?: number | null
+          prioridade?: string
+          status?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          criado_por?: string | null
+          data_entrega?: string | null
+          descricao?: string | null
+          gestor_responsavel_id?: string | null
+          id?: string
+          link_criativos?: string | null
+          orcamento?: number | null
+          prioridade?: string
+          status?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demandas_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demandas_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "leads_stats"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "demandas_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "relatorio_n8n_consolidated"
+            referencedColumns: ["conta_id"]
+          },
+          {
+            foreignKeyName: "demandas_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "users_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demandas_gestor_responsavel_id_fkey"
+            columns: ["gestor_responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           campanha: string | null

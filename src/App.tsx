@@ -7,7 +7,6 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import AuthPage from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-// ❌ REMOVIDO: import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
 import Accounts from "./pages/ContasCliente";
 import Clientes from "./pages/Clientes";
@@ -19,7 +18,7 @@ import AddTraining from "./pages/AddTraining";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import RelatorioN8n from "./pages/RelatorioN8n";
-import ChecklistDiario from "./pages/ChecklistDiario";
+import Demandas from "./pages/Demandas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -99,9 +98,9 @@ const App = () => (
                 <RelatorioN8n />
               </ProtectedRoute>
             } />
-            <Route path="/checklist-diario" element={
+            <Route path="/demandas" element={
               <ProtectedRoute>
-                <ChecklistDiario />
+                <Demandas />
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
