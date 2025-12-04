@@ -1385,14 +1385,64 @@ export type Database = {
           },
         ]
       }
+      demanda_historico: {
+        Row: {
+          alterado_em: string
+          alterado_por: string | null
+          demanda_id: string
+          id: string
+          observacao: string | null
+          status_anterior: string | null
+          status_novo: string
+        }
+        Insert: {
+          alterado_em?: string
+          alterado_por?: string | null
+          demanda_id: string
+          id?: string
+          observacao?: string | null
+          status_anterior?: string | null
+          status_novo: string
+        }
+        Update: {
+          alterado_em?: string
+          alterado_por?: string | null
+          demanda_id?: string
+          id?: string
+          observacao?: string | null
+          status_anterior?: string | null
+          status_novo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demanda_historico_alterado_por_fkey"
+            columns: ["alterado_por"]
+            isOneToOne: false
+            referencedRelation: "users_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demanda_historico_demanda_id_fkey"
+            columns: ["demanda_id"]
+            isOneToOne: false
+            referencedRelation: "demandas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demandas: {
         Row: {
           account_id: string
+          concluido_at: string | null
+          concluido_por: string | null
           created_at: string
           criado_por: string | null
           data_entrega: string | null
           descricao: string | null
+          em_andamento_at: string | null
+          em_andamento_por: string | null
           gestor_responsavel_id: string | null
+          hora_entrega: string | null
           id: string
           link_criativos: string | null
           orcamento: number | null
@@ -1403,11 +1453,16 @@ export type Database = {
         }
         Insert: {
           account_id: string
+          concluido_at?: string | null
+          concluido_por?: string | null
           created_at?: string
           criado_por?: string | null
           data_entrega?: string | null
           descricao?: string | null
+          em_andamento_at?: string | null
+          em_andamento_por?: string | null
           gestor_responsavel_id?: string | null
+          hora_entrega?: string | null
           id?: string
           link_criativos?: string | null
           orcamento?: number | null
@@ -1418,11 +1473,16 @@ export type Database = {
         }
         Update: {
           account_id?: string
+          concluido_at?: string | null
+          concluido_por?: string | null
           created_at?: string
           criado_por?: string | null
           data_entrega?: string | null
           descricao?: string | null
+          em_andamento_at?: string | null
+          em_andamento_por?: string | null
           gestor_responsavel_id?: string | null
+          hora_entrega?: string | null
           id?: string
           link_criativos?: string | null
           orcamento?: number | null
@@ -1454,8 +1514,22 @@ export type Database = {
             referencedColumns: ["conta_id"]
           },
           {
+            foreignKeyName: "demandas_concluido_por_fkey"
+            columns: ["concluido_por"]
+            isOneToOne: false
+            referencedRelation: "users_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "demandas_criado_por_fkey"
             columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "users_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demandas_em_andamento_por_fkey"
+            columns: ["em_andamento_por"]
             isOneToOne: false
             referencedRelation: "users_view"
             referencedColumns: ["id"]
