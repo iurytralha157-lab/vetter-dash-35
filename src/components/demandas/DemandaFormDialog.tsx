@@ -44,6 +44,7 @@ export function DemandaFormDialog({ open, onOpenChange, demanda, onSuccess }: De
     orcamento: "",
     link_criativos: "",
     data_entrega: "",
+    hora_entrega: "",
     prioridade: "media" as DemandaPrioridade,
     status: "pendente" as DemandaStatus,
   });
@@ -61,6 +62,7 @@ export function DemandaFormDialog({ open, onOpenChange, demanda, onSuccess }: De
         orcamento: demanda.orcamento?.toString() || "",
         link_criativos: demanda.link_criativos || "",
         data_entrega: demanda.data_entrega || "",
+        hora_entrega: demanda.hora_entrega?.slice(0, 5) || "",
         prioridade: demanda.prioridade,
         status: demanda.status,
       });
@@ -72,6 +74,7 @@ export function DemandaFormDialog({ open, onOpenChange, demanda, onSuccess }: De
         orcamento: "",
         link_criativos: "",
         data_entrega: "",
+        hora_entrega: "",
         prioridade: "media",
         status: "pendente",
       });
@@ -105,6 +108,7 @@ export function DemandaFormDialog({ open, onOpenChange, demanda, onSuccess }: De
         orcamento: form.orcamento ? parseFloat(form.orcamento) : undefined,
         link_criativos: form.link_criativos || undefined,
         data_entrega: form.data_entrega || undefined,
+        hora_entrega: form.hora_entrega || undefined,
         prioridade: form.prioridade,
       };
 
@@ -206,14 +210,25 @@ export function DemandaFormDialog({ open, onOpenChange, demanda, onSuccess }: De
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="data_entrega">Data de Entrega</Label>
-            <Input
-              id="data_entrega"
-              type="date"
-              value={form.data_entrega}
-              onChange={(e) => setForm({ ...form, data_entrega: e.target.value })}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="data_entrega">Data de Entrega</Label>
+              <Input
+                id="data_entrega"
+                type="date"
+                value={form.data_entrega}
+                onChange={(e) => setForm({ ...form, data_entrega: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="hora_entrega">Horário</Label>
+              <Input
+                id="hora_entrega"
+                type="time"
+                value={form.hora_entrega}
+                onChange={(e) => setForm({ ...form, hora_entrega: e.target.value })}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
