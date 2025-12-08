@@ -9,7 +9,8 @@ import {
   ShieldCheck, 
   MessageSquare,
   Webhook,
-  Kanban
+  Kanban,
+  Settings
 } from "lucide-react";
 import { pt } from "@/i18n/pt";
 import { UserRole } from "@/hooks/useUserRole";
@@ -29,6 +30,7 @@ export const navigationItems: NavigationItem[] = [
   { title: pt.nav.training, url: "/capacitacao", icon: GraduationCap, roles: ['admin'] },
   { title: pt.nav.users, url: "/usuarios", icon: ShieldCheck, roles: ['admin'] },
   { title: pt.nav.reportN8n, url: "/relatorio-n8n", icon: Webhook, roles: ['admin'] },
+  { title: pt.settings.title, url: "/configuracoes", icon: Settings, roles: ['admin'] },
 ];
 
 export const filterNavigationByRole = (items: NavigationItem[], userRole: UserRole | null): NavigationItem[] => {

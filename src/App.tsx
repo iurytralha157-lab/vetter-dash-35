@@ -90,7 +90,7 @@ const App = () => (
                 <Users />
               </ProtectedRoute>
             } />
-            <Route path="/configuracao" element={
+            <Route path="/configuracoes" element={
               <ProtectedRoute>
                 <Settings />
               </ProtectedRoute>
