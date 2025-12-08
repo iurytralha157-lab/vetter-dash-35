@@ -4,7 +4,6 @@ import {
   ChevronLeft, 
   ChevronRight,
   LogOut,
-  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -259,19 +258,11 @@ export function AppSidebar({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="flex-1 justify-start gap-2 text-text-secondary hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-200"
-                >
-                  <Settings className="h-4 w-4" />
-                  Configurações
-                </Button>
-                
-                <Button
-                  variant="ghost"
-                  size="sm"
                   onClick={handleLogout}
-                  className="px-3 text-text-secondary hover:text-destructive hover:bg-destructive/10 transition-all duration-200"
+                  className="flex-1 justify-start gap-2 px-3 text-text-secondary hover:text-destructive hover:bg-destructive/10 transition-all duration-200"
                 >
                   <LogOut className="h-4 w-4" />
+                  Sair
                 </Button>
               </div>
             </div>
