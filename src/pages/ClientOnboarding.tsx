@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { supabase } from '@/integrations/supabase/client';
+import { sendWebhookNotification } from '@/services/systemSettingsService';
 import { 
   Building2, User, Phone, Mail, MessageSquare, MapPin, Instagram, Facebook, Globe, Users,
   Target, Home, FolderOpen, Link2, Clock, FileText, CheckCircle2
@@ -177,6 +178,14 @@ const ClientOnboarding = () => {
           .update({ cliente_id: clienteData.id })
           .eq('id', onboardingData.id);
       }
+
+      // 4. Enviar webhook de notificação
+      sendWebhookNotification('novo_cliente', {
+        nome: formData.nome_imobiliaria,
+        email: formData.email_principal,
+        telefone: formData.telefone_responsavel,
+        responsavel_nome: formData.nome_responsavel,
+      });
 
       setSuccess(true);
       toast.success('Cadastro realizado com sucesso!');
