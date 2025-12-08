@@ -1,14 +1,177 @@
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings as SettingsIcon, Webhook, Globe, Bell } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Settings as SettingsIcon, Webhook, Bell, Building, Loader2, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 import { pt } from "@/i18n/pt";
+import { systemSettingsService, SystemSetting } from "@/services/systemSettingsService";
+import { useToast } from "@/hooks/use-toast";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useNavigate } from "react-router-dom";
 
 export default function Settings() {
+  const { toast } = useToast();
+  const { isAdmin, loading: roleLoading } = useUserRole();
+  const navigate = useNavigate();
+  
+  const [settings, setSettings] = useState<SystemSetting[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testingWebhook, setTestingWebhook] = useState<string | null>(null);
+
+  // Form state for URLs
+  const [webhookDemandas, setWebhookDemandas] = useState('');
+  const [webhookChecklist, setWebhookChecklist] = useState('');
+  const [webhookClientes, setWebhookClientes] = useState('');
+  const [orgName, setOrgName] = useState('');
+
+  useEffect(() => {
+    if (!roleLoading && !isAdmin) {
+      toast({
+        title: "Acesso negado",
+        description: "Apenas administradores podem acessar as configurações.",
+        variant: "destructive",
+      });
+      navigate('/');
+    }
+  }, [isAdmin, roleLoading, navigate, toast]);
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const data = await systemSettingsService.getSettings();
+      setSettings(data);
+      
+      // Set form values
+      setWebhookDemandas(data.find(s => s.key === 'webhook_demandas_url')?.value || '');
+      setWebhookChecklist(data.find(s => s.key === 'webhook_checklist_url')?.value || '');
+      setWebhookClientes(data.find(s => s.key === 'webhook_clientes_url')?.value || '');
+      setOrgName(data.find(s => s.key === 'organizacao_nome')?.value || '');
+    } catch (error) {
+      console.error('Error loading settings:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar as configurações.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getSettingEnabled = (key: string): boolean => {
+    return settings.find(s => s.key === key)?.enabled ?? true;
+  };
+
+  const handleToggle = async (key: string, enabled: boolean) => {
+    try {
+      await systemSettingsService.updateSettingEnabled(key, enabled);
+      setSettings(prev => prev.map(s => s.key === key ? { ...s, enabled } : s));
+      toast({
+        title: "Configuração atualizada",
+        description: enabled ? "Notificação ativada" : "Notificação desativada",
+      });
+    } catch (error) {
+      console.error('Error updating setting:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar a configuração.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveUrl = async (key: string, value: string) => {
+    setSaving(true);
+    try {
+      await systemSettingsService.updateSetting(key, value);
+      toast({
+        title: "Salvo",
+        description: "URL do webhook atualizada com sucesso.",
+      });
+    } catch (error) {
+      console.error('Error saving URL:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar a URL.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTestWebhook = async (url: string, type: string) => {
+    if (!url) {
+      toast({
+        title: "URL não configurada",
+        description: "Configure a URL do webhook antes de testar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTestingWebhook(type);
+    try {
+      const result = await systemSettingsService.testWebhook(url);
+      toast({
+        title: result.success ? "Sucesso" : "Erro",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Falha ao testar webhook.",
+        variant: "destructive",
+      });
+    } finally {
+      setTestingWebhook(null);
+    }
+  };
+
+  const handleSaveOrgName = async () => {
+    setSaving(true);
+    try {
+      await systemSettingsService.updateSetting('organizacao_nome', orgName);
+      toast({
+        title: "Salvo",
+        description: "Nome da organização atualizado.",
+      });
+    } catch (error) {
+      console.error('Error saving org name:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (roleLoading || loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -19,84 +182,284 @@ export default function Settings() {
           </div>
         </div>
 
-        <Tabs defaultValue="integrations" className="w-full">
+        <Tabs defaultValue="webhooks" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="integrations">{pt.settings.integrations}</TabsTrigger>
-            <TabsTrigger value="notifications">{pt.settings.notifications}</TabsTrigger>
-            <TabsTrigger value="general">{pt.settings.general}</TabsTrigger>
+            <TabsTrigger value="webhooks" className="flex items-center gap-2">
+              <Webhook className="h-4 w-4" />
+              Webhooks
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Notificações
+            </TabsTrigger>
+            <TabsTrigger value="general" className="flex items-center gap-2">
+              <SettingsIcon className="h-4 w-4" />
+              {pt.settings.general}
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="integrations" className="space-y-6">
+          {/* Webhooks Tab */}
+          <TabsContent value="webhooks" className="space-y-6">
+            {/* Demandas Webhook */}
             <Card className="surface-elevated">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Webhook className="h-5 w-5 text-primary" />
-                  Meta Business
+                  Webhook de Demandas
                 </CardTitle>
+                <CardDescription>
+                  Receba notificações quando demandas forem criadas ou concluídas
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="meta-token">{pt.settings.accessToken}</Label>
-                  <Input id="meta-token" type="password" placeholder="***************" />
+                  <Label htmlFor="webhook-demandas">URL do Webhook (N8N)</Label>
+                  <div className="flex gap-2">
+                    <Input 
+                      id="webhook-demandas" 
+                      placeholder="https://seu-n8n.com/webhook/..." 
+                      value={webhookDemandas}
+                      onChange={(e) => setWebhookDemandas(e.target.value)}
+                    />
+                    <Button 
+                      variant="outline" 
+                      onClick={() => handleSaveUrl('webhook_demandas_url', webhookDemandas)}
+                      disabled={saving}
+                    >
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
+                    </Button>
+                  </div>
                 </div>
-                <Button>{pt.actions.test}</Button>
+                <Button 
+                  variant="secondary" 
+                  onClick={() => handleTestWebhook(webhookDemandas, 'demandas')}
+                  disabled={testingWebhook === 'demandas'}
+                >
+                  {testingWebhook === 'demandas' ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                  )}
+                  Testar Webhook
+                </Button>
               </CardContent>
             </Card>
 
+            {/* Checklist Webhook */}
             <Card className="surface-elevated">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Globe className="h-5 w-5 text-primary" />
-                  Google Ads
+                  <Webhook className="h-5 w-5 text-primary" />
+                  Webhook de Checklist Diário
                 </CardTitle>
+                <CardDescription>
+                  Receba lembretes e relatórios do checklist diário
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="google-creds">{pt.settings.credentials}</Label>
-                  <Input id="google-creds" type="password" placeholder="***************" />
+                  <Label htmlFor="webhook-checklist">URL do Webhook (N8N)</Label>
+                  <div className="flex gap-2">
+                    <Input 
+                      id="webhook-checklist" 
+                      placeholder="https://seu-n8n.com/webhook/..." 
+                      value={webhookChecklist}
+                      onChange={(e) => setWebhookChecklist(e.target.value)}
+                    />
+                    <Button 
+                      variant="outline" 
+                      onClick={() => handleSaveUrl('webhook_checklist_url', webhookChecklist)}
+                      disabled={saving}
+                    >
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
+                    </Button>
+                  </div>
                 </div>
-                <Button>{pt.actions.test}</Button>
+                <Button 
+                  variant="secondary" 
+                  onClick={() => handleTestWebhook(webhookChecklist, 'checklist')}
+                  disabled={testingWebhook === 'checklist'}
+                >
+                  {testingWebhook === 'checklist' ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                  )}
+                  Testar Webhook
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Clientes Webhook */}
+            <Card className="surface-elevated">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Webhook className="h-5 w-5 text-primary" />
+                  Webhook de Novos Clientes
+                </CardTitle>
+                <CardDescription>
+                  Receba notificações quando novos clientes se cadastrarem
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="webhook-clientes">URL do Webhook (N8N)</Label>
+                  <div className="flex gap-2">
+                    <Input 
+                      id="webhook-clientes" 
+                      placeholder="https://seu-n8n.com/webhook/..." 
+                      value={webhookClientes}
+                      onChange={(e) => setWebhookClientes(e.target.value)}
+                    />
+                    <Button 
+                      variant="outline" 
+                      onClick={() => handleSaveUrl('webhook_clientes_url', webhookClientes)}
+                      disabled={saving}
+                    >
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
+                    </Button>
+                  </div>
+                </div>
+                <Button 
+                  variant="secondary" 
+                  onClick={() => handleTestWebhook(webhookClientes, 'clientes')}
+                  disabled={testingWebhook === 'clientes'}
+                >
+                  {testingWebhook === 'clientes' ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                  )}
+                  Testar Webhook
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
 
+          {/* Notifications Tab */}
           <TabsContent value="notifications" className="space-y-6">
             <Card className="surface-elevated">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Bell className="h-5 w-5 text-primary" />
-                  {pt.settings.notifications}
+                  Notificações de Demandas
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="enable-notifications">{pt.settings.enableNotifications}</Label>
-                  <Switch id="enable-notifications" defaultChecked />
+                  <div className="space-y-0.5">
+                    <Label>Demanda Criada</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Notificar responsável quando uma nova demanda for criada
+                    </p>
+                  </div>
+                  <Switch 
+                    checked={getSettingEnabled('webhook_demandas_criada')}
+                    onCheckedChange={(checked) => handleToggle('webhook_demandas_criada', checked)}
+                  />
                 </div>
+                <Separator />
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="balance-alerts">{pt.settings.lowBalanceAlerts}</Label>
-                  <Switch id="balance-alerts" defaultChecked />
+                  <div className="space-y-0.5">
+                    <Label>Demanda Concluída</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Notificar administradores quando uma demanda for concluída
+                    </p>
+                  </div>
+                  <Switch 
+                    checked={getSettingEnabled('webhook_demandas_concluida')}
+                    onCheckedChange={(checked) => handleToggle('webhook_demandas_concluida', checked)}
+                  />
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="surface-elevated">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="h-5 w-5 text-primary" />
+                  Notificações do Checklist Diário
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="daily-reports">{pt.settings.dailyReports}</Label>
-                  <Switch id="daily-reports" defaultChecked />
+                  <div className="space-y-0.5">
+                    <Label>Lembrete Matinal (8h)</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Enviar lembrete das contas pendentes de verificação
+                    </p>
+                  </div>
+                  <Switch 
+                    checked={getSettingEnabled('webhook_checklist_lembrete_manha')}
+                    onCheckedChange={(checked) => handleToggle('webhook_checklist_lembrete_manha', checked)}
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Relatório da Tarde (17h)</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Enviar relatório das contas ainda não verificadas
+                    </p>
+                  </div>
+                  <Switch 
+                    checked={getSettingEnabled('webhook_checklist_relatorio_tarde')}
+                    onCheckedChange={(checked) => handleToggle('webhook_checklist_relatorio_tarde', checked)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="surface-elevated">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="h-5 w-5 text-primary" />
+                  Notificações de Clientes
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Novo Cadastro</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Notificar quando um novo cliente se cadastrar via onboarding
+                    </p>
+                  </div>
+                  <Switch 
+                    checked={getSettingEnabled('webhook_clientes_novo_cadastro')}
+                    onCheckedChange={(checked) => handleToggle('webhook_clientes_novo_cadastro', checked)}
+                  />
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
+          {/* General Tab */}
           <TabsContent value="general" className="space-y-6">
             <Card className="surface-elevated">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <SettingsIcon className="h-5 w-5 text-primary" />
-                  {pt.settings.general}
+                  <Building className="h-5 w-5 text-primary" />
+                  Informações da Organização
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="org-name">{pt.settings.organizationName}</Label>
-                  <Input id="org-name" defaultValue="MetaFlow" />
+                  <div className="flex gap-2">
+                    <Input 
+                      id="org-name" 
+                      value={orgName}
+                      onChange={(e) => setOrgName(e.target.value)}
+                    />
+                    <Button 
+                      variant="outline" 
+                      onClick={handleSaveOrgName}
+                      disabled={saving}
+                    >
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="currency">{pt.settings.currency}</Label>
@@ -106,7 +469,6 @@ export default function Settings() {
                   <Label htmlFor="timezone">{pt.settings.timezone}</Label>
                   <Input id="timezone" defaultValue="America/Sao_Paulo" disabled />
                 </div>
-                <Button>{pt.actions.save}</Button>
               </CardContent>
             </Card>
           </TabsContent>

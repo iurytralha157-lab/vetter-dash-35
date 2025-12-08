@@ -1,1 +1,16 @@
 project_id = "mgiadncyehpahtursqdh"
+
+[functions.create-user]
+verify_jwt = true
+
+[functions.daily-checklist-notify]
+verify_jwt = false
+
+[functions.fetch-meta-campaigns]
+verify_jwt = true
+
+[functions.list-users]
+verify_jwt = true
+
+[functions.send-webhook-notification]
+verify_jwt = true
