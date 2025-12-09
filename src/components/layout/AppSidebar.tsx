@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import { useAuth } from "@/contexts/AuthContext";
 import { navigationItems, filterNavigationByRole } from "./navigationConfig";
 import { useUserRole } from "@/hooks/useUserRole";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AppSidebarProps {
   logoSrc?: string;
@@ -24,16 +25,35 @@ export function AppSidebar({
   brandName = "Vetter Co.",
 }: AppSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    // Persistir estado no localStorage
     const saved = localStorage.getItem('sidebar-collapsed');
     return saved ? JSON.parse(saved) : false;
   });
+  const [userName, setUserName] = useState<string | null>(null);
   
   const location = useLocation();
   const { user, signOut } = useAuth();
   const { role } = useUserRole();
   const currentPath = location.pathname;
   const filteredNavItems = filterNavigationByRole(navigationItems, role);
+
+  // Buscar nome real do usuário do perfil
+  useEffect(() => {
+    const fetchUserName = async () => {
+      if (!user?.id) return;
+      
+      const { data } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', user.id)
+        .single();
+      
+      if (data?.name) {
+        setUserName(data.name);
+      }
+    };
+    
+    fetchUserName();
+  }, [user?.id]);
 
   // Salvar estado no localStorage
   useEffect(() => {
@@ -201,7 +221,7 @@ export function AppSidebar({
                 <TooltipContent side="right" sideOffset={12}>
                   <div className="text-sm">
                     <div className="font-medium">
-                      {user?.user_metadata?.full_name || 'Usuário'}
+                      {userName || user?.user_metadata?.full_name || 'Usuário'}
                     </div>
                     <div className="text-text-tertiary text-xs">
                       {user?.email}
@@ -233,7 +253,7 @@ export function AppSidebar({
               <div className="flex items-center gap-3 p-3 rounded-xl bg-sidebar-accent/50 hover:bg-sidebar-accent/70 transition-colors duration-200">
                 <Avatar className="h-10 w-10 border-2 border-sidebar-border">
                   <AvatarFallback className="bg-gradient-primary text-white text-sm font-bold">
-                    {user?.user_metadata?.full_name?.charAt(0).toUpperCase() || 
+                    {userName?.charAt(0).toUpperCase() || 
                      user?.email?.charAt(0).toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
@@ -242,7 +262,7 @@ export function AppSidebar({
                   ${isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'}
                 `}>
                   <div className="text-sm font-semibold text-sidebar-foreground truncate">
-                    {user?.user_metadata?.full_name || 'Usuário'}
+                    {userName || 'Usuário'}
                   </div>
                   <div className="text-xs text-text-tertiary truncate">
                     {user?.email}
