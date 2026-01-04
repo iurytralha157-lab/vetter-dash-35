@@ -122,6 +122,7 @@ export default function ClientesReformulada() {
 
   useEffect(() => {
     loadClientesData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadClientesData = async () => {
@@ -300,13 +301,11 @@ export default function ClientesReformulada() {
   return (
     <AppLayout>
       <div className="space-y-6">
-
-        {/* HERO — agora sim com cara de produto */}
+        {/* HERO */}
         <Card className="surface-elevated overflow-hidden border-border/60">
           <CardContent className="p-0">
             <div className="relative">
-
-              {/* fundo com textura / grid */}
+              {/* textura */}
               <div
                 className="absolute inset-0 opacity-[0.35]"
                 style={{
@@ -316,7 +315,7 @@ export default function ClientesReformulada() {
                 }}
               />
 
-              {/* gradientes / glow */}
+              {/* gradientes */}
               <div className="absolute inset-0 bg-gradient-to-r from-primary/25 via-transparent to-emerald-500/15" />
               <div className="absolute -top-28 -left-28 h-72 w-72 rounded-full bg-primary/25 blur-3xl" />
               <div className="absolute -bottom-28 -right-28 h-72 w-72 rounded-full bg-emerald-500/15 blur-3xl" />
@@ -333,11 +332,8 @@ export default function ClientesReformulada() {
                     </span>
                   </div>
 
-                  <h1 className="text-2xl md:text-3xl font-bold tracking-tight mt-3">
-                    Clientes
-                  </h1>
+                  <h1 className="text-2xl md:text-3xl font-bold tracking-tight mt-3">Clientes</h1>
 
-                  {/* Pills premium */}
                   <div className="mt-4 flex flex-wrap gap-2">
                     {FILTER_PILLS.map((p) => {
                       const active = filterStatus === p.key;
@@ -385,7 +381,7 @@ export default function ClientesReformulada() {
           </CardContent>
         </Card>
 
-        {/* BUSCA + SELECT — painel premium */}
+        {/* BUSCA + SELECT */}
         <Card className="surface-elevated border-border/60">
           <CardContent className="p-4">
             <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
@@ -414,17 +410,26 @@ export default function ClientesReformulada() {
           </CardContent>
         </Card>
 
-        {/* LISTA — cards com “cara” */}
+        {/* LISTA — CARD CLICÁVEL PRA DETALHES */}
         <div className="space-y-3">
           {filteredClientes.map((cliente) => {
             const StatusIcon = STATUS_CONFIG[cliente.status].icon;
 
+            const goToDetails = () => navigate(`/clientes/${cliente.id}`);
+
             return (
               <Card
                 key={cliente.id}
+                role="button"
+                tabIndex={0}
+                onClick={goToDetails}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") goToDetails();
+                }}
                 className={[
-                  "surface-elevated border-border/60 transition-all",
+                  "surface-elevated border-border/60 transition-all cursor-pointer select-none",
                   "hover:translate-y-[-1px] hover:border-primary/25 hover:shadow-[0_10px_30px_rgba(0,0,0,0.35)]",
+                  "focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-0",
                 ].join(" ")}
               >
                 <CardContent className="p-5">
@@ -438,7 +443,6 @@ export default function ClientesReformulada() {
                       </Avatar>
 
                       <div className="min-w-0 flex-1">
-                        {/* Line 1 */}
                         <div className="flex flex-wrap items-center gap-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className={`h-2.5 w-2.5 rounded-full ${STATUS_CONFIG[cliente.status].dot}`} />
@@ -457,7 +461,6 @@ export default function ClientesReformulada() {
                             </Badge>
                           )}
 
-                          {/* chips integrações */}
                           <div className="flex items-center gap-2">
                             <span
                               className={[
@@ -482,7 +485,6 @@ export default function ClientesReformulada() {
                           </div>
                         </div>
 
-                        {/* Line 2 */}
                         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                           <span className="text-xs">
                             ID: <span className="text-foreground/90">{cliente.id.slice(0, 8)}…</span>
@@ -516,15 +518,16 @@ export default function ClientesReformulada() {
                       </div>
                     </div>
 
-                    {/* Right */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    {/* Right — impede o clique do card */}
+                    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                       <div className="flex gap-1">
                         {cliente.status !== "Ativo" && (
                           <Button
                             size="sm"
                             variant="outline"
                             className="h-10 w-10 p-0 rounded-xl text-emerald-300 hover:bg-emerald-500/10 border-border/60"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setSelectedCliente(cliente);
                               setNewStatus("Ativo");
                               setShowStatusModal(true);
@@ -540,7 +543,8 @@ export default function ClientesReformulada() {
                             size="sm"
                             variant="outline"
                             className="h-10 w-10 p-0 rounded-xl text-amber-300 hover:bg-amber-500/10 border-border/60"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setSelectedCliente(cliente);
                               setNewStatus("Pausado");
                               setShowStatusModal(true);
@@ -554,11 +558,16 @@ export default function ClientesReformulada() {
 
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-xl">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-10 w-10 p-0 rounded-xl"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <MoreVertical className="h-5 w-5" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuContent align="end" className="w-52" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenuItem onClick={() => navigate(`/clientes/${cliente.id}`)}>
                             <Eye className="mr-2 h-4 w-4" />
                             Ver detalhes
@@ -568,10 +577,7 @@ export default function ClientesReformulada() {
                             Editar
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteCliente(cliente.id)}
-                            className="text-destructive"
-                          >
+                          <DropdownMenuItem onClick={() => handleDeleteCliente(cliente.id)} className="text-destructive">
                             <Trash2 className="mr-2 h-4 w-4" />
                             Excluir
                           </DropdownMenuItem>
