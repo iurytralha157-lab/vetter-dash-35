@@ -13,8 +13,6 @@ import {
   Search,
   Plus,
   Users,
-  Building2,
-  Phone,
   Mail,
   Instagram,
   Globe,
@@ -23,14 +21,11 @@ import {
   Edit,
   Eye,
   Trash2,
-  Calendar,
-  UserCheck,
   AlertTriangle,
   CheckCircle,
   Clock,
   Pause,
   Play,
-  UserX,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -49,7 +44,6 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 type ClienteStatus = "Ativo" | "Pausado" | "Aguardando confirmação";
 
@@ -81,21 +75,29 @@ interface Stats {
 
 const STATUS_CONFIG: Record<ClienteStatus, { color: string; icon: any; label: string }> = {
   Ativo: {
-    color: "bg-success/20 text-success border-success/30",
+    color: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
     icon: CheckCircle,
     label: "Ativo",
   },
   Pausado: {
-    color: "bg-warning/20 text-warning border-warning/30",
+    color: "bg-amber-500/15 text-amber-300 border-amber-500/25",
     icon: Pause,
     label: "Pausado",
   },
   "Aguardando confirmação": {
-    color: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    color: "bg-sky-500/15 text-sky-300 border-sky-500/25",
     icon: Clock,
     label: "Aguardando",
   },
 };
+
+// “Pills” de filtro (visual) — continua usando a mesma state filterStatus
+const FILTER_PILLS: Array<{ key: string; label: string }> = [
+  { key: "todos", label: "Todos" },
+  { key: "Ativo", label: "Ativos" },
+  { key: "Pausado", label: "Pausados" },
+  { key: "Aguardando confirmação", label: "Aguardando" },
+];
 
 export default function ClientesReformulada() {
   const navigate = useNavigate();
@@ -161,27 +163,29 @@ export default function ClientesReformulada() {
       if (gestoresError) console.warn("Erro ao buscar gestores:", gestoresError);
 
       // 4. Processar dados
-      const processedClientes: Cliente[] = (clientesData || []).map((cliente) => cliente as any).map((cliente) => {
-        // Contar contas do cliente
-        const contasCliente = (accountsData || []).filter((account) => account.cliente_id === cliente.id);
+      const processedClientes: Cliente[] = (clientesData || [])
+        .map((cliente) => cliente as any)
+        .map((cliente) => {
+          // Contar contas do cliente
+          const contasCliente = (accountsData || []).filter((account) => account.cliente_id === cliente.id);
 
-        // Verificar integrações
-        const temMeta = contasCliente.some((conta) => conta.meta_account_id);
-        const temGoogle = contasCliente.some((conta) => conta.google_ads_id);
-        const configuracoesPendentes = !temMeta && !temGoogle;
+          // Verificar integrações
+          const temMeta = contasCliente.some((conta) => conta.meta_account_id);
+          const temGoogle = contasCliente.some((conta) => conta.google_ads_id);
+          const configuracoesPendentes = !temMeta && !temGoogle;
 
-        // Buscar gestor (simplificado por enquanto)
-        const gestorNome = "Sem gestor atribuído";
+          // Buscar gestor (simplificado por enquanto)
+          const gestorNome = "Sem gestor atribuído";
 
-        return {
-          ...cliente,
-          total_contas: contasCliente.length,
-          tem_meta: temMeta,
-          tem_google: temGoogle,
-          configuracoes_pendentes: configuracoesPendentes,
-          gestor_nome: gestorNome,
-        };
-      });
+          return {
+            ...cliente,
+            total_contas: contasCliente.length,
+            tem_meta: temMeta,
+            tem_google: temGoogle,
+            configuracoes_pendentes: configuracoesPendentes,
+            gestor_nome: gestorNome,
+          };
+        });
 
       setClientes(processedClientes);
 
@@ -253,7 +257,7 @@ export default function ClientesReformulada() {
         id_grupo: "",
       });
 
-      loadClientesData(); // Recarregar dados
+      loadClientesData();
     } catch (error) {
       console.error("Erro ao criar cliente:", error);
       toast({
@@ -330,9 +334,15 @@ export default function ClientesReformulada() {
     return matchSearch && matchStatus;
   });
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("pt-BR");
+  // Contadores pra badges dos pills (visual)
+  const counts = {
+    todos: clientes.length,
+    Ativo: clientes.filter((c) => c.status === "Ativo").length,
+    Pausado: clientes.filter((c) => c.status === "Pausado").length,
+    "Aguardando confirmação": clientes.filter((c) => c.status === "Aguardando confirmação").length,
   };
+
+  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString("pt-BR");
 
   const getInitials = (name: string) => {
     return name
@@ -348,15 +358,16 @@ export default function ClientesReformulada() {
       <AppLayout>
         <div className="space-y-6">
           <div className="animate-pulse">
-            <div className="h-8 bg-muted rounded w-1/4 mb-4"></div>
+            <div className="h-10 bg-muted rounded-2xl w-1/3 mb-4" />
+            <div className="h-24 bg-muted rounded-2xl mb-6" />
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-32 bg-muted rounded"></div>
+                <div key={i} className="h-32 bg-muted rounded-2xl" />
               ))}
             </div>
             <div className="space-y-4">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-32 bg-muted rounded"></div>
+                <div key={i} className="h-28 bg-muted rounded-2xl" />
               ))}
             </div>
           </div>
@@ -368,99 +379,164 @@ export default function ClientesReformulada() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* KPIs */}
+        {/* HERO / HEADER (pegada print) */}
+        <Card className="surface-elevated overflow-hidden border-border/60">
+          <CardContent className="p-0">
+            <div className="relative">
+              {/* Glow/Gradient */}
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-transparent to-emerald-500/10" />
+              <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
+              <div className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
+
+              <div className="relative px-6 py-6 md:px-8 md:py-7 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+                    Clientes
+                  </h1>
+                  <p className="text-muted-foreground mt-1">
+                    Gerencie status, integrações e configurações — sem dor e sem drama.
+                  </p>
+
+                  {/* Pills */}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {FILTER_PILLS.map((p) => {
+                      const active = filterStatus === p.key;
+                      const badgeCount = (counts as any)[p.key] ?? 0;
+
+                      return (
+                        <button
+                          key={p.key}
+                          onClick={() => setFilterStatus(p.key)}
+                          className={[
+                            "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm border transition",
+                            active
+                              ? "bg-primary text-primary-foreground border-primary/40 shadow-[0_0_0_1px_rgba(255,255,255,0.06)]"
+                              : "bg-background/30 text-muted-foreground border-border/60 hover:text-foreground hover:bg-background/40",
+                          ].join(" ")}
+                        >
+                          <span>{p.label}</span>
+                          <span
+                            className={[
+                              "text-xs rounded-full px-2 py-0.5",
+                              active ? "bg-primary-foreground/15" : "bg-muted/40",
+                            ].join(" ")}
+                          >
+                            {badgeCount}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={loadClientesData} className="gap-2">
+                    <RefreshCw className="h-4 w-4" />
+                    Atualizar
+                  </Button>
+                  <Button onClick={() => setShowCreateModal(true)} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Novo Cliente
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* KPIs (mais premium) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="surface-elevated">
+          <Card className="surface-elevated border-border/60">
             <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-primary/10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total de Clientes</p>
+                  <p className="text-3xl font-bold mt-1">{stats.total_clientes}</p>
+                  <p className="text-xs text-muted-foreground mt-2">Base completa</p>
+                </div>
+                <div className="h-12 w-12 rounded-2xl bg-primary/15 flex items-center justify-center shadow-inner">
                   <Users className="h-6 w-6 text-primary" />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="surface-elevated border-border/60">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-text-secondary">Total de Clientes</p>
-                  <p className="text-2xl font-bold">{stats.total_clientes}</p>
+                  <p className="text-sm text-muted-foreground">Clientes Ativos</p>
+                  <p className="text-3xl font-bold mt-1">{stats.clientes_ativos}</p>
+                  <p className="text-xs text-muted-foreground mt-2">Em operação</p>
+                </div>
+                <div className="h-12 w-12 rounded-2xl bg-emerald-500/15 flex items-center justify-center shadow-inner">
+                  <CheckCircle className="h-6 w-6 text-emerald-300" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="surface-elevated">
+          <Card className="surface-elevated border-border/60">
             <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-success/10">
-                  <CheckCircle className="h-6 w-6 text-success" />
-                </div>
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-text-secondary">Clientes Ativos</p>
-                  <p className="text-2xl font-bold">{stats.clientes_ativos}</p>
+                  <p className="text-sm text-muted-foreground">Config. Pendentes</p>
+                  <p className="text-3xl font-bold mt-1">{stats.configuracoes_pendentes}</p>
+                  <p className="text-xs text-muted-foreground mt-2">Precisa ação</p>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="surface-elevated">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-warning/10">
-                  <AlertTriangle className="h-6 w-6 text-warning" />
-                </div>
-                <div>
-                  <p className="text-sm text-text-secondary">Config. Pendentes</p>
-                  <p className="text-2xl font-bold">{stats.configuracoes_pendentes}</p>
+                <div className="h-12 w-12 rounded-2xl bg-amber-500/15 flex items-center justify-center shadow-inner">
+                  <AlertTriangle className="h-6 w-6 text-amber-300" />
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Filtros e Ações */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-between">
-          <div className="flex flex-col sm:flex-row gap-4 flex-1">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar clientes..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+        {/* BUSCA + SELECT (mantém funcional) */}
+        <div className="flex flex-col lg:flex-row gap-4 justify-between">
+          <Card className="surface-elevated border-border/60 flex-1">
+            <CardContent className="p-4">
+              <div className="flex flex-col md:flex-row gap-3 md:items-center">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar clientes por nome, e-mail ou CNPJ…"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
 
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filtrar por status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os Status</SelectItem>
-                <SelectItem value="Ativo">Ativos</SelectItem>
-                <SelectItem value="Pausado">Pausados</SelectItem>
-                <SelectItem value="Aguardando confirmação">Aguardando</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={loadClientesData} className="gap-2">
-              <RefreshCw className="h-4 w-4" />
-              Atualizar
-            </Button>
-            <Button onClick={() => setShowCreateModal(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Novo Cliente
-            </Button>
-          </div>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="w-full md:w-[220px]">
+                    <SelectValue placeholder="Filtrar por status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os Status</SelectItem>
+                    <SelectItem value="Ativo">Ativos</SelectItem>
+                    <SelectItem value="Pausado">Pausados</SelectItem>
+                    <SelectItem value="Aguardando confirmação">Aguardando</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Lista de Clientes */}
+        {/* LISTA (cards com cara premium) */}
         <div className="space-y-4">
           {filteredClientes.map((cliente) => {
             const StatusIcon = STATUS_CONFIG[cliente.status].icon;
 
             return (
-              <Card key={cliente.id} className="surface-elevated hover:surface-hover transition-colors">
+              <Card
+                key={cliente.id}
+                className="surface-elevated border-border/60 hover:surface-hover transition-colors"
+              >
                 <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 flex-1">
+                  <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+                    {/* Left */}
+                    <div className="flex items-start gap-4 flex-1">
                       <Avatar className="h-12 w-12">
                         <AvatarFallback className="bg-primary/10 text-primary font-semibold">
                           {getInitials(cliente.nome)}
@@ -468,97 +544,123 @@ export default function ClientesReformulada() {
                       </Avatar>
 
                       <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
+                        {/* Header row */}
+                        <div className="flex flex-wrap items-center gap-2">
                           <h3 className="font-semibold text-lg">{cliente.nome}</h3>
-                          <Badge className={STATUS_CONFIG[cliente.status].color}>
+
+                          <Badge className={["border", STATUS_CONFIG[cliente.status].color].join(" ")}>
                             <StatusIcon className="h-3 w-3 mr-1" />
                             {STATUS_CONFIG[cliente.status].label}
                           </Badge>
+
                           {cliente.configuracoes_pendentes && (
                             <Badge variant="destructive" className="text-xs">
                               <AlertTriangle className="h-3 w-3 mr-1" />
                               Config. Pendente
                             </Badge>
                           )}
+
+                          {/* Integrações (visual) */}
+                          <div className="flex items-center gap-2 ml-0 xl:ml-2">
+                            <span
+                              className={[
+                                "text-xs px-2 py-1 rounded-full border",
+                                cliente.tem_meta
+                                  ? "bg-primary/10 text-primary border-primary/20"
+                                  : "bg-muted/20 text-muted-foreground border-border/60",
+                              ].join(" ")}
+                            >
+                              Meta {cliente.tem_meta ? "OK" : "—"}
+                            </span>
+                            <span
+                              className={[
+                                "text-xs px-2 py-1 rounded-full border",
+                                cliente.tem_google
+                                  ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+                                  : "bg-muted/20 text-muted-foreground border-border/60",
+                              ].join(" ")}
+                            >
+                              Google {cliente.tem_google ? "OK" : "—"}
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                          <div>
-                            <span className="text-text-secondary">ID:</span>
-                            <span className="ml-1 font-medium">{cliente.id.slice(0, 8)}...</span>
+                        {/* Details */}
+                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 text-sm">
+                          <div className="text-muted-foreground">
+                            ID: <span className="text-foreground font-medium">{cliente.id.slice(0, 8)}...</span>
                           </div>
 
                           {cliente.cnpj && (
-                            <div>
-                              <span className="text-text-secondary">CNPJ:</span>
-                              <span className="ml-1 font-medium">{cliente.cnpj}</span>
+                            <div className="text-muted-foreground">
+                              CNPJ: <span className="text-foreground font-medium">{cliente.cnpj}</span>
                             </div>
                           )}
 
                           {cliente.email && (
-                            <div className="flex items-center gap-1">
-                              <Mail className="h-3 w-3 text-text-secondary" />
-                              <span className="font-medium">{cliente.email}</span>
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Mail className="h-4 w-4" />
+                              <span className="text-foreground font-medium truncate">{cliente.email}</span>
                             </div>
                           )}
 
                           {cliente.instagram_handle && (
-                            <div className="flex items-center gap-1">
-                              <Instagram className="h-3 w-3 text-text-secondary" />
-                              <span className="font-medium">@{cliente.instagram_handle}</span>
-                            </div>
-                          )}
-
-                          {cliente.site && (
-                            <div className="flex items-center gap-1">
-                              <Globe className="h-3 w-3 text-text-secondary" />
-                              <span className="font-medium">Site</span>
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Instagram className="h-4 w-4" />
+                              <span className="text-foreground font-medium">@{cliente.instagram_handle}</span>
                             </div>
                           )}
                         </div>
 
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm mt-3 pt-3 border-t border-border">
-                          <div>
-                            <span className="text-text-secondary">Criado:</span>
-                            <span className="ml-1 font-medium">{formatDate(cliente.created_at)}</span>
+                        <div className="mt-4 pt-4 border-t border-border/60 grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                          <div className="text-muted-foreground">
+                            Criado: <span className="text-foreground font-medium">{formatDate(cliente.created_at)}</span>
                           </div>
 
-                          <div>
-                            <span className="text-text-secondary">Contas:</span>
-                            <span className="ml-1 font-medium">{cliente.total_contas || 0}</span>
+                          <div className="text-muted-foreground">
+                            Contas: <span className="text-foreground font-medium">{cliente.total_contas || 0}</span>
                           </div>
 
-                          {cliente.id_grupo && (
-                            <div>
-                              <span className="text-text-secondary">Grupo:</span>
-                              <span className="ml-1 font-medium">{cliente.id_grupo}</span>
+                          {cliente.id_grupo ? (
+                            <div className="text-muted-foreground">
+                              Grupo: <span className="text-foreground font-medium">{cliente.id_grupo}</span>
+                            </div>
+                          ) : (
+                            <div className="text-muted-foreground">
+                              Grupo: <span className="text-foreground font-medium">—</span>
                             </div>
                           )}
 
-                          <div>
-                            <span className="text-text-secondary">Gestor:</span>
-                            <span className="ml-1 font-medium">{cliente.gestor_nome}</span>
+                          <div className="text-muted-foreground">
+                            Gestor: <span className="text-foreground font-medium">{cliente.gestor_nome}</span>
                           </div>
+
+                          {cliente.site && (
+                            <div className="flex items-center gap-2 text-muted-foreground col-span-2 lg:col-span-1">
+                              <Globe className="h-4 w-4" />
+                              <span className="text-foreground font-medium">Site cadastrado</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    {/* Ações */}
-                    <div className="flex items-center gap-2">
-                      {/* Botões de Status */}
+                    {/* Right actions */}
+                    <div className="flex items-center justify-end gap-2">
                       <div className="flex gap-1">
                         {cliente.status !== "Ativo" && (
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 w-8 p-0 text-success hover:bg-success/10"
+                            className="h-9 w-9 p-0 text-emerald-300 hover:bg-emerald-500/10 border-border/60"
                             onClick={() => {
                               setSelectedCliente(cliente);
                               setNewStatus("Ativo");
                               setShowStatusModal(true);
                             }}
+                            title="Ativar"
                           >
-                            <Play className="h-3 w-3" />
+                            <Play className="h-4 w-4" />
                           </Button>
                         )}
 
@@ -566,26 +668,26 @@ export default function ClientesReformulada() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 w-8 p-0 text-warning hover:bg-warning/10"
+                            className="h-9 w-9 p-0 text-amber-300 hover:bg-amber-500/10 border-border/60"
                             onClick={() => {
                               setSelectedCliente(cliente);
                               setNewStatus("Pausado");
                               setShowStatusModal(true);
                             }}
+                            title="Pausar"
                           >
-                            <Pause className="h-3 w-3" />
+                            <Pause className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
 
-                      {/* Menu de Ações */}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <MoreVertical className="h-4 w-4" />
+                          <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+                            <MoreVertical className="h-5 w-5" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuContent align="end" className="w-52">
                           <DropdownMenuItem onClick={() => navigate(`/clientes/${cliente.id}`)}>
                             <Eye className="mr-2 h-4 w-4" />
                             Ver detalhes
@@ -612,13 +714,13 @@ export default function ClientesReformulada() {
           })}
 
           {filteredClientes.length === 0 && (
-            <Card className="surface-elevated">
+            <Card className="surface-elevated border-border/60">
               <CardContent className="p-12 text-center">
-                <Users className="h-12 w-12 mx-auto mb-4 text-text-tertiary" />
+                <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-lg font-semibold text-foreground mb-2">Nenhum cliente encontrado</h3>
-                <p className="text-text-secondary mb-4">
+                <p className="text-muted-foreground mb-4">
                   {searchTerm
-                    ? "Tente ajustar os termos de busca para encontrar os clientes que procura."
+                    ? "Tenta ajustar a busca (às vezes é só um espaço a mais ferrando tudo 😄)."
                     : "Comece criando seu primeiro cliente."}
                 </p>
                 {!searchTerm && (
