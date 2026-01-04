@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { Users, DollarSign, Target, TrendingUp, BarChart3, Zap } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { KPICard } from "@/components/dashboard/KPICard";
+import { KPICardLarge } from "@/components/dashboard/KPICardLarge";
+import { SmartProjectionCard } from "@/components/dashboard/SmartProjectionCard";
+import { ProfitCard } from "@/components/dashboard/ProfitCard";
+import { PromoBanner } from "@/components/dashboard/PromoBanner";
 import { PeriodSelector, Period } from "@/components/dashboard/PeriodSelector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -67,9 +71,15 @@ export default function Dashboard() {
     }).format(value);
   };
 
+  // Prepare mini chart data from chartData
+  const miniChartData = chartData.map((d) => ({ value: d.leads }));
+
   return (
     <AppLayout>
       <div className="space-y-6">
+        {/* Promo Banner */}
+        <PromoBanner />
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -79,8 +89,47 @@ export default function Dashboard() {
           <PeriodSelector value={period} onValueChange={setPeriod} />
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Main KPI Grid - 12 columns */}
+        {isLoading ? (
+          <div className="grid grid-cols-12 gap-4">
+            <Skeleton className="col-span-12 lg:col-span-6 h-64" />
+            <Skeleton className="col-span-6 lg:col-span-3 h-64" />
+            <Skeleton className="col-span-6 lg:col-span-3 h-64" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-12 gap-4">
+            {/* Main KPI - Investimento Total */}
+            <div className="col-span-12 lg:col-span-6">
+              <KPICardLarge
+                title="Faturamento mensal (atual)"
+                value={formatCurrency(kpiData?.totalSpend || 0)}
+                icon={DollarSign}
+                trend={{ value: 12.5, isPositive: true }}
+                chartData={miniChartData}
+                chartColor="hsl(25 95% 53%)"
+              />
+            </div>
+
+            {/* Smart Projection AI */}
+            <div className="col-span-6 lg:col-span-3">
+              <SmartProjectionCard
+                projectedValue={(kpiData?.totalSpend || 0) * 1.25}
+                confidence={78}
+              />
+            </div>
+
+            {/* Profit Card */}
+            <div className="col-span-6 lg:col-span-3">
+              <ProfitCard
+                value={(kpiData?.totalSpend || 0) * 0.35}
+                percentage={100}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Secondary KPI Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {isLoading ? (
             <>
               {[...Array(6)].map((_, i) => (
@@ -91,40 +140,34 @@ export default function Dashboard() {
             kpiData && (
               <>
                 <KPICard
-                  title="Clientes Ativos (Meta)"
+                  title="Clientes Meta"
                   value={kpiData.activeClientsMeta}
                   icon={Users}
-                  description="Clientes com campanhas Meta ativas"
                 />
                 <KPICard
-                  title="Clientes Ativos (Google)"
+                  title="Clientes Google"
                   value={kpiData.activeClientsGoogle}
                   icon={Users}
-                  description="Clientes com campanhas Google ativas"
                 />
                 <KPICard
-                  title="Investimento Total"
-                  value={formatCurrency(kpiData.totalSpend)}
-                  icon={DollarSign}
-                  description={`${period === "30d" ? "Este mês" : `Últimos ${period.replace("d", " dias")}`}`}
-                />
-                <KPICard
-                  title="Leads Gerados"
+                  title="Leads"
                   value={kpiData.leads.toLocaleString()}
                   icon={Target}
-                  description={`${period === "30d" ? "Este mês" : `Últimos ${period.replace("d", " dias")}`}`}
                 />
                 <KPICard
                   title="CTR Médio"
                   value={`${kpiData.avgCTR.toFixed(2)}%`}
                   icon={TrendingUp}
-                  description="Taxa de cliques em todas as campanhas"
                 />
                 <KPICard
                   title="CPL Médio"
                   value={formatCurrency(kpiData.avgCPL)}
                   icon={BarChart3}
-                  description="Custo por lead em todas as campanhas"
+                />
+                <KPICard
+                  title="Investimento"
+                  value={formatCurrency(kpiData.totalSpend)}
+                  icon={DollarSign}
                 />
               </>
             )
@@ -134,10 +177,12 @@ export default function Dashboard() {
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Leads Chart */}
-          <Card className="surface-elevated">
+          <Card className="card-dark border-border/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-primary" />
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Target className="h-4 w-4 text-primary" />
+                </div>
                 Leads ao Longo do Tempo
               </CardTitle>
             </CardHeader>
@@ -171,10 +216,12 @@ export default function Dashboard() {
           </Card>
 
           {/* Spend Chart */}
-          <Card className="surface-elevated">
+          <Card className="card-dark border-border/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <DollarSign className="h-4 w-4 text-primary" />
+                </div>
                 Investimento Diário
               </CardTitle>
             </CardHeader>
@@ -204,10 +251,12 @@ export default function Dashboard() {
 
         {/* Bottom Row - Quick Stats */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="surface-elevated">
+          <Card className="card-dark border-border/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-primary" />
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Zap className="h-4 w-4 text-primary" />
+                </div>
                 Estatísticas de Automação
               </CardTitle>
             </CardHeader>
@@ -216,24 +265,24 @@ export default function Dashboard() {
                 <Skeleton className="h-32" />
               ) : (
                 <div className="space-y-4">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center p-3 rounded-xl bg-secondary/30">
                     <span className="text-muted-foreground">Envios WhatsApp</span>
-                    <span className="font-medium">{(automationStats?.whatsappSends ?? 0).toLocaleString()}</span>
+                    <span className="font-bold text-foreground">{(automationStats?.whatsappSends ?? 0).toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center p-3 rounded-xl bg-secondary/30">
                     <span className="text-muted-foreground">Relatórios Enviados</span>
-                    <span className="font-medium">{(automationStats?.reportsSent ?? 0).toLocaleString()}</span>
+                    <span className="font-bold text-foreground">{(automationStats?.reportsSent ?? 0).toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center p-3 rounded-xl bg-secondary/30">
                     <span className="text-muted-foreground">Leads Sincronizados</span>
-                    <span className="font-medium">{(automationStats?.leadsSynced ?? 0).toLocaleString()}</span>
+                    <span className="font-bold text-foreground">{(automationStats?.leadsSynced ?? 0).toLocaleString()}</span>
                   </div>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card className="surface-elevated lg:col-span-2">
+          <Card className="card-dark border-border/50 lg:col-span-2">
             <CardHeader>
               <CardTitle>Criativos com Melhor Performance</CardTitle>
             </CardHeader>
@@ -241,26 +290,26 @@ export default function Dashboard() {
               {isLoading ? (
                 <Skeleton className="h-32" />
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {(topCreatives ?? []).map((creative) => (
                     <div
                       key={creative.id}
-                      className="flex items-center justify-between p-3 rounded-xl bg-secondary/30"
+                      className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors"
                     >
-                      <span className="font-medium">{creative.name}</span>
-                      <div className="flex gap-4 text-sm">
+                      <span className="font-medium text-foreground">{creative.name}</span>
+                      <div className="flex gap-6 text-sm">
                         <span className="text-muted-foreground">
-                          CTR: <span className="text-foreground font-medium">{creative.ctr.toFixed(2)}%</span>
+                          CTR: <span className="text-primary font-bold">{creative.ctr.toFixed(2)}%</span>
                         </span>
                         <span className="text-muted-foreground">
-                          Taxa de Gancho:{" "}
-                          <span className="text-foreground font-medium">{creative.hookRate.toFixed(1)}%</span>
+                          Hook:{" "}
+                          <span className="text-success font-bold">{creative.hookRate.toFixed(1)}%</span>
                         </span>
                       </div>
                     </div>
                   ))}
                   {topCreatives.length === 0 && (
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-sm text-muted-foreground text-center py-8">
                       Ainda sem dados suficientes de criativos para exibir.
                     </div>
                   )}

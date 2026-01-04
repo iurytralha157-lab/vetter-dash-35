@@ -41,6 +41,7 @@ export default {
         accent: {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
+          ai: "hsl(var(--accent-ai))",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",
@@ -68,8 +69,32 @@ export default {
           secondary: "hsl(var(--text-secondary))",
           tertiary: "hsl(var(--text-tertiary))",
         },
-        success: "hsl(var(--success))",
-        warning: "hsl(var(--warning))",
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        // Nova paleta dark premium
+        dark: {
+          900: "#0B0B0B",
+          800: "#0E0E0E",
+          700: "#121212",
+          600: "#1A1A1A",
+        },
+        "brand-orange": {
+          DEFAULT: "#F97316",
+          light: "#FB923C",
+          dark: "#EA580C",
+        },
+        "brand-purple": {
+          DEFAULT: "#8B5CF6",
+          light: "#A78BFA",
+          dark: "#7C3AED",
+        },
+        "neon-green": "#00FF88",
       },
       backgroundImage: {
         'gradient-primary': 'var(--gradient-primary)',

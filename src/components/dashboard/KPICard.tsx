@@ -1,4 +1,3 @@
-import { ReactNode } from "react";
 import { LucideIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -23,28 +22,30 @@ export function KPICard({
   className
 }: KPICardProps) {
   return (
-    <Card className={`surface-elevated ${className}`}>
+    <Card className={`card-dark border-border/50 ${className}`}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+        <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           {title}
         </CardTitle>
-        <Icon className="h-5 w-5 text-muted-foreground" />
+        <div className="p-2 rounded-lg bg-primary/10">
+          <Icon className="h-4 w-4 text-primary" />
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold mb-1">{value}</div>
+        <div className="text-3xl font-bold text-foreground mb-1">{value}</div>
         {description && (
           <p className="text-xs text-muted-foreground">{description}</p>
         )}
         {trend && (
-          <div className="flex items-center mt-2">
+          <div className="flex items-center mt-2 gap-2">
             <span
               className={`text-xs font-medium ${
-                trend.isPositive ? "text-green-400" : "text-red-400"
+                trend.isPositive ? "text-success" : "text-destructive"
               }`}
             >
               {trend.isPositive ? "+" : ""}{trend.value}%
             </span>
-            <span className="text-xs text-muted-foreground ml-1">from last period</span>
+            <span className="text-xs text-muted-foreground">vs período anterior</span>
           </div>
         )}
       </CardContent>
