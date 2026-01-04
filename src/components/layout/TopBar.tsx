@@ -32,15 +32,12 @@ export function TopBar() {
     return saved ? JSON.parse(saved) : false;
   });
 
-  // Usuário real
   const [profileName, setProfileName] = useState<string>("Usuário");
   const [profileEmail, setProfileEmail] = useState<string>("");
 
-  // Notificações reais (Supabase)
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
 
-  // Sync sidebar collapsed state
   useEffect(() => {
     const handleStorageChange = () => {
       const saved = localStorage.getItem("sidebar-collapsed");
@@ -56,7 +53,6 @@ export function TopBar() {
     };
   }, []);
 
-  // Buscar nome real do usuário no profiles
   useEffect(() => {
     const loadProfile = async () => {
       try {
@@ -89,13 +85,11 @@ export function TopBar() {
     loadProfile();
   }, [user?.id]);
 
-  // Buscar notificações reais do Supabase (performance_alerts)
   useEffect(() => {
     const loadNotifications = async () => {
       try {
         setNotificationsLoading(true);
 
-        // Pega alertas ativos mais recentes
         const { data, error } = await supabase
           .from("performance_alerts")
           .select("id, title, message, severity, created_at, status")
@@ -141,7 +135,7 @@ export function TopBar() {
       {/* Desktop TopBar */}
       <header
         className={`
-          hidden lg:flex items-center justify-between h-16 bg-card border-b border-border
+          hidden lg:flex items-center justify-between h-16 bg-dark-900 border-b border-border/50
           transition-all duration-500 ease-in-out fixed top-0 right-0 z-30
           ${sidebarCollapsed ? "left-16" : "left-64"}
         `}
@@ -150,18 +144,16 @@ export function TopBar() {
           paddingRight: "1.5rem",
         }}
       >
-        {/* Left Section - (REMOVIDO título da página) */}
         <div />
 
-        {/* Right Section - Actions */}
         <div className="flex items-center gap-3">
-          {/* Notifications - agora real */}
+          {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="relative hover:bg-muted transition-all duration-200 hover:scale-105"
+                className="relative hover:bg-dark-700 transition-all duration-200 hover:scale-105"
               >
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (
@@ -175,88 +167,85 @@ export function TopBar() {
               </Button>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" className="w-96 shadow-xl">
+            <DropdownMenuContent align="end" className="w-96 shadow-xl bg-dark-800 border-border/50">
               <DropdownMenuLabel className="flex items-center justify-between">
                 <span>Notificações</span>
                 {unreadCount > 0 && (
-                  <Badge variant="secondary" className="ml-2">
+                  <Badge variant="secondary" className="ml-2 bg-primary/20 text-primary">
                     {unreadCount} ativa{unreadCount > 1 ? "s" : ""}
                   </Badge>
                 )}
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="bg-border/50" />
 
               <div className="max-h-96 overflow-y-auto scrollbar-thin">
                 {notificationsLoading ? (
-                  <div className="p-4 text-sm text-text-secondary">
+                  <div className="p-4 text-sm text-muted-foreground">
                     Carregando notificações...
                   </div>
                 ) : notifications.length === 0 ? (
-                  <div className="p-4 text-sm text-text-secondary">
+                  <div className="p-4 text-sm text-muted-foreground">
                     Nenhuma notificação ativa no momento.
                   </div>
                 ) : (
                   notifications.map((n) => (
                     <DropdownMenuItem
                       key={n.id}
-                      className="flex flex-col items-start p-4 gap-1 hover:bg-muted/50 transition-colors"
+                      className="flex flex-col items-start p-4 gap-1 hover:bg-dark-700 transition-colors"
                     >
                       <div className="flex items-start justify-between w-full gap-2">
                         <div className="flex-1">
                           <span className="text-sm font-medium text-foreground">
                             {n.title}
                           </span>
-                          <p className="text-xs text-text-tertiary mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             {n.description}
                           </p>
                         </div>
                       </div>
-                      <span className="text-xs text-text-muted">{n.time}</span>
+                      <span className="text-xs text-muted-foreground">{n.time}</span>
                     </DropdownMenuItem>
                   ))
                 )}
               </div>
 
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="bg-border/50" />
               <DropdownMenuItem
                 className="text-center text-primary cursor-pointer hover:bg-primary/10"
-                onClick={() => {
-                  // se você tiver uma rota tipo /alertas, manda pra lá
-                  // navigate("/alertas")
-                }}
+                onClick={() => {}}
               >
                 Ver todos os alertas
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* User Menu - nome real */}
+          {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="flex items-center gap-2 px-3 hover:bg-muted transition-all duration-200"
+                className="flex items-center gap-2 px-3 hover:bg-dark-700 transition-all duration-200"
               >
                 <div className="text-right">
                   <p className="text-sm font-medium text-foreground">
                     {profileName}
                   </p>
-                  <p className="text-xs text-text-secondary">
+                  <p className="text-xs text-muted-foreground">
                     {profileEmail ? profileEmail : "Conta"}
                   </p>
                 </div>
-                <ChevronDown className="h-4 w-4 text-text-tertiary" />
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" className="w-56 shadow-xl">
+            <DropdownMenuContent align="end" className="w-56 shadow-xl bg-dark-800 border-border/50">
               <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="hover:bg-muted/50">Perfil</DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-muted/50">
+              <DropdownMenuSeparator className="bg-border/50" />
+              <DropdownMenuItem className="hover:bg-dark-700">Perfil</DropdownMenuItem>
+              <DropdownMenuItem className="hover:bg-dark-700">
                 Configurações
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="bg-border/50" />
               <DropdownMenuItem className="text-destructive hover:bg-destructive/10">
                 Sair
               </DropdownMenuItem>
@@ -266,17 +255,15 @@ export function TopBar() {
       </header>
 
       {/* Mobile TopBar */}
-      <header className="lg:hidden flex items-center justify-between h-16 px-4 bg-card border-b border-border">
-        {/* Left - só drawer (REMOVIDO título da página) */}
+      <header className="lg:hidden flex items-center justify-between h-16 px-4 bg-dark-900 border-b border-border/50">
         <div className="flex items-center gap-3">
           <MobileDrawer />
         </div>
 
-        {/* Right - notifications + user */}
         <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative">
+              <Button variant="ghost" size="icon" className="relative hover:bg-dark-700">
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (
                   <Badge
@@ -288,21 +275,21 @@ export function TopBar() {
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80">
+            <DropdownMenuContent align="end" className="w-80 bg-dark-800 border-border/50">
               <DropdownMenuLabel>Notificações</DropdownMenuLabel>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="bg-border/50" />
               {notificationsLoading ? (
-                <div className="p-3 text-sm text-text-secondary">Carregando...</div>
+                <div className="p-3 text-sm text-muted-foreground">Carregando...</div>
               ) : notifications.length === 0 ? (
-                <div className="p-3 text-sm text-text-secondary">Sem alertas ativos.</div>
+                <div className="p-3 text-sm text-muted-foreground">Sem alertas ativos.</div>
               ) : (
                 notifications.slice(0, 5).map((n) => (
                   <DropdownMenuItem
                     key={n.id}
-                    className="flex flex-col items-start p-3 gap-1"
+                    className="flex flex-col items-start p-3 gap-1 hover:bg-dark-700"
                   >
                     <div className="font-medium text-sm">{n.title}</div>
-                    <div className="text-xs text-text-secondary">{n.time}</div>
+                    <div className="text-xs text-muted-foreground">{n.time}</div>
                   </DropdownMenuItem>
                 ))
               )}
@@ -311,21 +298,21 @@ export function TopBar() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center gap-2 px-2">
+              <Button variant="ghost" className="flex items-center gap-2 px-2 hover:bg-dark-700">
                 <div className="text-right">
                   <p className="text-sm font-medium text-foreground">{profileName}</p>
-                  <p className="text-[11px] text-text-secondary">Conta</p>
+                  <p className="text-[11px] text-muted-foreground">Conta</p>
                 </div>
-                <ChevronDown className="h-4 w-4 text-text-tertiary" />
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 shadow-xl">
+            <DropdownMenuContent align="end" className="w-56 shadow-xl bg-dark-800 border-border/50">
               <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Perfil</DropdownMenuItem>
-              <DropdownMenuItem>Configurações</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">Sair</DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-border/50" />
+              <DropdownMenuItem className="hover:bg-dark-700">Perfil</DropdownMenuItem>
+              <DropdownMenuItem className="hover:bg-dark-700">Configurações</DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-border/50" />
+              <DropdownMenuItem className="text-destructive hover:bg-destructive/10">Sair</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
