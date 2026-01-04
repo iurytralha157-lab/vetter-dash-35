@@ -336,9 +336,6 @@ export default function ClientesReformulada() {
                   <h1 className="text-2xl md:text-3xl font-bold tracking-tight mt-3">
                     Clientes
                   </h1>
-                  <p className="text-muted-foreground mt-1">
-                    Gerencie status, integrações e configurações — sem dor e sem drama.
-                  </p>
 
                   {/* Pills premium */}
                   <div className="mt-4 flex flex-wrap gap-2">
