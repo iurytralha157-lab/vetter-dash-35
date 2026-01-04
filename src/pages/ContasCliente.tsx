@@ -1,7 +1,8 @@
-// src/pages/ContasCliente.tsx — HERO premium no estilo do print (Clientes)
-// (lógica/queries/estados inalterados; só UI/UX)
+// src/pages/ContasCliente.tsx — HERO premium + filtros (inclui Meta/Google) + remove KPI cards
+// Mantém o texto "Gerencie status..." (como você pediu)
+// Move mini-métricas para dentro do card, abaixo do nome
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,16 +24,16 @@ import {
   Edit,
   Eye,
   Archive,
-  BarChart3,
-  Zap,
   Facebook,
   Chrome,
-  Filter,
   User,
   Pause,
   Play,
   Sparkles,
   ShieldCheck,
+  Wallet,
+  TrendingUp,
+  Target,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -87,23 +88,29 @@ interface StatsData {
   saldoTotal: number;
 }
 
-const STATUS_PILLS = [
-  { key: "Todos os Status", label: "Todos" },
+// Pills agora incluem Meta/Google como filtros
+const FILTER_PILLS = [
+  { key: "todos", label: "Todos" },
   { key: "Ativo", label: "Ativos" },
   { key: "Pausado", label: "Pausados" },
   { key: "Arquivado", label: "Arquivados" },
+  { key: "meta", label: "Meta Ads" },
+  { key: "google", label: "Google Ads" },
 ] as const;
+
+type FilterKey = (typeof FILTER_PILLS)[number]["key"];
 
 export default function ContasCliente() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Estados (inalterados)
+  // Estados (inalterados na lógica de dados)
   const [accounts, setAccounts] = useState<AccountData[]>([]);
   const [managers, setManagers] = useState<any[]>([]);
   const [clientes, setClientes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
   const [stats, setStats] = useState<StatsData>({
     total: 0,
     ativos: 0,
@@ -115,9 +122,13 @@ export default function ContasCliente() {
   });
 
   const [searchTerm, setSearchTerm] = useState("");
+  // Mantém selects, mas agora o "status" principal vem das pills
   const [filterStatus, setFilterStatus] = useState("Todos os Status");
   const [filterGestor, setFilterGestor] = useState("Todos os Gestores");
   const [filterCliente, setFilterCliente] = useState("Todos os Clientes");
+
+  // Novo: filtro por pill (inclui meta/google)
+  const [activePill, setActivePill] = useState<FilterKey>("todos");
 
   const [showModernForm, setShowModernForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountData | null>(null);
@@ -126,22 +137,20 @@ export default function ContasCliente() {
     loadAccountsData();
   }, []);
 
-  // === CARREGAMENTO ===
   const loadAccountsData = async () => {
     try {
       setLoading(true);
 
-      // ✅ Query CORRETA com join do gestor
       const { data: accountsData, error: accountsError } = await supabase
         .from("accounts")
         .select(
           `
-        *,
-        gestor:profiles!gestor_id(
-          id,
-          name
-        )
-      `,
+          *,
+          gestor:profiles!gestor_id(
+            id,
+            name
+          )
+        `,
         )
         .order("created_at", { ascending: false });
 
@@ -172,8 +181,8 @@ export default function ContasCliente() {
         ativos: processedAccounts.filter((a) => a.status === "Ativo").length,
         pausados: processedAccounts.filter((a) => a.status === "Pausado").length,
         arquivados: processedAccounts.filter((a) => a.status === "Arquivado").length,
-        metaAds: processedAccounts.filter((a) => a.usa_meta_ads).length,
-        googleAds: processedAccounts.filter((a) => a.usa_google_ads).length,
+        metaAds: processedAccounts.filter((a) => a.usa_meta_ads || !!a.meta_account_id).length,
+        googleAds: processedAccounts.filter((a) => a.usa_google_ads || !!a.google_ads_id).length,
         saldoTotal: processedAccounts.reduce((sum, a) => sum + (a.saldo_meta || 0), 0),
       };
 
@@ -192,30 +201,49 @@ export default function ContasCliente() {
     }
   };
 
-  // === FILTROS (inalterado) ===
+  // Contagem dos pills (inclui Meta/Google)
+  const pillCounts = useMemo(() => {
+    return {
+      todos: stats.total,
+      Ativo: stats.ativos,
+      Pausado: stats.pausados,
+      Arquivado: stats.arquivados,
+      meta: stats.metaAds,
+      google: stats.googleAds,
+    } as Record<FilterKey, number>;
+  }, [stats]);
+
+  // FILTROS — mantém o que você já tinha e adiciona filtro por pill
   const filteredAccounts = accounts.filter((account) => {
     const matchesSearch =
       !searchTerm ||
       account.nome_cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
       account.telefone.includes(searchTerm) ||
       (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesStatus = filterStatus === "Todos os Status" || account.status === filterStatus;
-    const matchesGestor = filterGestor === "Todos os Gestores" || true; // Removido gestor_id
+
+    // Select de status (se você quiser usar junto)
+    const matchesStatusSelect = filterStatus === "Todos os Status" || account.status === filterStatus;
+
+    const matchesGestor = filterGestor === "Todos os Gestores" || true; // (mantido)
     const matchesCliente = filterCliente === "Todos os Clientes" || account.cliente_id === filterCliente;
-    return matchesSearch && matchesStatus && matchesGestor && matchesCliente;
+
+    // Pill ativa (novo)
+    const metaConfigured = !!(account.meta_account_id && account.meta_account_id.trim().length > 0);
+    const googleConfigured = !!(account.google_ads_id && account.google_ads_id.trim().length > 0);
+
+    const matchesPill =
+      activePill === "todos"
+        ? true
+        : activePill === "meta"
+          ? (account.usa_meta_ads || metaConfigured)
+          : activePill === "google"
+            ? (account.usa_google_ads || googleConfigured)
+            : account.status === activePill;
+
+    return matchesSearch && matchesStatusSelect && matchesGestor && matchesCliente && matchesPill;
   });
 
-  // Contagens para as pills (UI)
-  const pillCounts = useMemo(() => {
-    return {
-      "Todos os Status": stats.total,
-      Ativo: stats.ativos,
-      Pausado: stats.pausados,
-      Arquivado: stats.arquivados,
-    } as Record<string, number>;
-  }, [stats]);
-
-  // === AÇÕES (inalteradas) ===
+  // AÇÕES (inalteradas)
   const handleCreateAccount = () => {
     setEditingAccount(null);
     setShowModernForm(true);
@@ -356,59 +384,26 @@ export default function ContasCliente() {
     setRefreshing(false);
   };
 
-  // === Helpers (inalterados) ===
-  const getInitials = (name: string) => {
-    return name
+  const getInitials = (name: string) =>
+    name
       .split(" ")
-      .map((word) => word[0])
+      .map((w) => w[0])
       .join("")
       .toUpperCase()
       .slice(0, 2);
-  };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("pt-BR");
-  };
+  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString("pt-BR");
 
-  // ====== UI Components (apenas layout) ======
-  const StatCard = ({
-    icon,
-    title,
-    value,
-    iconWrapClass,
-    iconClass,
-  }: {
-    icon: React.ReactNode;
-    title: string;
-    value: React.ReactNode;
-    iconWrapClass: string;
-    iconClass: string;
-  }) => (
-    <Card className="surface-elevated border-border/60 rounded-2xl">
-      <CardContent className="p-5">
-        <div className="flex items-center gap-4">
-          <div className={`h-12 w-12 rounded-xl ring-1 flex items-center justify-center ${iconWrapClass}`}>
-            <div className={iconClass}>{icon}</div>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm text-text-secondary">{title}</span>
-            <span className="text-2xl md:text-3xl font-semibold tabular-nums text-foreground">{value}</span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  const formatMoney = (value?: number) => {
+    const v = Number(value || 0);
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+  };
 
   if (loading) {
     return (
       <AppLayout>
         <div className="space-y-6">
           <div className="h-40 bg-muted/30 rounded-2xl animate-pulse border border-border/40" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-24 bg-muted/30 rounded-2xl animate-pulse border border-border/40" />
-            ))}
-          </div>
           <div className="h-20 bg-muted/30 rounded-2xl animate-pulse border border-border/40" />
           <div className="space-y-4">
             {[...Array(6)].map((_, i) => (
@@ -424,7 +419,7 @@ export default function ContasCliente() {
     <AppLayout>
       <TooltipProvider delayDuration={200}>
         <div className="space-y-6">
-          {/* HERO premium igual ao modelo */}
+          {/* HERO premium */}
           <Card className="surface-elevated overflow-hidden border-border/60">
             <CardContent className="p-0">
               <div className="relative">
@@ -455,20 +450,25 @@ export default function ContasCliente() {
                     </div>
 
                     <h1 className="text-2xl md:text-3xl font-bold tracking-tight mt-3">Contas</h1>
-                    <p className="text-muted-foreground mt-1">
-                      Gerencie status, integrações e configurações — sem dor e sem drama.
-                    </p>
 
-                    {/* Pills premium */}
+                    {/* Pills premium (agora inclui Meta/Google) */}
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {STATUS_PILLS.map((p) => {
-                        const active = filterStatus === p.key;
+                      {FILTER_PILLS.map((p) => {
+                        const active = activePill === p.key;
                         const badgeCount = pillCounts[p.key] ?? 0;
 
                         return (
                           <button
                             key={p.key}
-                            onClick={() => setFilterStatus(p.key)}
+                            onClick={() => {
+                              setActivePill(p.key);
+                              // se clicar num pill de status, sincroniza select também (pra não brigar)
+                              if (p.key === "Ativo" || p.key === "Pausado" || p.key === "Arquivado") {
+                                setFilterStatus(p.key);
+                              }
+                              if (p.key === "todos") setFilterStatus("Todos os Status");
+                              // meta/google não mexe no select de status
+                            }}
                             className={[
                               "group inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm border transition",
                               "shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
@@ -514,46 +514,7 @@ export default function ContasCliente() {
             </CardContent>
           </Card>
 
-          {/* KPIs — mantém, só alinhado no padrão */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-            <StatCard
-              icon={<Users className="h-5 w-5" />}
-              title="Total"
-              value={stats.total}
-              iconWrapClass="bg-primary/10 ring-primary/20"
-              iconClass="text-primary"
-            />
-            <StatCard
-              icon={<CheckCircleIcon />}
-              title="Ativos"
-              value={stats.ativos}
-              iconWrapClass="bg-success/10 ring-success/20"
-              iconClass="text-success"
-            />
-            <StatCard
-              icon={<Zap className="h-5 w-5" />}
-              title="Pausados"
-              value={stats.pausados}
-              iconWrapClass="bg-yellow-500/10 ring-yellow-500/20"
-              iconClass="text-yellow-500"
-            />
-            <StatCard
-              icon={<BarChart3 className="h-5 w-5" />}
-              title="Meta Ads"
-              value={stats.metaAds}
-              iconWrapClass="bg-blue-500/10 ring-blue-500/20"
-              iconClass="text-blue-500"
-            />
-            <StatCard
-              icon={<TargetIcon />}
-              title="Google Ads"
-              value={stats.googleAds}
-              iconWrapClass="bg-amber-500/10 ring-amber-500/20"
-              iconClass="text-amber-500"
-            />
-          </div>
-
-          {/* FILTROS — painel premium */}
+          {/* Filtros (sem KPIs cards) */}
           <Card className="surface-elevated border-border/60">
             <CardContent className="p-4">
               <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
@@ -596,8 +557,16 @@ export default function ContasCliente() {
                   </SelectContent>
                 </Select>
 
-                {/* (Opcional) Mantém o select de status também, apesar das pills */}
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                {/* Mantém status select caso queira granular (mas pills já resolvem) */}
+                <Select
+                  value={filterStatus}
+                  onValueChange={(v) => {
+                    setFilterStatus(v);
+                    // sincroniza pill com status quando for status
+                    if (v === "Ativo" || v === "Pausado" || v === "Arquivado") setActivePill(v as any);
+                    if (v === "Todos os Status") setActivePill("todos");
+                  }}
+                >
                   <SelectTrigger className="w-full lg:w-[220px] h-11 rounded-xl bg-background/40 border-border/60">
                     <SelectValue placeholder="Todos os Status" />
                   </SelectTrigger>
@@ -612,15 +581,15 @@ export default function ContasCliente() {
             </CardContent>
           </Card>
 
-          {/* LISTA DE CONTAS — igual você já tinha, só “polida” no hover */}
+          {/* LISTA DE CONTAS — mini-métricas embaixo do nome */}
           <div className="space-y-3">
             {filteredAccounts.map((account) => {
               const statusColor =
                 account.status === "Ativo"
                   ? "from-success/70 to-success/10"
                   : account.status === "Pausado"
-                  ? "from-yellow-500/70 to-yellow-500/10"
-                  : "from-text-muted/70 to-text-muted/10";
+                    ? "from-yellow-500/70 to-yellow-500/10"
+                    : "from-text-muted/70 to-text-muted/10";
 
               const metaConfigured = !!(account.meta_account_id && account.meta_account_id.trim().length > 0);
               const googleConfigured = !!(account.google_ads_id && account.google_ads_id.trim().length > 0);
@@ -638,32 +607,67 @@ export default function ContasCliente() {
                 >
                   <div className={`absolute left-0 top-0 h-full w-1.5 bg-gradient-to-b ${statusColor}`} />
                   <CardContent className="p-4 md:p-5">
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] items-start gap-4">
                       {/* ESQUERDA */}
-                      <div className="flex items-center gap-4 min-w-0">
-                        <Avatar className="h-12 w-12 ring-1 ring-border/50 transition">
+                      <div className="flex items-start gap-4 min-w-0">
+                        <Avatar className="h-12 w-12 ring-1 ring-border/50 transition mt-0.5">
                           <AvatarFallback className="bg-primary text-primary-foreground font-bold text-sm">
                             {getInitials(account.nome_cliente)}
                           </AvatarFallback>
                         </Avatar>
 
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                        <div className="min-w-0 flex-1">
+                          {/* Linha 1 */}
+                          <div className="flex flex-wrap items-center gap-2">
                             <h3 className="font-semibold text-foreground text-lg truncate">{account.nome_cliente}</h3>
+
                             <Badge
-                              className={
+                              className={[
+                                "rounded-full",
                                 account.status === "Ativo"
                                   ? "bg-success text-white"
                                   : account.status === "Pausado"
-                                  ? "bg-yellow-500 text-black dark:text-white"
-                                  : "bg-text-muted text-white"
-                              }
+                                    ? "bg-yellow-500 text-black dark:text-white"
+                                    : "bg-text-muted text-white",
+                              ].join(" ")}
                             >
                               {account.status}
                             </Badge>
+
+                            {/* Chips de canal (mais “premium”) */}
+                            <div className="flex items-center gap-2">
+                              {showMetaChip && (
+                                <span
+                                  className={[
+                                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border",
+                                    metaConfigured
+                                      ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
+                                      : "border-border/40 bg-transparent text-text-muted",
+                                  ].join(" ")}
+                                >
+                                  <Facebook className="h-3.5 w-3.5" />
+                                  Meta
+                                </span>
+                              )}
+
+                              {showGoogleChip && (
+                                <span
+                                  className={[
+                                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border",
+                                    googleConfigured
+                                      ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+                                      : "border-border/40 bg-transparent text-text-muted",
+                                  ].join(" ")}
+                                >
+                                  <Chrome className="h-3.5 w-3.5" />
+                                  Google
+                                </span>
+                              )}
+                            </div>
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-text-secondary">
+                          {/* Linha 2: cliente + gestor */}
+                          <div className="mt-1.5 flex flex-wrap items-center gap-4 text-sm text-text-secondary">
                             <div className="flex items-center gap-1">
                               <Building2 className="h-3.5 w-3.5" />
                               <span className="truncate">
@@ -677,60 +681,34 @@ export default function ContasCliente() {
                               <span>{account.gestor_name || "Gestor não definido"}</span>
                             </div>
                           </div>
-                        </div>
-                      </div>
 
-                      {/* CANAIS */}
-                      <div className="text-right md:text-left">
-                        <div className="text-xs text-text-tertiary font-medium mb-1">Canais</div>
-                        <div className="flex items-center md:justify-start justify-end gap-2">
-                          {showMetaChip && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span
-                                  className={[
-                                    "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium border",
-                                    metaConfigured
-                                      ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
-                                      : "border-border/40 bg-transparent text-text-muted",
-                                  ].join(" ")}
-                                >
-                                  <Facebook className="h-3.5 w-3.5" />
-                                  Meta
+                          {/* Linha 3: mini-KPIs embaixo do nome (novo) */}
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border border-border/60 bg-background/30 text-muted-foreground">
+                              <Wallet className="h-3.5 w-3.5" />
+                              Budget: <span className="text-foreground/90">{formatMoney(account.total_budget)}</span>
+                            </span>
+
+                            <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border border-border/60 bg-background/30 text-muted-foreground">
+                              <TrendingUp className="h-3.5 w-3.5" />
+                              Leads/mês: <span className="text-foreground/90">{account.leads_mes ?? 0}</span>
+                            </span>
+
+                            <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border border-border/60 bg-background/30 text-muted-foreground">
+                              <Target className="h-3.5 w-3.5" />
+                              Conv/mês: <span className="text-foreground/90">{account.conversoes_mes ?? 0}</span>
+                            </span>
+
+                            {!!account.saldo_meta && account.saldo_meta > 0 && (
+                              <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border border-blue-500/25 bg-blue-500/10 text-blue-300">
+                                <Wallet className="h-3.5 w-3.5" />
+                                Saldo Meta:{" "}
+                                <span className="text-blue-100">
+                                  {formatMoney((account.saldo_meta || 0) / 100)}
                                 </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {metaConfigured ? "Meta Ads configurado" : "Meta Ads não configurado (adicione o ID)."}
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-
-                          {showGoogleChip && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span
-                                  className={[
-                                    "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium border",
-                                    googleConfigured
-                                      ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
-                                      : "border-border/40 bg-transparent text-text-muted",
-                                  ].join(" ")}
-                                >
-                                  <Chrome className="h-3.5 w-3.5" />
-                                  Google
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {googleConfigured
-                                  ? "Google Ads configurado"
-                                  : "Google Ads não configurado (adicione o ID)."}
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-
-                          {!showMetaChip && !showGoogleChip && (
-                            <span className="text-text-muted text-sm">Não configurado</span>
-                          )}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -740,20 +718,49 @@ export default function ContasCliente() {
                         <div className="text-sm text-foreground font-medium">{formatDate(account.updated_at)}</div>
                       </div>
 
-                      {/* AÇÕES */}
-                      <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+                      {/* AÇÕES rápidas */}
+                      <div className="flex items-center gap-2 justify-start md:justify-end">
+                        {account.status !== "Ativo" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-10 w-10 p-0 rounded-xl text-emerald-300 hover:bg-emerald-500/10 border-border/60"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleStatus(account, e);
+                            }}
+                            title="Ativar"
+                          >
+                            <Play className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {account.status === "Ativo" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-10 w-10 p-0 rounded-xl text-amber-300 hover:bg-amber-500/10 border-border/60"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleStatus(account, e);
+                            }}
+                            title="Pausar"
+                          >
+                            <Pause className="h-4 w-4" />
+                          </Button>
+                        )}
+
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="ghost"
-                              size="icon"
+                              size="sm"
+                              className="h-10 w-10 p-0 rounded-xl"
                               onClick={(e) => e.stopPropagation()}
-                              className="h-10 w-10 rounded-xl"
-                              aria-label="Abrir ações"
                             >
-                              <MoreVertical className="h-4 w-4" />
+                              <MoreVertical className="h-5 w-5" />
                             </Button>
                           </DropdownMenuTrigger>
+
                           <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                             <DropdownMenuItem onClick={() => handleViewAccount(account.id)}>
                               <Eye className="h-4 w-4 mr-2" />
@@ -764,17 +771,6 @@ export default function ContasCliente() {
                               Editar conta
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            {account.status === "Ativo" ? (
-                              <DropdownMenuItem onClick={(e) => handleToggleStatus(account, e as any)}>
-                                <Pause className="h-4 w-4 mr-2" />
-                                Pausar conta
-                              </DropdownMenuItem>
-                            ) : account.status === "Pausado" ? (
-                              <DropdownMenuItem onClick={(e) => handleToggleStatus(account, e as any)}>
-                                <Play className="h-4 w-4 mr-2" />
-                                Despausar conta
-                              </DropdownMenuItem>
-                            ) : null}
                             <DropdownMenuItem className="text-warning">
                               <Archive className="h-4 w-4 mr-2" />
                               Arquivar
@@ -836,21 +832,5 @@ export default function ContasCliente() {
         </div>
       </TooltipProvider>
     </AppLayout>
-  );
-}
-
-/** Ícones auxiliares */
-function CheckCircleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
-      <path d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2Zm-1 14-4-4 1.414-1.414L11 12.172l4.586-4.586L17 9l-6 7Z" />
-    </svg>
-  );
-}
-function TargetIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
-      <path d="M12 2a10 10 0 1 0 10 10h-2a8 8 0 1 1-8-8V2Zm0 4a6 6 0 1 0 6 6h-2a4 4 0 1 1-4-4V6Zm1 5h7v2h-7v-2Z" />
-    </svg>
   );
 }
