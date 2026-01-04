@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
               action.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
               action.action_type === 'onsite_conversion.post_save'
             );
-            conversions = leadActions.reduce((sum, action) => sum + parseInt(action.value || '0'), 0);
+            conversions = leadActions.reduce((sum: number, action: { value?: string }) => sum + parseInt(action.value || '0'), 0);
           }
 
           if (insights?.cost_per_action_type && conversions > 0) {
@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
           action.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
           action.action_type === 'onsite_conversion.post_save'
         );
-        conversions = leadActions.reduce((sum, action) => sum + parseInt(action.value || '0'), 0);
+        conversions = leadActions.reduce((sum: number, action: { value?: string }) => sum + parseInt(action.value || '0'), 0);
       }
 
       accountMetrics = {
