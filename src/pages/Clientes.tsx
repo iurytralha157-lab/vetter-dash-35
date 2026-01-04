@@ -452,7 +452,6 @@ export default function ClientesReformulada() {
                 <div>
                   <p className="text-sm text-muted-foreground">Total de Clientes</p>
                   <p className="text-3xl font-bold mt-1">{stats.total_clientes}</p>
-                  <p className="text-xs text-muted-foreground mt-2">Base completa</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-primary/15 flex items-center justify-center shadow-inner">
                   <Users className="h-6 w-6 text-primary" />
@@ -467,7 +466,6 @@ export default function ClientesReformulada() {
                 <div>
                   <p className="text-sm text-muted-foreground">Clientes Ativos</p>
                   <p className="text-3xl font-bold mt-1">{stats.clientes_ativos}</p>
-                  <p className="text-xs text-muted-foreground mt-2">Em operação</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-emerald-500/15 flex items-center justify-center shadow-inner">
                   <CheckCircle className="h-6 w-6 text-emerald-300" />
@@ -482,7 +480,6 @@ export default function ClientesReformulada() {
                 <div>
                   <p className="text-sm text-muted-foreground">Config. Pendentes</p>
                   <p className="text-3xl font-bold mt-1">{stats.configuracoes_pendentes}</p>
-                  <p className="text-xs text-muted-foreground mt-2">Precisa ação</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-amber-500/15 flex items-center justify-center shadow-inner">
                   <AlertTriangle className="h-6 w-6 text-amber-300" />
