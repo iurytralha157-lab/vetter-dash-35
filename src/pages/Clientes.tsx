@@ -444,36 +444,6 @@ export default function ClientesReformulada() {
           </CardContent>
         </Card>
 
-        {/* KPIs (mais premium) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="surface-elevated border-border/60">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total de Clientes</p>
-                  <p className="text-3xl font-bold mt-1">{stats.total_clientes}</p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-primary/15 flex items-center justify-center shadow-inner">
-                  <Users className="h-6 w-6 text-primary" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="surface-elevated border-border/60">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Clientes Ativos</p>
-                  <p className="text-3xl font-bold mt-1">{stats.clientes_ativos}</p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-emerald-500/15 flex items-center justify-center shadow-inner">
-                  <CheckCircle className="h-6 w-6 text-emerald-300" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           <Card className="surface-elevated border-border/60">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
