@@ -1,33 +1,49 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Users, MessageSquare, Webhook, Menu } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { LayoutDashboard, Building2, Kanban, Rss } from "lucide-react";
 import { MobileDrawer } from "./MobileDrawer";
+import { useUserRole, UserRole } from "@/hooks/useUserRole";
 
-const bottomNavItems = [
+interface BottomNavItem {
+  title: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles?: UserRole[];
+}
+
+const bottomNavItems: BottomNavItem[] = [
   { 
     title: "Dashboard", 
     url: "/dashboard", 
     icon: LayoutDashboard 
   },
   { 
-    title: "Clientes", 
-    url: "/clientes", 
-    icon: Users 
+    title: "Contas", 
+    url: "/contas", 
+    icon: Building2 
   },
   { 
-    title: "Feedbacks", 
-    url: "/feedbacks", 
-    icon: MessageSquare 
+    title: "Demandas", 
+    url: "/demandas", 
+    icon: Kanban 
   },
   { 
-    title: "Relatório", 
-    url: "/relatorio-n8n", 
-    icon: Webhook 
+    title: "VFeed", 
+    url: "/vfeed", 
+    icon: Rss 
   },
 ];
 
 export function BottomNavigation() {
   const location = useLocation();
+  const { role } = useUserRole();
+
+  // Filtrar itens por role
+  const filteredItems = bottomNavItems.filter(item => {
+    if (!item.roles || item.roles.length === 0) return true;
+    if (!role) return false;
+    if (role === 'admin') return true;
+    return item.roles.includes(role);
+  });
 
   const isActive = (path: string) => {
     if (path === "/dashboard") {
@@ -44,7 +60,7 @@ export function BottomNavigation() {
       }}
     >
       <div className="grid grid-cols-5 h-16">
-        {bottomNavItems.map((item) => {
+        {filteredItems.map((item) => {
           const active = isActive(item.url);
           return (
             <NavLink

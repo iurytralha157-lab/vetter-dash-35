@@ -27,7 +27,7 @@ export interface NavigationItem {
 
 export const navigationItems: NavigationItem[] = [
   { title: pt.nav.dashboard, url: "/dashboard", icon: LayoutDashboard },
-  { title: "Clientes", url: "/clientes", icon: Users },
+  { title: "Clientes", url: "/clientes", icon: Users, roles: ['admin', 'gestor'] },
   { title: "Contas", url: "/contas", icon: Building2 },
   { title: "Demandas", url: "/demandas", icon: Kanban },
   { title: "VFeed", url: "/vfeed", icon: Rss },

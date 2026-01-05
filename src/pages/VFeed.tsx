@@ -162,7 +162,8 @@ export default function VFeed() {
           post_type: postType,
           post_category: postCategory,
           poll_options: postCategory === 'enquete' ? pollOptions.filter(o => o.trim()) : null,
-          organization_id: profile?.organization_id
+          organization_id: profile?.organization_id,
+          visibility: 'public'
         });
 
       if (error) throw error;

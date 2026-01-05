@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Bell, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,9 +26,9 @@ type NotificationItem = {
 };
 
 export function TopBar() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem("sidebar-collapsed");
     return saved ? JSON.parse(saved) : false;
@@ -34,9 +36,15 @@ export function TopBar() {
 
   const [profileName, setProfileName] = useState<string>("Usuário");
   const [profileEmail, setProfileEmail] = useState<string>("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/login');
+  };
 
   useEffect(() => {
     const handleStorageChange = () => {
@@ -62,7 +70,7 @@ export function TopBar() {
 
         const { data, error } = await supabase
           .from("profiles")
-          .select("name, email")
+          .select("name, email, avatar_url")
           .eq("id", user.id)
           .maybeSingle();
 
@@ -77,6 +85,7 @@ export function TopBar() {
 
         setProfileName(data?.name?.trim() || fallbackName);
         setProfileEmail(data?.email || user?.email || "");
+        setAvatarUrl(data?.avatar_url || null);
       } catch (err) {
         console.warn("Falha ao carregar profile:", err);
       }
@@ -241,12 +250,14 @@ export function TopBar() {
             <DropdownMenuContent align="end" className="w-56 shadow-xl bg-dark-800 border-border/50">
               <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border/50" />
-              <DropdownMenuItem className="hover:bg-dark-700">Perfil</DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-dark-700">
+              <DropdownMenuItem className="hover:bg-dark-700" onClick={() => navigate('/configuracoes')}>
+                Perfil
+              </DropdownMenuItem>
+              <DropdownMenuItem className="hover:bg-dark-700" onClick={() => navigate('/configuracoes')}>
                 Configurações
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-border/50" />
-              <DropdownMenuItem className="text-destructive hover:bg-destructive/10">
+              <DropdownMenuItem className="text-destructive hover:bg-destructive/10" onClick={handleLogout}>
                 Sair
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -299,20 +310,31 @@ export function TopBar() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-2 px-2 hover:bg-dark-700">
-                <div className="text-right">
-                  <p className="text-sm font-medium text-foreground">{profileName}</p>
-                  <p className="text-[11px] text-muted-foreground">Conta</p>
-                </div>
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={avatarUrl || undefined} />
+                  <AvatarFallback className="bg-primary/20 text-primary text-sm">
+                    {profileName?.charAt(0).toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-sm font-medium text-foreground max-w-[80px] truncate">
+                  {profileName}
+                </span>
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 shadow-xl bg-dark-800 border-border/50">
               <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border/50" />
-              <DropdownMenuItem className="hover:bg-dark-700">Perfil</DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-dark-700">Configurações</DropdownMenuItem>
+              <DropdownMenuItem className="hover:bg-dark-700" onClick={() => navigate('/configuracoes')}>
+                Perfil
+              </DropdownMenuItem>
+              <DropdownMenuItem className="hover:bg-dark-700" onClick={() => navigate('/configuracoes')}>
+                Configurações
+              </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-border/50" />
-              <DropdownMenuItem className="text-destructive hover:bg-destructive/10">Sair</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive hover:bg-destructive/10" onClick={handleLogout}>
+                Sair
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
