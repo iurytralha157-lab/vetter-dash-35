@@ -111,7 +111,7 @@ export function AppSidebar({
         `}>
           <NavLink to="/" className="flex items-center gap-3 group w-full">
             <div className="flex items-center justify-center flex-shrink-0">
-              <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center glow-orange">
+              <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center glow-primary">
                 <span className="text-white font-bold text-sm">V</span>
               </div>
             </div>
@@ -144,7 +144,7 @@ export function AppSidebar({
                           flex items-center justify-center h-12 w-12 mx-auto rounded-xl
                           transition-all duration-300 ease-out group relative
                           ${active 
-                            ? 'bg-primary/10 text-primary border-l-2 border-primary glow-orange' 
+                            ? 'bg-primary/10 text-primary border-l-2 border-primary glow-primary' 
                             : 'text-muted-foreground hover:bg-dark-700 hover:text-foreground hover:scale-105'
                           }
                         `}
@@ -174,7 +174,7 @@ export function AppSidebar({
                     flex items-center gap-3 px-4 py-3 rounded-xl
                     transition-all duration-300 ease-out group relative overflow-hidden
                     ${active
-                      ? 'bg-primary/10 text-primary border-l-2 border-primary glow-orange'
+                      ? 'bg-primary/10 text-primary border-l-2 border-primary glow-primary'
                       : 'text-muted-foreground hover:bg-dark-700 hover:text-foreground hover:scale-[1.02]'
                     }
                   `}

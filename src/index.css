@@ -20,8 +20,8 @@
     --popover: 0 0% 8%;
     --popover-foreground: 0 0% 98%;
 
-    /* Primary: Laranja vibrante */
-    --primary: 25 95% 53%; /* #F97316 */
+    /* Primary: Verde Esmeralda */
+    --primary: 160 84% 39%; /* #10B981 */
     --primary-foreground: 0 0% 100%;
 
     /* Secondary Surfaces */
@@ -55,7 +55,7 @@
     /* Borders and Inputs */
     --border: 0 0% 12%;
     --input: 0 0% 12%;
-    --ring: 25 95% 53%;
+    --ring: 160 84% 39%;
 
     /* Border Radius */
     --radius: 0.75rem;
@@ -63,12 +63,12 @@
     /* Sidebar - preto absoluto */
     --sidebar-background: 0 0% 3%;
     --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 25 95% 53%;
+    --sidebar-primary: 160 84% 39%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 0 0% 8%;
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 0 0% 12%;
-    --sidebar-ring: 25 95% 53%;
+    --sidebar-ring: 160 84% 39%;
 
     /* Design Tokens */
     --surface-elevated: 0 0% 8%;
@@ -81,7 +81,7 @@
     --text-muted: 0 0% 40%;
     
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(25 95% 53%) 0%, hsl(25 95% 60%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(160 84% 39%) 0%, hsl(160 84% 50%) 100%);
     --gradient-surface: linear-gradient(145deg, hsl(0 0% 7%) 0%, hsl(0 0% 5%) 100%);
     --gradient-glass: linear-gradient(145deg, hsl(0 0% 8% / 0.8) 0%, hsl(0 0% 10% / 0.6) 100%);
     --gradient-ai: linear-gradient(145deg, hsl(265 89% 20% / 0.5) 0%, hsl(240 60% 15% / 0.5) 100%);
@@ -95,9 +95,9 @@
     --shadow-xl: 0 16px 32px -8px rgba(0, 0, 0, 0.9);
     
     /* Glow effects */
-    --shadow-glow: 0 0 24px rgba(249, 115, 22, 0.4);
-    --shadow-glow-lg: 0 0 48px rgba(249, 115, 22, 0.3);
-    --shadow-glow-orange: 0 0 20px rgba(249, 115, 22, 0.3);
+    --shadow-glow: 0 0 24px rgba(16, 185, 129, 0.4);
+    --shadow-glow-lg: 0 0 48px rgba(16, 185, 129, 0.3);
+    --shadow-glow-primary: 0 0 20px rgba(16, 185, 129, 0.3);
     --shadow-glow-green: 0 0 20px rgba(0, 255, 136, 0.3);
     --shadow-glow-purple: 0 0 20px rgba(139, 92, 246, 0.3);
     
@@ -219,12 +219,12 @@
     box-shadow: 0 0 0 2px hsl(var(--primary) / 0.3), var(--shadow-glow);
   }
   
-  /* Botão primário com gradiente laranja */
+  /* Botão primário com gradiente verde */
   .btn-primary {
     background: var(--gradient-primary);
     @apply text-white font-medium px-4 py-2 rounded-xl;
     @apply transition-all duration-200;
-    box-shadow: var(--shadow-sm), var(--shadow-glow-orange);
+    box-shadow: var(--shadow-sm), var(--shadow-glow-primary);
   }
   
   .btn-primary:hover {
@@ -295,8 +295,8 @@
   }
 
   /* Glow effects */
-  .glow-orange {
-    box-shadow: var(--shadow-glow-orange);
+  .glow-primary {
+    box-shadow: var(--shadow-glow-primary);
   }
 
   .glow-green {
