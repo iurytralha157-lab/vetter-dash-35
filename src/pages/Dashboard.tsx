@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Users, DollarSign, Target, TrendingUp, BarChart3, Zap } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { KPICardLarge } from "@/components/dashboard/KPICardLarge";
 import { SmartProjectionCard } from "@/components/dashboard/SmartProjectionCard";
@@ -76,15 +77,13 @@ export default function Dashboard() {
   return (
     <AppLayout>
       <div className="space-y-6">
-
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground mt-1">Visão geral do desempenho de suas campanhas</p>
-          </div>
-          <PeriodSelector value={period} onValueChange={setPeriod} />
-        </div>
+        {/* Page Header */}
+        <PageHeader
+          title="Dashboard"
+          breadcrumb="Visão Geral"
+          subtitle="Desempenho de campanhas"
+          actions={<PeriodSelector value={period} onValueChange={setPeriod} />}
+        />
 
         {/* Main KPI Grid - 12 columns */}
         {isLoading ? (
