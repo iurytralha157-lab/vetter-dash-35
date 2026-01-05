@@ -198,16 +198,18 @@ export default function VFeed() {
           <p className="text-muted-foreground">Comunidade e atualizações</p>
         </div>
 
-        {/* Create Post */}
+        {/* Create Post - Mobile Responsive */}
         <Card className="mb-6 border-border/50">
           <CardContent className="pt-4">
-            <div className="flex gap-3">
-              <Avatar className="h-10 w-10 shrink-0">
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* Avatar - Hidden on mobile, visible on sm+ */}
+              <Avatar className="h-10 w-10 shrink-0 hidden sm:flex">
                 <AvatarImage src={userAvatarUrl || undefined} />
                 <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white">
                   {user?.email?.charAt(0).toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
+              
               <div className="flex-1 space-y-3">
                 <Textarea
                   placeholder={postCategory === 'enquete' ? 'Faça uma pergunta...' : 'O que você quer compartilhar?'}
@@ -244,7 +246,7 @@ export default function VFeed() {
                         <Button
                           variant="destructive"
                           size="icon"
-                          className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-2 right-2 h-7 w-7 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                           onClick={() => removeMedia(index)}
                         >
                           <X className="h-4 w-4" />
@@ -273,8 +275,9 @@ export default function VFeed() {
 
                 <Separator />
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                {/* Actions - Responsive Layout */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 justify-center sm:justify-start">
                     <PostTypeSelector value={postCategory} onChange={setPostCategory} />
                     
                     {postCategory !== 'enquete' && (
@@ -303,7 +306,7 @@ export default function VFeed() {
                   <Button 
                     onClick={handleCreatePost} 
                     disabled={(!newPost.trim() && mediaFiles.length === 0 && postCategory !== 'enquete') || isPosting}
-                    className="px-6"
+                    className="w-full sm:w-auto px-6"
                   >
                     {isUploading ? (
                       <>
