@@ -103,10 +103,9 @@ export function SecureVideoPlayer({ url, title = "Vídeo", className = "" }: Sec
         src={embedUrl}
         title={title}
         className="w-full h-full"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowFullScreen
         referrerPolicy="strict-origin-when-cross-origin"
-        sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
       />
       {/* Overlay to prevent right-click on video */}
       <div 
