@@ -128,12 +128,7 @@ export function AppSidebar({
           )}
         </Button>
 
-        <div className={`
-          flex items-center border-b border-border/50
-          transition-all duration-500 ease-in-out
-          ${isCollapsed ? 'py-2 px-3 justify-center' : 'py-3 px-4'}
-        `}
-        >
+        <div className="flex items-center justify-center border-b border-border/50">
           <NavLink to="/" className="flex items-center justify-center group w-full">
             <div className="flex items-center justify-center flex-shrink-0">
               {isCollapsed ? (
