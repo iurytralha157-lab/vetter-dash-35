@@ -73,21 +73,26 @@ const AuthPage = () => {
         <div className="surface-elevated rounded-3xl p-8 shadow-2xl">
           {/* Logo */}
           <div className="flex justify-center mb-8">
-            <div 
-              className="rounded-2xl bg-gradient-primary flex items-center justify-center overflow-hidden"
-              style={{ width: logoSize, height: logoSize }}
-            >
-              {logoUrl ? (
-                <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
-              ) : (
+            {logoUrl ? (
+              <img 
+                src={logoUrl} 
+                alt="Logo" 
+                className="object-contain"
+                style={{ width: logoSize, height: logoSize }}
+              />
+            ) : (
+              <div 
+                className="rounded-2xl bg-gradient-primary flex items-center justify-center"
+                style={{ width: logoSize, height: logoSize }}
+              >
                 <span 
                   className="text-primary-foreground font-bold"
                   style={{ fontSize: logoSize * 0.4 }}
                 >
                   {systemName.charAt(0).toUpperCase()}
                 </span>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Header */}

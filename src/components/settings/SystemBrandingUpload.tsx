@@ -317,22 +317,27 @@ export function SystemBrandingUpload() {
         {/* Preview */}
         <div className="pt-4 border-t border-border">
           <Label className="text-muted-foreground text-sm">Preview da Sidebar</Label>
-          <div className="mt-3 flex items-center gap-3 p-4 rounded-xl bg-secondary/30">
-            <div 
-              className="rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center overflow-hidden"
-              style={{ width: logoSize, height: logoSize }}
-            >
-              {logoUrl ? (
-                <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
-              ) : (
+          <div className="mt-3 flex items-center justify-center p-4 rounded-xl bg-secondary/30">
+            {logoUrl ? (
+              <img 
+                src={logoUrl} 
+                alt="Logo" 
+                className="object-contain"
+                style={{ width: logoSize, height: logoSize }}
+              />
+            ) : (
+              <div 
+                className="rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center"
+                style={{ width: logoSize, height: logoSize }}
+              >
                 <span 
                   className="text-primary-foreground font-bold"
                   style={{ fontSize: logoSize * 0.4 }}
                 >
                   {systemName.charAt(0).toUpperCase()}
                 </span>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </CardContent>
