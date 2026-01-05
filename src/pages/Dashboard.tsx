@@ -5,7 +5,6 @@ import { KPICard } from "@/components/dashboard/KPICard";
 import { KPICardLarge } from "@/components/dashboard/KPICardLarge";
 import { SmartProjectionCard } from "@/components/dashboard/SmartProjectionCard";
 import { ProfitCard } from "@/components/dashboard/ProfitCard";
-import { PromoBanner } from "@/components/dashboard/PromoBanner";
 import { PeriodSelector, Period } from "@/components/dashboard/PeriodSelector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -77,8 +76,6 @@ export default function Dashboard() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* Promo Banner */}
-        <PromoBanner />
 
         {/* Header */}
         <div className="flex items-center justify-between">
