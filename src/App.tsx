@@ -25,6 +25,7 @@ import BlockedAccount from "./pages/BlockedAccount";
 import VFeed from "./pages/VFeed";
 import VAcademy from "./pages/VAcademy";
 import CourseDetail from "./pages/CourseDetail";
+import CourseEditor from "./pages/CourseEditor";
 
 const queryClient = new QueryClient();
 
@@ -114,7 +115,17 @@ const App = () => (
                 <VAcademy />
               </ProtectedRoute>
             } />
-            <Route path="/vacademy/:id" element={
+            <Route path="/vacademy/novo" element={
+              <ProtectedRoute>
+                <CourseEditor />
+              </ProtectedRoute>
+            } />
+            <Route path="/vacademy/:courseId/editar" element={
+              <ProtectedRoute>
+                <CourseEditor />
+              </ProtectedRoute>
+            } />
+            <Route path="/vacademy/:courseId" element={
               <ProtectedRoute>
                 <CourseDetail />
               </ProtectedRoute>

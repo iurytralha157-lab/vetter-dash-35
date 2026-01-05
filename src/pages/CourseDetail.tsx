@@ -14,8 +14,10 @@ import {
   ChevronDown, 
   ChevronRight,
   BookOpen,
-  Video
+  Video,
+  Pencil
 } from "lucide-react";
+import { useUserContext } from "@/hooks/useUserContext";
 import { coursesService } from "@/services/coursesService";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
@@ -24,6 +26,7 @@ export default function CourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isVetterAdmin } = useUserContext();
   const [openModules, setOpenModules] = useState<Set<string>>(new Set());
   const [activeLesson, setActiveLesson] = useState<string | null>(null);
 
@@ -106,6 +109,15 @@ export default function CourseDetail() {
             <h1 className="text-2xl font-bold">{course.title}</h1>
             <p className="text-muted-foreground">{course.description}</p>
           </div>
+          {isVetterAdmin && (
+            <Button 
+              variant="outline"
+              onClick={() => navigate(`/vacademy/${courseId}/editar`)}
+            >
+              <Pencil className="h-4 w-4 mr-2" />
+              Editar Curso
+            </Button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
