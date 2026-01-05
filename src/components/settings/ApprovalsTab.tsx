@@ -52,11 +52,10 @@ export function ApprovalsTab() {
       if (usersError) throw usersError;
       setPendingUsers(users || []);
 
-      // Load accounts (clientes/contas)
+      // Load accounts (clientes/contas) - trazer todos independente do status
       const { data: accs, error: accsError } = await supabase
         .from('accounts')
-        .select('id, nome_cliente, email')
-        .eq('status', 'ativo')
+        .select('id, nome_cliente, email, status')
         .order('nome_cliente');
 
       if (accsError) throw accsError;
