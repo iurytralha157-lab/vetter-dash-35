@@ -5,211 +5,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Heart, MessageCircle, Send, Pin, MoreVertical, Trash2, Image, Video, X, Loader2 } from "lucide-react";
-import { communityService, CommunityPost, CommunityComment } from "@/services/communityService";
-import { formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { Image, Video, X, Loader2, MessageCircle } from "lucide-react";
+import { communityService, CommunityPost } from "@/services/communityService";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-function PostCard({ post, onUpdate }: { post: CommunityPost; onUpdate: () => void }) {
-  const { user } = useAuth();
-  const [showComments, setShowComments] = useState(false);
-  const [newComment, setNewComment] = useState("");
-  const [comments, setComments] = useState<CommunityComment[]>([]);
-  const [loadingComments, setLoadingComments] = useState(false);
-
-  const loadComments = async () => {
-    if (!showComments) {
-      setLoadingComments(true);
-      try {
-        const data = await communityService.getComments(post.id);
-        setComments(data);
-      } catch (error) {
-        console.error('Erro ao carregar comentários:', error);
-      } finally {
-        setLoadingComments(false);
-      }
-    }
-    setShowComments(!showComments);
-  };
-
-  const handleLike = async () => {
-    try {
-      await communityService.toggleLike(post.id);
-      onUpdate();
-    } catch (error) {
-      toast.error('Erro ao curtir');
-    }
-  };
-
-  const handleComment = async () => {
-    if (!newComment.trim()) return;
-    try {
-      const comment = await communityService.addComment(post.id, newComment);
-      setComments([...comments, comment]);
-      setNewComment("");
-      onUpdate();
-    } catch (error) {
-      toast.error('Erro ao comentar');
-    }
-  };
-
-  const handleDelete = async () => {
-    try {
-      await communityService.deletePost(post.id);
-      toast.success('Post excluído');
-      onUpdate();
-    } catch (error) {
-      toast.error('Erro ao excluir');
-    }
-  };
-
-  const isAuthor = user?.id === post.author_id;
-
-  return (
-    <Card className="mb-4">
-      <CardContent className="pt-4">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <Avatar>
-              <AvatarImage src={post.author?.avatar_url || undefined} />
-              <AvatarFallback>
-                {post.author?.name?.charAt(0).toUpperCase() || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="font-medium">{post.author?.name || 'Usuário'}</p>
-              <p className="text-xs text-muted-foreground">
-                {formatDistanceToNow(new Date(post.created_at), { 
-                  addSuffix: true, 
-                  locale: ptBR 
-                })}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {post.is_pinned && (
-              <Badge variant="secondary" className="gap-1">
-                <Pin className="h-3 w-3" />
-                Fixado
-              </Badge>
-            )}
-            {isAuthor && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Excluir
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-        </div>
-
-        {/* Content */}
-        <p className="text-foreground mb-4 whitespace-pre-wrap">{post.content}</p>
-
-        {/* Media */}
-        {post.media_urls && post.media_urls.length > 0 && (
-          <div className={`grid gap-2 mb-4 ${post.media_urls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-            {post.media_urls.map((url, i) => {
-              const isVideo = url.includes('.mp4') || url.includes('.webm') || url.includes('.mov');
-              return isVideo ? (
-                <video 
-                  key={i} 
-                  src={url} 
-                  controls
-                  className="rounded-lg w-full max-h-96 object-contain bg-black"
-                />
-              ) : (
-                <img 
-                  key={i} 
-                  src={url} 
-                  alt="Mídia" 
-                  className="rounded-lg w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => window.open(url, '_blank')}
-                />
-              );
-            })}
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex items-center gap-4 pt-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLike}
-            className={post.user_has_liked ? "text-red-500" : ""}
-          >
-            <Heart className={`h-4 w-4 mr-1 ${post.user_has_liked ? "fill-current" : ""}`} />
-            {post.likes_count}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={loadComments}>
-            <MessageCircle className="h-4 w-4 mr-1" />
-            {post.comments_count}
-          </Button>
-        </div>
-
-        {/* Comments Section */}
-        {showComments && (
-          <div className="mt-4 pt-4 border-t">
-            {loadingComments ? (
-              <p className="text-sm text-muted-foreground">Carregando...</p>
-            ) : (
-              <>
-                {comments.map((comment) => (
-                  <div key={comment.id} className="flex gap-2 mb-3">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={comment.author?.avatar_url || undefined} />
-                      <AvatarFallback className="text-xs">
-                        {comment.author?.name?.charAt(0).toUpperCase() || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 bg-muted rounded-lg p-2">
-                      <p className="text-sm font-medium">{comment.author?.name}</p>
-                      <p className="text-sm">{comment.content}</p>
-                    </div>
-                  </div>
-                ))}
-
-                {/* New Comment */}
-                <div className="flex gap-2 mt-3">
-                  <Textarea
-                    placeholder="Escreva um comentário..."
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    className="min-h-[60px]"
-                  />
-                  <Button size="icon" onClick={handleComment} disabled={!newComment.trim()}>
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+import { PostTypeSelector, PostCategory } from "@/components/feed/PostTypeSelector";
+import { PollCreator } from "@/components/feed/PollCreator";
+import { FeedPostCard } from "@/components/feed/FeedPostCard";
+import { UserProfileSheet } from "@/components/feed/UserProfileSheet";
 
 export default function VFeed() {
   const { user } = useAuth();
@@ -219,8 +24,29 @@ export default function VFeed() {
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [postCategory, setPostCategory] = useState<PostCategory>('normal');
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [profileSheetOpen, setProfileSheetOpen] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+
+  // Buscar avatar do usuário
+  useQuery({
+    queryKey: ['user-avatar', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', user.id)
+        .single();
+      setUserAvatarUrl(data?.avatar_url || null);
+      return data?.avatar_url;
+    },
+    enabled: !!user?.id
+  });
 
   const { data: posts, isLoading } = useQuery({
     queryKey: ['community-posts'],
@@ -231,13 +57,11 @@ export default function VFeed() {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    // Limite de 4 arquivos
     if (mediaFiles.length + files.length > 4) {
       toast.error('Máximo de 4 arquivos por post');
       return;
     }
 
-    // Validar tamanho (máximo 50MB por arquivo)
     const maxSize = 50 * 1024 * 1024;
     const invalidFiles = files.filter(f => f.size > maxSize);
     if (invalidFiles.length > 0) {
@@ -245,7 +69,6 @@ export default function VFeed() {
       return;
     }
 
-    // Criar previews
     files.forEach(file => {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -255,7 +78,7 @@ export default function VFeed() {
     });
 
     setMediaFiles(prev => [...prev, ...files]);
-    e.target.value = ''; // Reset input
+    e.target.value = '';
   };
 
   const removeMedia = (index: number) => {
@@ -292,7 +115,16 @@ export default function VFeed() {
   };
 
   const handleCreatePost = async () => {
-    if (!newPost.trim() && mediaFiles.length === 0) return;
+    // Validar enquete
+    if (postCategory === 'enquete') {
+      const validOptions = pollOptions.filter(o => o.trim());
+      if (validOptions.length < 2) {
+        toast.error('Adicione pelo menos 2 opções para a enquete');
+        return;
+      }
+    }
+
+    if (!newPost.trim() && mediaFiles.length === 0 && postCategory !== 'enquete') return;
     setIsPosting(true);
     setIsUploading(mediaFiles.length > 0);
 
@@ -303,16 +135,43 @@ export default function VFeed() {
         mediaUrls = await uploadMedia();
       }
 
-      const postType = mediaFiles.some(f => f.type.startsWith('video/')) 
-        ? 'video' 
-        : mediaFiles.length > 0 
-          ? 'image' 
-          : 'text';
+      const postType = postCategory === 'enquete' 
+        ? 'poll' 
+        : mediaFiles.some(f => f.type.startsWith('video/')) 
+          ? 'video' 
+          : mediaFiles.length > 0 
+            ? 'image' 
+            : 'text';
 
-      await communityService.createPost(newPost, mediaUrls, postType);
+      // Criar post com poll_options e category
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) throw new Error('Usuário não autenticado');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', currentUser.id)
+        .single();
+
+      const { error } = await supabase
+        .from('community_posts')
+        .insert({
+          author_id: currentUser.id,
+          content: newPost,
+          media_urls: mediaUrls,
+          post_type: postType,
+          post_category: postCategory,
+          poll_options: postCategory === 'enquete' ? pollOptions.filter(o => o.trim()) : null,
+          organization_id: profile?.organization_id
+        });
+
+      if (error) throw error;
+
       setNewPost("");
       setMediaFiles([]);
       setMediaPreviews([]);
+      setPostCategory('normal');
+      setPollOptions(['', '']);
       queryClient.invalidateQueries({ queryKey: ['community-posts'] });
       toast.success('Post publicado!');
     } catch (error) {
@@ -324,124 +183,156 @@ export default function VFeed() {
     }
   };
 
+  const handleViewProfile = (userId: string) => {
+    setSelectedUserId(userId);
+    setProfileSheetOpen(true);
+  };
+
   return (
     <AppLayout>
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-xl mx-auto">
+        {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold">VFeed</h1>
           <p className="text-muted-foreground">Comunidade e atualizações</p>
         </div>
 
         {/* Create Post */}
-        <Card className="mb-6">
+        <Card className="mb-6 border-border/50">
           <CardContent className="pt-4">
-            <Textarea
-              placeholder="O que você quer compartilhar?"
-              value={newPost}
-              onChange={(e) => setNewPost(e.target.value)}
-              className="min-h-[100px] mb-3"
-            />
+            <div className="flex gap-3">
+              <Avatar className="h-10 w-10 shrink-0">
+                <AvatarImage src={userAvatarUrl || undefined} />
+                <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white">
+                  {user?.email?.charAt(0).toUpperCase() || 'U'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 space-y-3">
+                <Textarea
+                  placeholder={postCategory === 'enquete' ? 'Faça uma pergunta...' : 'O que você quer compartilhar?'}
+                  value={newPost}
+                  onChange={(e) => setNewPost(e.target.value)}
+                  className="min-h-[80px] resize-none border-0 p-0 focus-visible:ring-0 text-base"
+                />
 
-            {/* Media Previews */}
-            {mediaPreviews.length > 0 && (
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                {mediaPreviews.map((preview, index) => (
-                  <div key={index} className="relative group">
-                    {mediaFiles[index]?.type.startsWith('video/') ? (
-                      <video 
-                        src={preview} 
-                        className="rounded-lg w-full h-32 object-cover"
-                      />
-                    ) : (
-                      <img 
-                        src={preview} 
-                        alt="Preview" 
-                        className="rounded-lg w-full h-32 object-cover"
-                      />
-                    )}
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => removeMedia(index)}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
+                {/* Poll Creator */}
+                {postCategory === 'enquete' && (
+                  <PollCreator 
+                    options={pollOptions}
+                    onChange={setPollOptions}
+                  />
+                )}
+
+                {/* Media Previews */}
+                {mediaPreviews.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2 rounded-lg overflow-hidden">
+                    {mediaPreviews.map((preview, index) => (
+                      <div key={index} className="relative group aspect-square">
+                        {mediaFiles[index]?.type.startsWith('video/') ? (
+                          <video 
+                            src={preview} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <img 
+                            src={preview} 
+                            alt="Preview" 
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => removeMedia(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
+                )}
 
-            {/* Hidden file inputs */}
-            <input
-              type="file"
-              ref={imageInputRef}
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => handleFileSelect(e, 'image')}
-            />
-            <input
-              type="file"
-              ref={videoInputRef}
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => handleFileSelect(e, 'video')}
-            />
+                {/* Hidden file inputs */}
+                <input
+                  type="file"
+                  ref={imageInputRef}
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleFileSelect(e, 'image')}
+                />
+                <input
+                  type="file"
+                  ref={videoInputRef}
+                  accept="video/*"
+                  className="hidden"
+                  onChange={(e) => handleFileSelect(e, 'video')}
+                />
 
-            <div className="flex items-center justify-between">
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => imageInputRef.current?.click()}
-                  disabled={mediaFiles.length >= 4}
-                >
-                  <Image className="h-4 w-4 mr-1" />
-                  Foto
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => videoInputRef.current?.click()}
-                  disabled={mediaFiles.length >= 4}
-                >
-                  <Video className="h-4 w-4 mr-1" />
-                  Vídeo
-                </Button>
+                <Separator />
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <PostTypeSelector value={postCategory} onChange={setPostCategory} />
+                    
+                    {postCategory !== 'enquete' && (
+                      <>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-9 w-9 text-muted-foreground hover:text-primary"
+                          onClick={() => imageInputRef.current?.click()}
+                          disabled={mediaFiles.length >= 4}
+                        >
+                          <Image className="h-5 w-5" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-9 w-9 text-muted-foreground hover:text-primary"
+                          onClick={() => videoInputRef.current?.click()}
+                          disabled={mediaFiles.length >= 4}
+                        >
+                          <Video className="h-5 w-5" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                  <Button 
+                    onClick={handleCreatePost} 
+                    disabled={(!newPost.trim() && mediaFiles.length === 0 && postCategory !== 'enquete') || isPosting}
+                    className="px-6"
+                  >
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : isPosting ? 'Publicando...' : 'Publicar'}
+                  </Button>
+                </div>
               </div>
-              <Button 
-                onClick={handleCreatePost} 
-                disabled={(!newPost.trim() && mediaFiles.length === 0) || isPosting}
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                    Enviando...
-                  </>
-                ) : isPosting ? 'Publicando...' : 'Publicar'}
-              </Button>
             </div>
           </CardContent>
         </Card>
 
-        <Separator className="mb-6" />
-
         {/* Posts Feed */}
         {isLoading ? (
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">Carregando posts...</p>
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : posts && posts.length > 0 ? (
           posts.map((post) => (
-            <PostCard 
+            <FeedPostCard 
               key={post.id} 
-              post={post}
+              post={post as any}
               onUpdate={() => queryClient.invalidateQueries({ queryKey: ['community-posts'] })}
+              onViewProfile={handleViewProfile}
             />
           ))
         ) : (
-          <Card>
+          <Card className="border-border/50">
             <CardContent className="text-center py-12">
               <MessageCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">
@@ -450,6 +341,13 @@ export default function VFeed() {
             </CardContent>
           </Card>
         )}
+
+        {/* User Profile Sheet */}
+        <UserProfileSheet
+          userId={selectedUserId}
+          open={profileSheetOpen}
+          onOpenChange={setProfileSheetOpen}
+        />
       </div>
     </AppLayout>
   );

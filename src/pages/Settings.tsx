@@ -8,15 +8,20 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Settings as SettingsIcon, Webhook, Bell, Building, Loader2, ExternalLink } from "lucide-react";
+import { Settings as SettingsIcon, Webhook, Bell, Building, Loader2, ExternalLink, User } from "lucide-react";
 import { pt } from "@/i18n/pt";
 import { systemSettingsService, SystemSetting } from "@/services/systemSettingsService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { ProfilePhotoUpload } from "@/components/settings/ProfilePhotoUpload";
+import { OrganizationLogoUpload } from "@/components/settings/OrganizationLogoUpload";
 
 export default function Settings() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
   
@@ -30,17 +35,40 @@ export default function Settings() {
   const [webhookChecklist, setWebhookChecklist] = useState('');
   const [webhookClientes, setWebhookClientes] = useState('');
   const [orgName, setOrgName] = useState('');
+  
+  // Profile state
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!roleLoading && !isAdmin) {
-      toast({
-        title: "Acesso negado",
-        description: "Apenas administradores podem acessar as configurações.",
-        variant: "destructive",
-      });
-      navigate('/');
+    loadUserProfile();
+  }, [user?.id]);
+
+  const loadUserProfile = async () => {
+    if (!user?.id) return;
+    
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('avatar_url, organization_id')
+      .eq('id', user.id)
+      .single();
+    
+    if (profile) {
+      setUserAvatarUrl(profile.avatar_url);
+      setOrganizationId(profile.organization_id);
+      
+      if (profile.organization_id) {
+        const { data: org } = await supabase
+          .from('organizations')
+          .select('sidebar_logo_url')
+          .eq('id', profile.organization_id)
+          .single();
+        
+        setOrgLogoUrl(org?.sidebar_logo_url || null);
+      }
     }
-  }, [isAdmin, roleLoading, navigate, toast]);
+  };
 
   useEffect(() => {
     loadSettings();
@@ -169,10 +197,6 @@ export default function Settings() {
     );
   }
 
-  if (!isAdmin) {
-    return null;
-  }
-
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -183,8 +207,12 @@ export default function Settings() {
           icon={<SettingsIcon className="h-6 w-6" />}
         />
 
-        <Tabs defaultValue="webhooks" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue="profile" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="profile" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Perfil
+            </TabsTrigger>
             <TabsTrigger value="webhooks" className="flex items-center gap-2">
               <Webhook className="h-4 w-4" />
               Webhooks
@@ -198,6 +226,22 @@ export default function Settings() {
               {pt.settings.general}
             </TabsTrigger>
           </TabsList>
+
+          {/* Profile Tab - Available to all users */}
+          <TabsContent value="profile" className="space-y-6">
+            <ProfilePhotoUpload
+              currentAvatarUrl={userAvatarUrl}
+              onUpdate={loadUserProfile}
+            />
+            
+            {isAdmin && (
+              <OrganizationLogoUpload
+                organizationId={organizationId}
+                currentLogoUrl={orgLogoUrl}
+                onUpdate={loadUserProfile}
+              />
+            )}
+          </TabsContent>
 
           {/* Webhooks Tab */}
           <TabsContent value="webhooks" className="space-y-6">
