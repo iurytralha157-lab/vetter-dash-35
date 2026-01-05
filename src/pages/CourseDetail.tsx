@@ -17,10 +17,11 @@ import {
   Video,
   Pencil
 } from "lucide-react";
-import { useUserContext } from "@/hooks/useUserContext";
 import { coursesService } from "@/services/coursesService";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
+import { useUserContext } from "@/hooks/useUserContext";
+import { SecureVideoPlayer } from "@/components/courses/SecureVideoPlayer";
 
 export default function CourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -143,13 +144,11 @@ export default function CourseDetail() {
                 </CardHeader>
                 <CardContent>
                   {currentLesson.video_url ? (
-                    <div className="aspect-video bg-black rounded-lg overflow-hidden mb-4">
-                      <iframe
-                        src={currentLesson.video_url}
-                        className="w-full h-full"
-                        allowFullScreen
-                      />
-                    </div>
+                    <SecureVideoPlayer 
+                      url={currentLesson.video_url} 
+                      title={currentLesson.title}
+                      className="mb-4"
+                    />
                   ) : (
                     <div className="aspect-video bg-muted rounded-lg flex items-center justify-center mb-4">
                       <Video className="h-12 w-12 text-muted-foreground" />
