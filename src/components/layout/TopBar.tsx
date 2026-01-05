@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, ChevronDown } from "lucide-react";
+import { Bell, ChevronDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -16,14 +16,7 @@ import {
 import { MobileDrawer } from "./MobileDrawer";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-
-type NotificationItem = {
-  id: string;
-  title: string;
-  description: string;
-  time: string;
-  severity: "low" | "medium" | "high" | "critical" | string;
-};
+import { useNotifications } from "@/hooks/useNotifications";
 
 export function TopBar() {
   const { user, signOut } = useAuth();
@@ -38,8 +31,15 @@ export function TopBar() {
   const [profileEmail, setProfileEmail] = useState<string>("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  // Usar o novo hook de notificações
+  const { 
+    notifications, 
+    unreadCount, 
+    loading: notificationsLoading, 
+    markAsRead, 
+    markAllAsRead,
+    navigateToNotification 
+  } = useNotifications();
 
   const handleLogout = async () => {
     await signOut();
@@ -94,50 +94,39 @@ export function TopBar() {
     loadProfile();
   }, [user?.id]);
 
-  useEffect(() => {
-    const loadNotifications = async () => {
-      try {
-        setNotificationsLoading(true);
+  const formatNotificationTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
 
-        const { data, error } = await supabase
-          .from("performance_alerts")
-          .select("id, title, message, severity, created_at, status")
-          .eq("status", "active")
-          .order("created_at", { ascending: false })
-          .limit(10);
+    if (diffMins < 1) return 'agora';
+    if (diffMins < 60) return `há ${diffMins}min`;
+    if (diffHours < 24) return `há ${diffHours}h`;
+    if (diffDays < 7) return `há ${diffDays}d`;
+    
+    return date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+    });
+  };
 
-        if (error) {
-          console.warn("Erro ao buscar notificações:", error);
-          setNotifications([]);
-          return;
-        }
-
-        const mapped: NotificationItem[] = (data || []).map((n: any) => ({
-          id: n.id,
-          title: n.title || "Alerta",
-          description: n.message || "",
-          severity: n.severity || "info",
-          time: new Date(n.created_at).toLocaleString("pt-BR", {
-            day: "2-digit",
-            month: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        }));
-
-        setNotifications(mapped);
-      } catch (err) {
-        console.warn("Falha ao carregar notificações:", err);
-        setNotifications([]);
-      } finally {
-        setNotificationsLoading(false);
-      }
-    };
-
-    loadNotifications();
-  }, []);
-
-  const unreadCount = notifications.length;
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'post':
+        return '📢';
+      case 'demanda_designada':
+        return '📋';
+      case 'demanda_nova':
+        return '🆕';
+      case 'demanda_status':
+        return '🔄';
+      default:
+        return '🔔';
+    }
+  };
 
   return (
     <>
@@ -170,7 +159,7 @@ export function TopBar() {
                     variant="destructive"
                     className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs"
                   >
-                    {unreadCount}
+                    {unreadCount > 9 ? '9+' : unreadCount}
                   </Badge>
                 )}
               </Button>
@@ -180,9 +169,18 @@ export function TopBar() {
               <DropdownMenuLabel className="flex items-center justify-between">
                 <span>Notificações</span>
                 {unreadCount > 0 && (
-                  <Badge variant="secondary" className="ml-2 bg-primary/20 text-primary">
-                    {unreadCount} ativa{unreadCount > 1 ? "s" : ""}
-                  </Badge>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 text-xs text-primary hover:text-primary/80"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      markAllAsRead();
+                    }}
+                  >
+                    <Check className="h-3 w-3 mr-1" />
+                    Marcar todas como lidas
+                  </Button>
                 )}
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border/50" />
@@ -193,38 +191,55 @@ export function TopBar() {
                     Carregando notificações...
                   </div>
                 ) : notifications.length === 0 ? (
-                  <div className="p-4 text-sm text-muted-foreground">
-                    Nenhuma notificação ativa no momento.
+                  <div className="p-4 text-sm text-muted-foreground text-center">
+                    Nenhuma notificação no momento.
                   </div>
                 ) : (
                   notifications.map((n) => (
                     <DropdownMenuItem
                       key={n.id}
-                      className="flex flex-col items-start p-4 gap-1 hover:bg-dark-700 transition-colors"
+                      className={`flex flex-col items-start p-4 gap-1 hover:bg-dark-700 transition-colors cursor-pointer ${
+                        !n.is_read ? 'bg-primary/5 border-l-2 border-l-primary' : ''
+                      }`}
+                      onClick={() => navigateToNotification(n)}
                     >
                       <div className="flex items-start justify-between w-full gap-2">
-                        <div className="flex-1">
-                          <span className="text-sm font-medium text-foreground">
-                            {n.title}
-                          </span>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {n.description}
-                          </p>
+                        <div className="flex items-start gap-2 flex-1">
+                          <span className="text-lg">{getNotificationIcon(n.type)}</span>
+                          <div className="flex-1 min-w-0">
+                            <span className={`text-sm ${!n.is_read ? 'font-semibold' : 'font-medium'} text-foreground`}>
+                              {n.title}
+                            </span>
+                            {n.message && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                {n.message}
+                              </p>
+                            )}
+                          </div>
                         </div>
+                        {!n.is_read && (
+                          <div className="h-2 w-2 rounded-full bg-primary shrink-0 mt-1" />
+                        )}
                       </div>
-                      <span className="text-xs text-muted-foreground">{n.time}</span>
+                      <span className="text-xs text-muted-foreground ml-7">
+                        {formatNotificationTime(n.created_at)}
+                      </span>
                     </DropdownMenuItem>
                   ))
                 )}
               </div>
 
-              <DropdownMenuSeparator className="bg-border/50" />
-              <DropdownMenuItem
-                className="text-center text-primary cursor-pointer hover:bg-primary/10"
-                onClick={() => {}}
-              >
-                Ver todos os alertas
-              </DropdownMenuItem>
+              {notifications.length > 0 && (
+                <>
+                  <DropdownMenuSeparator className="bg-border/50" />
+                  <DropdownMenuItem
+                    className="text-center text-primary cursor-pointer hover:bg-primary/10 justify-center"
+                    onClick={() => navigate('/vfeed')}
+                  >
+                    Ver todas as notificações
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -281,26 +296,54 @@ export function TopBar() {
                     variant="destructive"
                     className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-xs"
                   >
-                    {unreadCount}
+                    {unreadCount > 9 ? '9+' : unreadCount}
                   </Badge>
                 )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80 bg-dark-800 border-border/50">
-              <DropdownMenuLabel>Notificações</DropdownMenuLabel>
+              <DropdownMenuLabel className="flex items-center justify-between">
+                <span>Notificações</span>
+                {unreadCount > 0 && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 text-xs text-primary"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      markAllAsRead();
+                    }}
+                  >
+                    <Check className="h-3 w-3" />
+                  </Button>
+                )}
+              </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border/50" />
               {notificationsLoading ? (
                 <div className="p-3 text-sm text-muted-foreground">Carregando...</div>
               ) : notifications.length === 0 ? (
-                <div className="p-3 text-sm text-muted-foreground">Sem alertas ativos.</div>
+                <div className="p-3 text-sm text-muted-foreground text-center">Sem notificações.</div>
               ) : (
                 notifications.slice(0, 5).map((n) => (
                   <DropdownMenuItem
                     key={n.id}
-                    className="flex flex-col items-start p-3 gap-1 hover:bg-dark-700"
+                    className={`flex flex-col items-start p-3 gap-1 hover:bg-dark-700 cursor-pointer ${
+                      !n.is_read ? 'bg-primary/5' : ''
+                    }`}
+                    onClick={() => navigateToNotification(n)}
                   >
-                    <div className="font-medium text-sm">{n.title}</div>
-                    <div className="text-xs text-muted-foreground">{n.time}</div>
+                    <div className="flex items-center gap-2 w-full">
+                      <span>{getNotificationIcon(n.type)}</span>
+                      <span className={`font-medium text-sm flex-1 ${!n.is_read ? 'font-semibold' : ''}`}>
+                        {n.title}
+                      </span>
+                      {!n.is_read && (
+                        <div className="h-2 w-2 rounded-full bg-primary shrink-0" />
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground ml-6">
+                      {formatNotificationTime(n.created_at)}
+                    </div>
                   </DropdownMenuItem>
                 ))
               )}
