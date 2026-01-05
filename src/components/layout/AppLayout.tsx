@@ -2,7 +2,6 @@ import { ReactNode, useState, useEffect } from "react";
 import { AppSidebar } from "./AppSidebar";
 import { TopBar } from "./TopBar";
 import { BottomNavigation } from "./BottomNavigation";
-import { PromoBanner } from "@/components/dashboard/PromoBanner";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -52,9 +51,6 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div className="h-full overflow-y-auto scrollbar-thin">
           <div className="p-4 sm:p-6 lg:p-8 min-h-full">
             <div className="max-w-screen-2xl mx-auto">
-              <div className="mb-6">
-                <PromoBanner />
-              </div>
               {children}
             </div>
           </div>

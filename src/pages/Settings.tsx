@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Settings as SettingsIcon, Webhook, Bell, Building, Loader2, CheckCircle, XCircle, ExternalLink } from "lucide-react";
+import { Settings as SettingsIcon, Webhook, Bell, Building, Loader2, ExternalLink } from "lucide-react";
 import { pt } from "@/i18n/pt";
 import { systemSettingsService, SystemSetting } from "@/services/systemSettingsService";
 import { useToast } from "@/hooks/use-toast";
@@ -175,12 +176,12 @@ export default function Settings() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">{pt.settings.title}</h1>
-            <p className="text-muted-foreground mt-1">{pt.settings.subtitle}</p>
-          </div>
-        </div>
+        <PageHeader
+          title={pt.settings.title}
+          breadcrumb="Configurações"
+          subtitle="Sistema e integrações"
+          icon={<SettingsIcon className="h-6 w-6" />}
+        />
 
         <Tabs defaultValue="webhooks" className="w-full">
           <TabsList className="grid w-full grid-cols-3">

@@ -1,6 +1,7 @@
 // src/pages/Users.tsx
 import React, { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,14 +18,7 @@ import {
   User,
   MoreVertical,
   Edit,
-  Eye,
   Trash2,
-  ChevronRight,
-  Filter,
-  Mail,
-  Phone,
-  Building2,
-  Calendar,
   Lock,
   Unlock,
   RefreshCw
@@ -60,11 +54,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Usuario {
   id: string;
@@ -446,22 +440,22 @@ export default function Users() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Usuários</h1>
-            <p className="text-muted-foreground mt-1">
-              Gerencie os usuários e suas permissões
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={loadUsuarios}>
-              <RefreshCw className="mr-2 h-4 w-4" /> Atualizar
-            </Button>
-            <Button onClick={() => setShowCreateModal(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Novo Usuário
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          title="Usuários"
+          breadcrumb="Gestão de Usuários"
+          subtitle="Permissões e acessos"
+          icon={<UsersIcon className="h-6 w-6" />}
+          actions={
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={loadUsuarios}>
+                <RefreshCw className="mr-2 h-4 w-4" /> Atualizar
+              </Button>
+              <Button onClick={() => setShowCreateModal(true)}>
+                <Plus className="mr-2 h-4 w-4" /> Novo Usuário
+              </Button>
+            </div>
+          }
+        />
 
         <Card>
           <CardHeader>
