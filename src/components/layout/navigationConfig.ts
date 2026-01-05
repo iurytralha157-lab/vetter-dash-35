@@ -37,7 +37,10 @@ export const navigationItems: NavigationItem[] = [
 ];
 
 export const filterNavigationByRole = (items: NavigationItem[], userRole: UserRole | null): NavigationItem[] => {
-  if (!userRole) return [];
+  // Durante o carregamento ou sem role, mostra items sem restrição
+  if (!userRole) {
+    return items.filter(item => !item.roles || item.roles.length === 0);
+  }
   if (userRole === 'admin') return items; // Admin vê tudo
   
   return items.filter(item => {
