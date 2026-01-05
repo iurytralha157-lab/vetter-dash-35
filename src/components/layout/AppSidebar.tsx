@@ -140,7 +140,7 @@ export function AppSidebar({
                 <img 
                   src={displayLogoUrl} 
                   alt="Logo" 
-                  className="rounded-xl object-contain"
+                  className="object-contain"
                   style={{ 
                     width: isCollapsed ? Math.min(displayLogoSize, 40) : displayLogoSize, 
                     height: isCollapsed ? Math.min(displayLogoSize, 40) : displayLogoSize 
