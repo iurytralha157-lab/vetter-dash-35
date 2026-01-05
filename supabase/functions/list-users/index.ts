@@ -37,6 +37,7 @@ serve(async (req) => {
     // Identify caller
     const { data: { user }, error: userErr } = await supabaseUser.auth.getUser();
     if (userErr || !user) {
+      console.log("Auth error:", userErr);
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -50,31 +51,42 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
 
+    console.log("User role check:", { userId: user.id, role: roleRow?.role, error: roleErr });
+
     if ((roleErr && roleErr.message) || roleRow?.role !== "admin") {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
+      return new Response(JSON.stringify({ error: "Forbidden - admin role required" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // List all auth users (service role required)
-    const { data: { users: authUsers }, error: authError } = await supabaseService.auth.admin.listUsers();
-    if (authError) throw authError;
-
-    // Load complementary data
-    const [profilesRes, rolesRes, accountsRes, clientesRes, userAccountsRes] = await Promise.all([
+    // Load profiles and complementary data directly from tables
+    // This avoids issues with auth.admin.listUsers() which can fail on some Supabase instances
+    const [profilesRes, rolesRes, accountsRes, clientesRes] = await Promise.all([
       supabaseService.from("profiles").select("*"),
       supabaseService.from("user_roles").select("*"),
       supabaseService.from("accounts").select("id, nome_cliente, gestor_id, cliente_id, usuarios_vinculados"),
       supabaseService.from("clientes").select("id"),
-      supabaseService.from("accounts").select("id, nome_cliente, usuarios_vinculados"),
     ]);
+
+    console.log("Data loaded:", {
+      profiles: profilesRes.data?.length || 0,
+      roles: rolesRes.data?.length || 0,
+      accounts: accountsRes.data?.length || 0,
+      clientes: clientesRes.data?.length || 0,
+      profilesError: profilesRes.error,
+      rolesError: rolesRes.error,
+    });
+
+    if (profilesRes.error) {
+      console.error("Error loading profiles:", profilesRes.error);
+      throw new Error(`Failed to load profiles: ${profilesRes.error.message}`);
+    }
 
     const profiles = profilesRes.data ?? [];
     const roles = rolesRes.data ?? [];
     const accounts = accountsRes.data ?? [];
     const totalClientes = clientesRes.data?.length ?? 0;
-    const allAccounts = userAccountsRes.data ?? [];
 
     // Count unique clientes per gestor
     const clientCountByGestor: Record<string, Set<string>> = {};
@@ -89,7 +101,7 @@ serve(async (req) => {
 
     // Get accounts linked to each user
     const getLinkedAccounts = (userId: string) => {
-      return allAccounts
+      return accounts
         .filter((acc: any) => {
           const linkedUsers = acc.usuarios_vinculados || [];
           return linkedUsers.includes(userId) || acc.gestor_id === userId;
@@ -100,37 +112,39 @@ serve(async (req) => {
         }));
     };
 
-    const users = (authUsers ?? []).map((au: any) => {
-      const profile = profiles.find((p: any) => p.id === au.id);
-      const roleRow = roles.find((r: any) => r.user_id === au.id);
+    // Build user list from profiles table
+    const users = profiles.map((profile: any) => {
+      const roleRow = roles.find((r: any) => r.user_id === profile.id);
       const role = roleRow?.role ?? "usuario";
 
       let total_clientes = 0;
       if (role === "admin") {
         total_clientes = totalClientes;
       } else if (role === "gestor") {
-        total_clientes = clientCountByGestor[au.id]?.size ?? 0;
+        total_clientes = clientCountByGestor[profile.id]?.size ?? 0;
       }
 
-      const linkedAccounts = getLinkedAccounts(au.id);
+      const linkedAccounts = getLinkedAccounts(profile.id);
 
       return {
-        id: au.id,
-        email: au.email ?? "",
-        name: profile?.name ?? null,
+        id: profile.id,
+        email: profile.email ?? "",
+        name: profile.name ?? null,
         role,
-        ativo: profile?.ativo ?? true,
-        ultimo_acesso: profile?.ultimo_acesso ?? null,
-        last_sign_in_at: au.last_sign_in_at ?? null,
-        created_at: au.created_at,
-        telefone: profile?.telefone ?? null,
-        departamento: profile?.departamento ?? null,
-        updated_at: profile?.updated_at ?? au.updated_at,
-        avatar_url: profile?.avatar_url ?? null,
+        ativo: profile.ativo ?? true,
+        ultimo_acesso: profile.ultimo_acesso ?? null,
+        last_sign_in_at: profile.ultimo_acesso ?? null,
+        created_at: profile.updated_at ?? new Date().toISOString(),
+        telefone: profile.telefone ?? null,
+        departamento: profile.departamento ?? null,
+        updated_at: profile.updated_at ?? new Date().toISOString(),
+        avatar_url: profile.avatar_url ?? null,
         total_clientes,
         linked_accounts: linkedAccounts,
       };
     });
+
+    console.log("Returning users:", users.length);
 
     return new Response(JSON.stringify({ users }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
