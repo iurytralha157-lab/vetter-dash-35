@@ -64,10 +64,10 @@ export function MobileDrawer() {
           <SheetHeader className="p-6 border-b border-border">
             <div className="flex items-center">
               {logoUrl ? (
-                <img 
+              <img 
                   src={logoUrl} 
                   alt={systemName || 'Logo'} 
-                  className="h-10 object-contain"
+                  className="h-7 object-contain"
                 />
               ) : (
                 <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0">
