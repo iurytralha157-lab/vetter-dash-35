@@ -1,9 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Image, Video, X, Loader2, MessageCircle } from "lucide-react";
@@ -15,6 +14,8 @@ import { PostTypeSelector, PostCategory } from "@/components/feed/PostTypeSelect
 import { PollCreator } from "@/components/feed/PollCreator";
 import { FeedPostCard } from "@/components/feed/FeedPostCard";
 import { UserProfileSheet } from "@/components/feed/UserProfileSheet";
+import { FeedSearchFilter, CategoryFilter } from "@/components/feed/FeedSearchFilter";
+import { MentionInput, extractMentions } from "@/components/feed/MentionInput";
 
 export default function VFeed() {
   const { user } = useAuth();
@@ -29,6 +30,8 @@ export default function VFeed() {
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
@@ -52,6 +55,37 @@ export default function VFeed() {
     queryKey: ['community-posts'],
     queryFn: () => communityService.getPosts()
   });
+
+  // Filtrar posts baseado na pesquisa e categoria
+  const filteredPosts = useMemo(() => {
+    if (!posts) return [];
+    
+    return posts.filter((post: any) => {
+      // Filtro de categoria
+      if (categoryFilter !== 'all') {
+        const postCategory = post.post_category || 'normal';
+        if (postCategory !== categoryFilter) return false;
+      }
+      
+      // Filtro de pesquisa
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const authorName = post.author?.name?.toLowerCase() || '';
+        const content = post.content?.toLowerCase() || '';
+        
+        // Pesquisa por @autor
+        if (query.startsWith('@')) {
+          const authorQuery = query.slice(1);
+          return authorName.includes(authorQuery);
+        }
+        
+        // Pesquisa no conteúdo ou autor
+        return content.includes(query) || authorName.includes(query);
+      }
+      
+      return true;
+    });
+  }, [posts, searchQuery, categoryFilter]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
     const files = Array.from(e.target.files || []);
@@ -192,11 +226,19 @@ export default function VFeed() {
   return (
     <AppLayout>
       <div className="max-w-xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
+        {/* Header - mais compacto */}
+        <div className="mb-4">
           <h1 className="text-2xl font-bold">VFeed</h1>
-          <p className="text-muted-foreground">Comunidade e atualizações</p>
+          <p className="text-muted-foreground text-sm">Comunidade e atualizações</p>
         </div>
+
+        {/* Search and Filter */}
+        <FeedSearchFilter
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          categoryFilter={categoryFilter}
+          onCategoryChange={setCategoryFilter}
+        />
 
         {/* Create Post - Mobile Responsive */}
         <Card className="mb-6 border-border/50">
@@ -211,11 +253,11 @@ export default function VFeed() {
               </Avatar>
               
               <div className="flex-1 space-y-3">
-                <Textarea
+                <MentionInput
                   placeholder={postCategory === 'enquete' ? 'Faça uma pergunta...' : 'O que você quer compartilhar?'}
                   value={newPost}
-                  onChange={(e) => setNewPost(e.target.value)}
-                  className="min-h-[80px] resize-none border-0 p-0 focus-visible:ring-0 text-base"
+                  onChange={setNewPost}
+                  minHeight="80px"
                 />
 
                 {/* Poll Creator */}
@@ -326,15 +368,24 @@ export default function VFeed() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        ) : posts && posts.length > 0 ? (
-          posts.map((post) => (
+        ) : filteredPosts.length > 0 ? (
+          filteredPosts.map((post: any) => (
             <FeedPostCard 
               key={post.id} 
-              post={post as any}
+              post={post}
               onUpdate={() => queryClient.invalidateQueries({ queryKey: ['community-posts'] })}
               onViewProfile={handleViewProfile}
             />
           ))
+        ) : posts && posts.length > 0 ? (
+          <Card className="border-border/50">
+            <CardContent className="text-center py-12">
+              <MessageCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">
+                Nenhum resultado encontrado para sua pesquisa.
+              </p>
+            </CardContent>
+          </Card>
         ) : (
           <Card className="border-border/50">
             <CardContent className="text-center py-12">
