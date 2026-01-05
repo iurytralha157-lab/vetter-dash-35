@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface SystemBranding {
   logoUrl: string | null;
+  faviconUrl: string | null;
   name: string;
   logoSize: number;
   loading: boolean;
@@ -10,6 +11,7 @@ interface SystemBranding {
 
 export function useSystemBranding(): SystemBranding {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
   const [name, setName] = useState('MetaFlow');
   const [logoSize, setLogoSize] = useState(40);
   const [loading, setLoading] = useState(true);
@@ -19,12 +21,13 @@ export function useSystemBranding(): SystemBranding {
       try {
         const { data, error } = await supabase
           .from('system_branding')
-          .select('logo_url, name, logo_size')
+          .select('logo_url, favicon_url, name, logo_size')
           .limit(1)
           .single();
 
         if (data && !error) {
           setLogoUrl(data.logo_url);
+          setFaviconUrl(data.favicon_url);
           setName(data.name || 'MetaFlow');
           setLogoSize(data.logo_size || 40);
         }
@@ -38,5 +41,5 @@ export function useSystemBranding(): SystemBranding {
     fetchBranding();
   }, []);
 
-  return { logoUrl, name, logoSize, loading };
+  return { logoUrl, faviconUrl, name, logoSize, loading };
 }

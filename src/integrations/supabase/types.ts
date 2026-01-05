@@ -2927,6 +2927,7 @@ export type Database = {
       system_branding: {
         Row: {
           created_at: string | null
+          favicon_url: string | null
           id: string
           logo_size: number | null
           logo_url: string | null
@@ -2935,6 +2936,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          favicon_url?: string | null
           id?: string
           logo_size?: number | null
           logo_url?: string | null
@@ -2943,6 +2945,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          favicon_url?: string | null
           id?: string
           logo_size?: number | null
           logo_url?: string | null

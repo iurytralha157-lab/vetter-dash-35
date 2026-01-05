@@ -37,12 +37,13 @@ export function AppSidebar({
   const location = useLocation();
   const { user, signOut } = useAuth();
   const { role } = useUserRole();
-  const { logoUrl: systemLogoUrl, name: systemName, logoSize: systemLogoSize } = useSystemBranding();
+  const { logoUrl: systemLogoUrl, faviconUrl: systemFaviconUrl, name: systemName, logoSize: systemLogoSize } = useSystemBranding();
   const currentPath = location.pathname;
   const filteredNavItems = filterNavigationByRole(navigationItems, role);
   
   // Determine which logo and name to use (org > system > default)
   const displayLogoUrl = orgLogoUrl || systemLogoUrl;
+  const displayFaviconUrl = systemFaviconUrl;
   const displayName = orgName || systemName || brandName;
   const displayLogoSize = systemLogoSize || 40;
 
@@ -136,31 +137,51 @@ export function AppSidebar({
         >
           <NavLink to="/" className="flex items-center justify-center group w-full">
             <div className="flex items-center justify-center flex-shrink-0">
-              {displayLogoUrl ? (
-                <img 
-                  src={displayLogoUrl} 
-                  alt="Logo" 
-                  className="object-contain"
-                  style={{ 
-                    width: isCollapsed ? Math.min(displayLogoSize, 40) : displayLogoSize, 
-                    height: isCollapsed ? Math.min(displayLogoSize, 40) : displayLogoSize 
-                  }}
-                />
+              {isCollapsed ? (
+                // Sidebar recolhida - usa favicon ou logo reduzida
+                displayFaviconUrl ? (
+                  <img 
+                    src={displayFaviconUrl} 
+                    alt="Favicon" 
+                    className="object-contain"
+                    style={{ width: 32, height: 32 }}
+                  />
+                ) : displayLogoUrl ? (
+                  <img 
+                    src={displayLogoUrl} 
+                    alt="Logo" 
+                    className="object-contain"
+                    style={{ width: 32, height: 32 }}
+                  />
+                ) : (
+                  <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center glow-primary">
+                    <span className="text-white font-bold text-sm">
+                      {displayName.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )
               ) : (
-                <div 
-                  className="rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center glow-primary"
-                  style={{ 
-                    width: isCollapsed ? Math.min(displayLogoSize, 40) : displayLogoSize, 
-                    height: isCollapsed ? Math.min(displayLogoSize, 40) : displayLogoSize 
-                  }}
-                >
-                  <span 
-                    className="text-white font-bold"
-                    style={{ fontSize: (isCollapsed ? Math.min(displayLogoSize, 40) : displayLogoSize) * 0.4 }}
+                // Sidebar expandida - usa logo principal
+                displayLogoUrl ? (
+                  <img 
+                    src={displayLogoUrl} 
+                    alt="Logo" 
+                    className="object-contain"
+                    style={{ width: displayLogoSize, height: displayLogoSize }}
+                  />
+                ) : (
+                  <div 
+                    className="rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center glow-primary"
+                    style={{ width: displayLogoSize, height: displayLogoSize }}
                   >
-                    {displayName.charAt(0).toUpperCase()}
-                  </span>
-                </div>
+                    <span 
+                      className="text-white font-bold"
+                      style={{ fontSize: displayLogoSize * 0.4 }}
+                    >
+                      {displayName.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )
               )}
             </div>
           </NavLink>

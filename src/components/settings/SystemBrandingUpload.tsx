@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Upload, Trash2, Building2, Loader2 } from "lucide-react";
+import { Upload, Trash2, Building2, Loader2, Image } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -13,6 +13,7 @@ export function SystemBrandingUpload() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
   const [systemName, setSystemName] = useState('MetaFlow');
   const [logoSize, setLogoSize] = useState(40);
   const [brandingId, setBrandingId] = useState<string | null>(null);
@@ -32,6 +33,7 @@ export function SystemBrandingUpload() {
       if (data) {
         setBrandingId(data.id);
         setLogoUrl(data.logo_url);
+        setFaviconUrl(data.favicon_url);
         setSystemName(data.name || 'MetaFlow');
         setLogoSize(data.logo_size || 40);
       }
@@ -42,9 +44,11 @@ export function SystemBrandingUpload() {
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !brandingId) return;
+  const handleFileUpload = async (
+    file: File, 
+    type: 'logo' | 'favicon'
+  ) => {
+    if (!brandingId) return;
 
     if (file.size > 2 * 1024 * 1024) {
       toast({
@@ -68,7 +72,7 @@ export function SystemBrandingUpload() {
 
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `system-logo-${Date.now()}.${fileExt}`;
+      const fileName = `system-${type}-${Date.now()}.${fileExt}`;
       const filePath = `branding/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -81,24 +85,29 @@ export function SystemBrandingUpload() {
         .from('org-logos')
         .getPublicUrl(filePath);
 
+      const updateField = type === 'logo' ? 'logo_url' : 'favicon_url';
       const { error: updateError } = await supabase
         .from('system_branding')
-        .update({ logo_url: publicUrl, updated_at: new Date().toISOString() })
+        .update({ [updateField]: publicUrl, updated_at: new Date().toISOString() })
         .eq('id', brandingId);
 
       if (updateError) throw updateError;
 
-      setLogoUrl(publicUrl);
+      if (type === 'logo') {
+        setLogoUrl(publicUrl);
+      } else {
+        setFaviconUrl(publicUrl);
+      }
 
       toast({
-        title: "Logo atualizada",
-        description: "A logo do sistema foi atualizada com sucesso.",
+        title: type === 'logo' ? "Logo atualizada" : "Favicon atualizado",
+        description: `${type === 'logo' ? 'A logo' : 'O favicon'} foi atualizado com sucesso.`,
       });
     } catch (error) {
-      console.error('Error uploading logo:', error);
+      console.error(`Error uploading ${type}:`, error);
       toast({
         title: "Erro",
-        description: "Não foi possível fazer o upload da logo.",
+        description: `Não foi possível fazer o upload.`,
         variant: "destructive",
       });
     } finally {
@@ -106,31 +115,37 @@ export function SystemBrandingUpload() {
     }
   };
 
-  const handleRemove = async () => {
-    if (!brandingId || !logoUrl) return;
+  const handleRemoveImage = async (type: 'logo' | 'favicon') => {
+    const url = type === 'logo' ? logoUrl : faviconUrl;
+    if (!brandingId || !url) return;
 
     setSaving(true);
 
     try {
-      const path = logoUrl.split('/').slice(-2).join('/');
+      const path = url.split('/').slice(-2).join('/');
       await supabase.storage.from('org-logos').remove([path]);
 
+      const updateField = type === 'logo' ? 'logo_url' : 'favicon_url';
       await supabase
         .from('system_branding')
-        .update({ logo_url: null, updated_at: new Date().toISOString() })
+        .update({ [updateField]: null, updated_at: new Date().toISOString() })
         .eq('id', brandingId);
 
-      setLogoUrl(null);
+      if (type === 'logo') {
+        setLogoUrl(null);
+      } else {
+        setFaviconUrl(null);
+      }
 
       toast({
-        title: "Logo removida",
-        description: "A logo do sistema foi removida.",
+        title: type === 'logo' ? "Logo removida" : "Favicon removido",
+        description: `${type === 'logo' ? 'A logo' : 'O favicon'} foi removido.`,
       });
     } catch (error) {
-      console.error('Error removing logo:', error);
+      console.error(`Error removing ${type}:`, error);
       toast({
         title: "Erro",
-        description: "Não foi possível remover a logo.",
+        description: `Não foi possível remover.`,
         variant: "destructive",
       });
     } finally {
@@ -208,7 +223,7 @@ export function SystemBrandingUpload() {
       <CardContent className="space-y-6">
         {/* Logo Upload */}
         <div className="space-y-4">
-          <Label>Logo do Sistema</Label>
+          <Label>Logo do Sistema (Sidebar Expandida)</Label>
           <div className="flex items-center gap-6">
             <div className="relative h-20 w-20 rounded-2xl bg-secondary/50 border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
               {logoUrl ? (
@@ -243,7 +258,7 @@ export function SystemBrandingUpload() {
                     variant="outline"
                     size="sm"
                     disabled={saving}
-                    onClick={handleRemove}
+                    onClick={() => handleRemoveImage('logo')}
                     className="text-destructive hover:bg-destructive/10"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -260,7 +275,72 @@ export function SystemBrandingUpload() {
               id="system-logo-input"
               accept="image/*"
               className="hidden"
-              onChange={handleFileSelect}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFileUpload(file, 'logo');
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Favicon Upload */}
+        <div className="space-y-4">
+          <Label>Favicon (Sidebar Recolhida)</Label>
+          <div className="flex items-center gap-6">
+            <div className="relative h-14 w-14 rounded-xl bg-secondary/50 border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
+              {faviconUrl ? (
+                <img 
+                  src={faviconUrl} 
+                  alt="Favicon" 
+                  className="h-full w-full object-contain p-1"
+                />
+              ) : (
+                <Image className="h-6 w-6 text-muted-foreground" />
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={saving}
+                  onClick={() => document.getElementById('system-favicon-input')?.click()}
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
+                  {faviconUrl ? 'Trocar' : 'Upload'}
+                </Button>
+                
+                {faviconUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={saving}
+                    onClick={() => handleRemoveImage('favicon')}
+                    className="text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Ícone pequeno para sidebar recolhida. PNG, JPG ou SVG.
+              </p>
+            </div>
+
+            <input
+              type="file"
+              id="system-favicon-input"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFileUpload(file, 'favicon');
+              }}
             />
           </div>
         </div>
@@ -316,28 +396,62 @@ export function SystemBrandingUpload() {
 
         {/* Preview */}
         <div className="pt-4 border-t border-border">
-          <Label className="text-muted-foreground text-sm">Preview da Sidebar</Label>
-          <div className="mt-3 flex items-center justify-center p-4 rounded-xl bg-secondary/30">
-            {logoUrl ? (
-              <img 
-                src={logoUrl} 
-                alt="Logo" 
-                className="object-contain"
-                style={{ width: logoSize, height: logoSize }}
-              />
-            ) : (
-              <div 
-                className="rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center"
-                style={{ width: logoSize, height: logoSize }}
-              >
-                <span 
-                  className="text-primary-foreground font-bold"
-                  style={{ fontSize: logoSize * 0.4 }}
-                >
-                  {systemName.charAt(0).toUpperCase()}
-                </span>
+          <Label className="text-muted-foreground text-sm">Preview</Label>
+          <div className="mt-3 grid grid-cols-2 gap-4">
+            {/* Expanded Preview */}
+            <div className="p-4 rounded-xl bg-secondary/30">
+              <p className="text-xs text-muted-foreground mb-3">Sidebar Expandida</p>
+              <div className="flex items-center justify-center">
+                {logoUrl ? (
+                  <img 
+                    src={logoUrl} 
+                    alt="Logo" 
+                    className="object-contain"
+                    style={{ width: logoSize, height: logoSize }}
+                  />
+                ) : (
+                  <div 
+                    className="rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center"
+                    style={{ width: logoSize, height: logoSize }}
+                  >
+                    <span 
+                      className="text-primary-foreground font-bold"
+                      style={{ fontSize: logoSize * 0.4 }}
+                    >
+                      {systemName.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+
+            {/* Collapsed Preview */}
+            <div className="p-4 rounded-xl bg-secondary/30">
+              <p className="text-xs text-muted-foreground mb-3">Sidebar Recolhida</p>
+              <div className="flex items-center justify-center">
+                {faviconUrl ? (
+                  <img 
+                    src={faviconUrl} 
+                    alt="Favicon" 
+                    className="object-contain"
+                    style={{ width: 32, height: 32 }}
+                  />
+                ) : logoUrl ? (
+                  <img 
+                    src={logoUrl} 
+                    alt="Logo" 
+                    className="object-contain"
+                    style={{ width: 32, height: 32 }}
+                  />
+                ) : (
+                  <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+                    <span className="text-primary-foreground font-bold text-sm">
+                      {systemName.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </CardContent>
