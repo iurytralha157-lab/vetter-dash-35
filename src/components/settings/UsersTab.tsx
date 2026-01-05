@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,10 @@ import {
   MoreVertical,
   Edit,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Mail,
+  Key,
+  Building2,
 } from "lucide-react";
 import {
   Select,
@@ -46,8 +49,15 @@ import {
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+interface LinkedAccount {
+  id: string;
+  nome_cliente: string;
+}
 
 interface Usuario {
   id: string;
@@ -62,10 +72,20 @@ interface Usuario {
   departamento: string | null;
   updated_at: string;
   avatar_url?: string | null;
+  linked_accounts?: LinkedAccount[];
+  total_clientes?: number;
+}
+
+interface Account {
+  id: string;
+  nome_cliente: string;
+  email: string | null;
+  status: string;
 }
 
 export function UsersTab() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("todos");
@@ -74,8 +94,12 @@ export function UsersTab() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showAccountsModal, setShowAccountsModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Usuario | null>(null);
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [creatingUser, setCreatingUser] = useState(false);
+  const [savingAccounts, setSavingAccounts] = useState(false);
+  const [sendingReset, setSendingReset] = useState(false);
 
   const [editFormData, setEditFormData] = useState({
     name: "",
@@ -96,6 +120,7 @@ export function UsersTab() {
   useEffect(() => {
     loadCurrentUser();
     loadUsuarios();
+    loadAccounts();
   }, []);
 
   const loadCurrentUser = async () => {
@@ -126,6 +151,20 @@ export function UsersTab() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('id, nome_cliente, email, status')
+        .order('nome_cliente');
+      
+      if (error) throw error;
+      setAccounts(data || []);
+    } catch (error) {
+      console.error("Error loading accounts:", error);
     }
   };
 
@@ -162,6 +201,92 @@ export function UsersTab() {
       departamento: user.departamento || "",
     });
     setShowEditModal(true);
+  };
+
+  const openAccountsModal = (user: Usuario) => {
+    setSelectedUser(user);
+    const linkedIds = user.linked_accounts?.map(a => a.id) || [];
+    setSelectedAccounts(linkedIds);
+    setShowAccountsModal(true);
+  };
+
+  const toggleAccountSelection = (accountId: string) => {
+    setSelectedAccounts(prev => 
+      prev.includes(accountId) 
+        ? prev.filter(id => id !== accountId)
+        : [...prev, accountId]
+    );
+  };
+
+  const saveUserAccounts = async () => {
+    if (!selectedUser) return;
+    setSavingAccounts(true);
+    
+    try {
+      // First, remove user from all accounts
+      const { data: allAccounts } = await supabase
+        .from('accounts')
+        .select('id, usuarios_vinculados');
+      
+      for (const acc of allAccounts || []) {
+        const currentUsers = (acc.usuarios_vinculados as string[]) || [];
+        if (currentUsers.includes(selectedUser.id)) {
+          await supabase
+            .from('accounts')
+            .update({
+              usuarios_vinculados: currentUsers.filter(id => id !== selectedUser.id)
+            })
+            .eq('id', acc.id);
+        }
+      }
+
+      // Then, add user to selected accounts
+      for (const accountId of selectedAccounts) {
+        const { data: account } = await supabase
+          .from('accounts')
+          .select('usuarios_vinculados')
+          .eq('id', accountId)
+          .single();
+        
+        const currentUsers = (account?.usuarios_vinculados as string[]) || [];
+        if (!currentUsers.includes(selectedUser.id)) {
+          await supabase
+            .from('accounts')
+            .update({
+              usuarios_vinculados: [...currentUsers, selectedUser.id]
+            })
+            .eq('id', accountId);
+        }
+      }
+
+      toast({ title: "Contas atualizadas com sucesso" });
+      setShowAccountsModal(false);
+      loadUsuarios();
+    } catch (error: any) {
+      console.error("Error saving accounts:", error);
+      toast({ title: "Erro ao salvar contas", variant: "destructive" });
+    } finally {
+      setSavingAccounts(false);
+    }
+  };
+
+  const sendPasswordReset = async (user: Usuario) => {
+    if (!isAdmin || !user.email) return;
+    setSendingReset(true);
+    
+    try {
+      const { error } = await supabase.functions.invoke('reset-password', {
+        body: { email: user.email }
+      });
+      
+      if (error) throw error;
+      toast({ title: "Email de redefinição enviado", description: `Enviado para ${user.email}` });
+    } catch (error: any) {
+      console.error("Error sending password reset:", error);
+      toast({ title: "Erro ao enviar email", description: error?.message, variant: "destructive" });
+    } finally {
+      setSendingReset(false);
+    }
   };
 
   const saveUserEdits = async () => {
@@ -245,6 +370,7 @@ export function UsersTab() {
         <div className="flex items-center gap-2">
           <UsersIcon className="h-5 w-5 text-primary" />
           <h3 className="font-semibold">Gestão de Usuários</h3>
+          <Badge variant="outline">{usuarios.length} usuários</Badge>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={loadUsuarios} disabled={loading}>
@@ -286,14 +412,20 @@ export function UsersTab() {
         <CardContent className="p-0">
           {loading ? (
             <div className="p-8 text-center text-muted-foreground">Carregando...</div>
+          ) : filteredUsuarios.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">
+              <UsersIcon className="h-10 w-10 mx-auto mb-3 opacity-50" />
+              <p>Nenhum usuário encontrado</p>
+            </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Usuário</TableHead>
                   <TableHead>Cargo</TableHead>
+                  <TableHead>Contas</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Último Acesso</TableHead>
+                  <TableHead>Último Login</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -302,9 +434,11 @@ export function UsersTab() {
                   <TableRow key={user.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-8 w-8">
+                        <Avatar className="h-9 w-9">
                           <AvatarImage src={user.avatar_url || undefined} />
-                          <AvatarFallback className="text-xs">{(user.name || user.email)[0].toUpperCase()}</AvatarFallback>
+                          <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                            {(user.name || user.email)[0].toUpperCase()}
+                          </AvatarFallback>
                         </Avatar>
                         <div>
                           <p className="font-medium text-sm">{user.name || "Sem nome"}</p>
@@ -315,7 +449,7 @@ export function UsersTab() {
                     <TableCell>
                       {isAdmin ? (
                         <Select value={user.role} onValueChange={(v) => updateRole(user.id, v)}>
-                          <SelectTrigger className="h-7 w-24">{getRoleBadge(user.role)}</SelectTrigger>
+                          <SelectTrigger className="h-7 w-28">{getRoleBadge(user.role)}</SelectTrigger>
                           <SelectContent>
                             <SelectItem value="admin">Admin</SelectItem>
                             <SelectItem value="gestor">Gestor</SelectItem>
@@ -323,6 +457,17 @@ export function UsersTab() {
                           </SelectContent>
                         </Select>
                       ) : getRoleBadge(user.role)}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1 text-xs"
+                        onClick={() => openAccountsModal(user)}
+                      >
+                        <Building2 className="h-3 w-3" />
+                        {user.linked_accounts?.length || 0} contas
+                      </Button>
                     </TableCell>
                     <TableCell>
                       <Badge variant={user.ativo ? "default" : "secondary"} className={user.ativo ? "bg-green-500" : ""}>
@@ -336,13 +481,22 @@ export function UsersTab() {
                           <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditModal(user)}><Edit className="h-4 w-4 mr-2" />Editar</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openEditModal(user)}>
+                            <Edit className="h-4 w-4 mr-2" />Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openAccountsModal(user)}>
+                            <Building2 className="h-4 w-4 mr-2" />Gerenciar Contas
+                          </DropdownMenuItem>
                           {isAdmin && (
                             <>
                               <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => sendPasswordReset(user)} disabled={sendingReset}>
+                                <Key className="h-4 w-4 mr-2" />Enviar Reset de Senha
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => toggleStatus(user.id, !user.ativo)}>
                                 {user.ativo ? "Desativar" : "Ativar"}
                               </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem className="text-destructive" onClick={() => { setSelectedUser(user); setShowDeleteModal(true); }}>
                                 <Trash2 className="h-4 w-4 mr-2" />Remover
                               </DropdownMenuItem>
@@ -421,6 +575,59 @@ export function UsersTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancelar</Button>
             <Button onClick={saveUserEdits}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Accounts Modal */}
+      <Dialog open={showAccountsModal} onOpenChange={setShowAccountsModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Gerenciar Contas</DialogTitle>
+            <DialogDescription>
+              Selecione as contas para {selectedUser?.name || selectedUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[350px] pr-4">
+            <div className="space-y-2 py-4">
+              {accounts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma conta disponível</p>
+              ) : (
+                accounts.map(account => (
+                  <div
+                    key={account.id}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 cursor-pointer border border-border/50"
+                    onClick={() => toggleAccountSelection(account.id)}
+                  >
+                    <Checkbox
+                      checked={selectedAccounts.includes(account.id)}
+                      onCheckedChange={() => toggleAccountSelection(account.id)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{account.nome_cliente}</p>
+                      {account.email && (
+                        <p className="text-xs text-muted-foreground truncate">{account.email}</p>
+                      )}
+                    </div>
+                    <Badge variant="outline" className="text-xs shrink-0">
+                      {account.status || 'ativo'}
+                    </Badge>
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+          
+          <p className="text-xs text-muted-foreground">
+            {selectedAccounts.length} conta{selectedAccounts.length !== 1 ? 's' : ''} selecionada{selectedAccounts.length !== 1 ? 's' : ''}
+          </p>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAccountsModal(false)}>Cancelar</Button>
+            <Button onClick={saveUserAccounts} disabled={savingAccounts}>
+              {savingAccounts ? "Salvando..." : "Salvar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

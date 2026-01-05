@@ -62,17 +62,19 @@ serve(async (req) => {
     if (authError) throw authError;
 
     // Load complementary data
-    const [profilesRes, rolesRes, accountsRes, clientesRes] = await Promise.all([
+    const [profilesRes, rolesRes, accountsRes, clientesRes, userAccountsRes] = await Promise.all([
       supabaseService.from("profiles").select("*"),
       supabaseService.from("user_roles").select("*"),
-      supabaseService.from("accounts").select("gestor_id, cliente_id"),
+      supabaseService.from("accounts").select("id, nome_cliente, gestor_id, cliente_id, usuarios_vinculados"),
       supabaseService.from("clientes").select("id"),
+      supabaseService.from("accounts").select("id, nome_cliente, usuarios_vinculados"),
     ]);
 
     const profiles = profilesRes.data ?? [];
     const roles = rolesRes.data ?? [];
     const accounts = accountsRes.data ?? [];
     const totalClientes = clientesRes.data?.length ?? 0;
+    const allAccounts = userAccountsRes.data ?? [];
 
     // Count unique clientes per gestor
     const clientCountByGestor: Record<string, Set<string>> = {};
@@ -84,6 +86,19 @@ serve(async (req) => {
         clientCountByGestor[acc.gestor_id].add(acc.cliente_id);
       }
     });
+
+    // Get accounts linked to each user
+    const getLinkedAccounts = (userId: string) => {
+      return allAccounts
+        .filter((acc: any) => {
+          const linkedUsers = acc.usuarios_vinculados || [];
+          return linkedUsers.includes(userId) || acc.gestor_id === userId;
+        })
+        .map((acc: any) => ({
+          id: acc.id,
+          nome_cliente: acc.nome_cliente,
+        }));
+    };
 
     const users = (authUsers ?? []).map((au: any) => {
       const profile = profiles.find((p: any) => p.id === au.id);
@@ -97,6 +112,8 @@ serve(async (req) => {
         total_clientes = clientCountByGestor[au.id]?.size ?? 0;
       }
 
+      const linkedAccounts = getLinkedAccounts(au.id);
+
       return {
         id: au.id,
         email: au.email ?? "",
@@ -109,7 +126,9 @@ serve(async (req) => {
         telefone: profile?.telefone ?? null,
         departamento: profile?.departamento ?? null,
         updated_at: profile?.updated_at ?? au.updated_at,
+        avatar_url: profile?.avatar_url ?? null,
         total_clientes,
+        linked_accounts: linkedAccounts,
       };
     });
 
