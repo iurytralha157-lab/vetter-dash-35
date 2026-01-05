@@ -161,7 +161,7 @@ export function AppSidebar({
                     src={displayLogoUrl} 
                     alt="Logo" 
                     className="object-contain"
-                    style={{ width: displayLogoSize, height: displayLogoSize }}
+                    style={{ height: displayLogoSize }}
                   />
                 ) : (
                   <div 
