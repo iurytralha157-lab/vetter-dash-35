@@ -37,13 +37,14 @@ export function AppSidebar({
   const location = useLocation();
   const { user, signOut } = useAuth();
   const { role } = useUserRole();
-  const { logoUrl: systemLogoUrl, name: systemName } = useSystemBranding();
+  const { logoUrl: systemLogoUrl, name: systemName, logoSize: systemLogoSize } = useSystemBranding();
   const currentPath = location.pathname;
   const filteredNavItems = filterNavigationByRole(navigationItems, role);
   
   // Determine which logo and name to use (org > system > default)
   const displayLogoUrl = orgLogoUrl || systemLogoUrl;
   const displayName = orgName || systemName || brandName;
+  const displayLogoSize = systemLogoSize || 40;
 
   // Buscar dados do perfil e organização
   useEffect(() => {
@@ -129,19 +130,34 @@ export function AppSidebar({
         <div className={`
           flex items-center border-b border-border/50
           transition-all duration-500 ease-in-out
-          ${isCollapsed ? 'p-3 justify-center min-h-[64px]' : 'p-4 min-h-[64px]'}
-        `}>
-          <NavLink to="/" className="flex items-center gap-3 group w-full">
+          ${isCollapsed ? 'p-3 justify-center' : 'p-4'}
+        `}
+        style={{ minHeight: Math.max(64, displayLogoSize + 24) }}
+        >
+          <NavLink to="/" className="flex items-center justify-center group w-full">
             <div className="flex items-center justify-center flex-shrink-0">
               {displayLogoUrl ? (
                 <img 
                   src={displayLogoUrl} 
                   alt="Logo" 
-                  className="h-8 w-8 rounded-xl object-contain"
+                  className="rounded-xl object-contain"
+                  style={{ 
+                    width: isCollapsed ? Math.min(displayLogoSize, 40) : displayLogoSize, 
+                    height: isCollapsed ? Math.min(displayLogoSize, 40) : displayLogoSize 
+                  }}
                 />
               ) : (
-                <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center glow-primary">
-                  <span className="text-white font-bold text-sm">
+                <div 
+                  className="rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center glow-primary"
+                  style={{ 
+                    width: isCollapsed ? Math.min(displayLogoSize, 40) : displayLogoSize, 
+                    height: isCollapsed ? Math.min(displayLogoSize, 40) : displayLogoSize 
+                  }}
+                >
+                  <span 
+                    className="text-white font-bold"
+                    style={{ fontSize: (isCollapsed ? Math.min(displayLogoSize, 40) : displayLogoSize) * 0.4 }}
+                  >
                     {displayName.charAt(0).toUpperCase()}
                   </span>
                 </div>
