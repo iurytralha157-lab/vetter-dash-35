@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProfilePhotoUpload } from "@/components/settings/ProfilePhotoUpload";
 import { OrganizationLogoUpload } from "@/components/settings/OrganizationLogoUpload";
+import { SystemBrandingUpload } from "@/components/settings/SystemBrandingUpload";
 import { UsersTab } from "@/components/settings/UsersTab";
 import { ApprovalsTab } from "@/components/settings/ApprovalsTab";
 
@@ -509,6 +510,9 @@ export default function Settings() {
 
           {/* General Tab */}
           <TabsContent value="general" className="space-y-6">
+            {/* System Branding - Admin only */}
+            {isAdmin && <SystemBrandingUpload />}
+            
             <Card className="surface-elevated">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

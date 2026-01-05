@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import { useAuth } from "@/contexts/AuthContext";
 import { navigationItems, filterNavigationByRole } from "./navigationConfig";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useSystemBranding } from "@/hooks/useSystemBranding";
 import { supabase } from "@/integrations/supabase/client";
 
 interface AppSidebarProps {
@@ -36,8 +37,13 @@ export function AppSidebar({
   const location = useLocation();
   const { user, signOut } = useAuth();
   const { role } = useUserRole();
+  const { logoUrl: systemLogoUrl, name: systemName } = useSystemBranding();
   const currentPath = location.pathname;
   const filteredNavItems = filterNavigationByRole(navigationItems, role);
+  
+  // Determine which logo and name to use (org > system > default)
+  const displayLogoUrl = orgLogoUrl || systemLogoUrl;
+  const displayName = orgName || systemName || brandName;
 
   // Buscar dados do perfil e organização
   useEffect(() => {
@@ -127,15 +133,17 @@ export function AppSidebar({
         `}>
           <NavLink to="/" className="flex items-center gap-3 group w-full">
             <div className="flex items-center justify-center flex-shrink-0">
-              {orgLogoUrl ? (
+              {displayLogoUrl ? (
                 <img 
-                  src={orgLogoUrl} 
+                  src={displayLogoUrl} 
                   alt="Logo" 
                   className="h-8 w-8 rounded-xl object-contain"
                 />
               ) : (
                 <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center glow-primary">
-                  <span className="text-white font-bold text-sm">V</span>
+                  <span className="text-white font-bold text-sm">
+                    {displayName.charAt(0).toUpperCase()}
+                  </span>
                 </div>
               )}
             </div>
@@ -145,7 +153,7 @@ export function AppSidebar({
               ${isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'}
             `}>
               <span className="font-bold text-lg text-foreground whitespace-nowrap">
-                {orgName || brandName}
+                {displayName}
               </span>
             </div>
           </NavLink>

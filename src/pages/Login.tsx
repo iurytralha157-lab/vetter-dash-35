@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSystemBranding } from '@/hooks/useSystemBranding';
 import { Lock, Mail, Eye, EyeOff } from "lucide-react";
 
 const AuthPage = () => {
@@ -19,6 +20,7 @@ const AuthPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   
   const { signIn, signUp, user } = useAuth();
+  const { logoUrl, name: systemName } = useSystemBranding();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -71,14 +73,20 @@ const AuthPage = () => {
         <div className="surface-elevated rounded-3xl p-8 shadow-2xl">
           {/* Logo */}
           <div className="flex justify-center mb-8">
-            <div className="h-12 w-12 rounded-2xl bg-gradient-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-xl">M</span>
+            <div className="h-12 w-12 rounded-2xl bg-gradient-primary flex items-center justify-center overflow-hidden">
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="h-full w-full object-contain p-1" />
+              ) : (
+                <span className="text-primary-foreground font-bold text-xl">
+                  {systemName.charAt(0).toUpperCase()}
+                </span>
+              )}
             </div>
           </div>
 
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold mb-2">MetaFlow</h1>
+            <h1 className="text-2xl font-bold mb-2">{systemName}</h1>
             <p className="text-muted-foreground">Acesse sua conta ou crie uma nova</p>
           </div>
 
