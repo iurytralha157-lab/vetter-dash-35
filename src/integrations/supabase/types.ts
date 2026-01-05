@@ -2065,6 +2065,45 @@ export type Database = {
           },
         ]
       }
+      organizations: {
+        Row: {
+          created_at: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          plan: string | null
+          slug: string
+          status: string | null
+          updated_at: string | null
+          webhook_secret: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          plan?: string | null
+          slug: string
+          status?: string | null
+          updated_at?: string | null
+          webhook_secret?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          plan?: string | null
+          slug?: string
+          status?: string | null
+          updated_at?: string | null
+          webhook_secret?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       performance_alerts: {
         Row: {
           account_id: string
@@ -2191,6 +2230,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           ativo: boolean | null
           avatar_url: string | null
           cargo: string | null
@@ -2198,12 +2239,16 @@ export type Database = {
           email: string | null
           id: string
           name: string | null
+          organization_id: string | null
           role: Database["public"]["Enums"]["app_role"] | null
+          status: string | null
           telefone: string | null
           ultimo_acesso: string | null
           updated_at: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           ativo?: boolean | null
           avatar_url?: string | null
           cargo?: string | null
@@ -2211,12 +2256,16 @@ export type Database = {
           email?: string | null
           id: string
           name?: string | null
+          organization_id?: string | null
           role?: Database["public"]["Enums"]["app_role"] | null
+          status?: string | null
           telefone?: string | null
           ultimo_acesso?: string | null
           updated_at?: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           ativo?: boolean | null
           avatar_url?: string | null
           cargo?: string | null
@@ -2224,7 +2273,9 @@ export type Database = {
           email?: string | null
           id?: string
           name?: string | null
+          organization_id?: string | null
           role?: Database["public"]["Enums"]["app_role"] | null
+          status?: string | null
           telefone?: string | null
           ultimo_acesso?: string | null
           updated_at?: string
@@ -2235,6 +2286,13 @@ export type Database = {
             columns: ["id"]
             isOneToOne: true
             referencedRelation: "users_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2579,6 +2637,8 @@ export type Database = {
           webhook_meta: string
         }[]
       }
+      get_user_org: { Args: { _user_id: string }; Returns: string }
+      get_user_status: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2588,6 +2648,8 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_gestor: { Args: { _user_id: string }; Returns: boolean }
+      is_org_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_vetter_admin: { Args: { _user_id: string }; Returns: boolean }
       user_has_client_access: {
         Args: { _cliente_id: string; _user_id: string }
         Returns: boolean

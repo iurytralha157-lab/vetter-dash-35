@@ -21,6 +21,9 @@ import Settings from "./pages/Settings";
 import RelatorioN8n from "./pages/RelatorioN8n";
 import Demandas from "./pages/Demandas";
 import NotFound from "./pages/NotFound";
+import PendingApproval from "./pages/PendingApproval";
+import BlockedAccount from "./pages/BlockedAccount";
+import UserApprovals from "./pages/admin/UserApprovals";
 
 const queryClient = new QueryClient();
 
@@ -32,9 +35,14 @@ const App = () => (
       <AuthProvider>
         <BrowserRouter>
           <Routes>
+            {/* Public Routes */}
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/login" element={<Navigate to="/auth" replace />} />
             <Route path="/onboarding" element={<ClientOnboarding />} />
+            <Route path="/aguardando-aprovacao" element={<PendingApproval />} />
+            <Route path="/conta-bloqueada" element={<BlockedAccount />} />
+            
+            {/* Protected Routes */}
             <Route path="/" element={
               <ProtectedRoute>
                 <Dashboard />
@@ -105,6 +113,14 @@ const App = () => (
                 <Demandas />
               </ProtectedRoute>
             } />
+            
+            {/* Admin Routes */}
+            <Route path="/admin/aprovacoes" element={
+              <ProtectedRoute requireAdmin>
+                <UserApprovals />
+              </ProtectedRoute>
+            } />
+            
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
