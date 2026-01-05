@@ -15,13 +15,14 @@ import {
   DialogContent,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Heart, MessageCircle, Send, Pin, MoreVertical, Trash2, Edit2, AlertTriangle, Megaphone, X } from "lucide-react";
+import { Heart, MessageCircle, Send, Pin, MoreVertical, Trash2, AlertTriangle, Megaphone } from "lucide-react";
 import { communityService, CommunityPost, CommunityComment } from "@/services/communityService";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { PollDisplay } from "./PollDisplay";
+import { RenderContentWithMentions } from "./RenderContentWithMentions";
 
 interface FeedPostCardProps {
   post: CommunityPost & { poll_options?: string[] | null; post_category?: string };
@@ -161,7 +162,15 @@ export function FeedPostCard({ post, onUpdate, onViewProfile }: FeedPostCardProp
 
         {/* Content */}
         <div className="px-4 pb-3">
-          <p className="text-foreground whitespace-pre-wrap">{post.content}</p>
+          <p className="text-foreground whitespace-pre-wrap">
+            <RenderContentWithMentions 
+              content={post.content} 
+              onMentionClick={(username) => {
+                // Buscar usuário pelo nome e abrir perfil
+                // Por enquanto apenas destaca visualmente
+              }}
+            />
+          </p>
         </div>
 
         {/* Media - Full Width Instagram Style */}
