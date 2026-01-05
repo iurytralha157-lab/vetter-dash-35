@@ -147,15 +147,6 @@ export function AppSidebar({
                 </div>
               )}
             </div>
-            
-            <div className={`
-              flex flex-col overflow-hidden transition-all duration-500 ease-in-out
-              ${isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'}
-            `}>
-              <span className="font-bold text-lg text-foreground whitespace-nowrap">
-                {displayName}
-              </span>
-            </div>
           </NavLink>
         </div>
 
