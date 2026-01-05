@@ -6,7 +6,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import { navigationItems, filterNavigationByRole } from "./navigationConfig";
@@ -29,6 +29,9 @@ export function AppSidebar({
     return saved ? JSON.parse(saved) : false;
   });
   const [userName, setUserName] = useState<string | null>(null);
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
+  const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null);
+  const [orgName, setOrgName] = useState<string | null>(null);
   
   const location = useLocation();
   const { user, signOut } = useAuth();
@@ -36,23 +39,37 @@ export function AppSidebar({
   const currentPath = location.pathname;
   const filteredNavItems = filterNavigationByRole(navigationItems, role);
 
-  // Buscar nome real do usuário do perfil
+  // Buscar dados do perfil e organização
   useEffect(() => {
-    const fetchUserName = async () => {
+    const fetchUserData = async () => {
       if (!user?.id) return;
       
-      const { data } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
-        .select('name')
+        .select('name, avatar_url, organization_id')
         .eq('id', user.id)
         .single();
       
-      if (data?.name) {
-        setUserName(data.name);
+      if (profile) {
+        setUserName(profile.name);
+        setUserAvatarUrl(profile.avatar_url);
+        
+        if (profile.organization_id) {
+          const { data: org } = await supabase
+            .from('organizations')
+            .select('name, sidebar_logo_url')
+            .eq('id', profile.organization_id)
+            .single();
+          
+          if (org) {
+            setOrgName(org.name);
+            setOrgLogoUrl(org.sidebar_logo_url);
+          }
+        }
       }
     };
     
-    fetchUserName();
+    fetchUserData();
   }, [user?.id]);
 
   // Salvar estado no localStorage
@@ -103,7 +120,6 @@ export function AppSidebar({
           )}
         </Button>
 
-        {/* Header com Logo */}
         <div className={`
           flex items-center border-b border-border/50
           transition-all duration-500 ease-in-out
@@ -111,9 +127,17 @@ export function AppSidebar({
         `}>
           <NavLink to="/" className="flex items-center gap-3 group w-full">
             <div className="flex items-center justify-center flex-shrink-0">
-              <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center glow-primary">
-                <span className="text-white font-bold text-sm">V</span>
-              </div>
+              {orgLogoUrl ? (
+                <img 
+                  src={orgLogoUrl} 
+                  alt="Logo" 
+                  className="h-8 w-8 rounded-xl object-contain"
+                />
+              ) : (
+                <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center glow-primary">
+                  <span className="text-white font-bold text-sm">V</span>
+                </div>
+              )}
             </div>
             
             <div className={`
@@ -121,7 +145,7 @@ export function AppSidebar({
               ${isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'}
             `}>
               <span className="font-bold text-lg text-foreground whitespace-nowrap">
-                {brandName}
+                {orgName || brandName}
               </span>
             </div>
           </NavLink>
@@ -208,8 +232,9 @@ export function AppSidebar({
                 <TooltipTrigger asChild>
                   <div className="flex justify-center">
                     <Avatar className="h-10 w-10 border-2 border-border/50 hover:scale-105 transition-transform duration-200 hover:border-primary/30">
+                      <AvatarImage src={userAvatarUrl || undefined} />
                       <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white text-xs font-bold">
-                        {user?.user_metadata?.full_name?.charAt(0).toUpperCase() || 
+                        {userName?.charAt(0).toUpperCase() || 
                          user?.email?.charAt(0).toUpperCase() || 'U'}
                       </AvatarFallback>
                     </Avatar>
@@ -218,7 +243,7 @@ export function AppSidebar({
                 <TooltipContent side="right" sideOffset={12} className="bg-dark-800 border-border/50">
                   <div className="text-sm">
                     <div className="font-medium">
-                      {userName || user?.user_metadata?.full_name || 'Usuário'}
+                      {userName || 'Usuário'}
                     </div>
                     <div className="text-muted-foreground text-xs">
                       {user?.email}
@@ -247,6 +272,7 @@ export function AppSidebar({
             <div className="space-y-3">
               <div className="flex items-center gap-3 p-3 rounded-xl bg-dark-700/50 hover:bg-dark-700 transition-colors duration-200">
                 <Avatar className="h-10 w-10 border-2 border-border/50">
+                  <AvatarImage src={userAvatarUrl || undefined} />
                   <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white text-sm font-bold">
                     {userName?.charAt(0).toUpperCase() || 
                      user?.email?.charAt(0).toUpperCase() || 'U'}

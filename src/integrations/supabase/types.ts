@@ -1386,17 +1386,53 @@ export type Database = {
           },
         ]
       }
+      community_poll_votes: {
+        Row: {
+          created_at: string | null
+          id: string
+          option_index: number
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          option_index: number
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          option_index?: number
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_poll_votes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       community_posts: {
         Row: {
           author_id: string
           comments_count: number | null
           content: string
           created_at: string | null
+          edited_at: string | null
           id: string
           is_pinned: boolean | null
           likes_count: number | null
           media_urls: string[] | null
           organization_id: string | null
+          poll_expires_at: string | null
+          poll_options: Json | null
+          post_category: string | null
           post_type: string | null
           updated_at: string | null
           visibility: string | null
@@ -1406,11 +1442,15 @@ export type Database = {
           comments_count?: number | null
           content: string
           created_at?: string | null
+          edited_at?: string | null
           id?: string
           is_pinned?: boolean | null
           likes_count?: number | null
           media_urls?: string[] | null
           organization_id?: string | null
+          poll_expires_at?: string | null
+          poll_options?: Json | null
+          post_category?: string | null
           post_type?: string | null
           updated_at?: string | null
           visibility?: string | null
@@ -1420,11 +1460,15 @@ export type Database = {
           comments_count?: number | null
           content?: string
           created_at?: string | null
+          edited_at?: string | null
           id?: string
           is_pinned?: boolean | null
           likes_count?: number | null
           media_urls?: string[] | null
           organization_id?: string | null
+          poll_expires_at?: string | null
+          poll_options?: Json | null
+          post_category?: string | null
           post_type?: string | null
           updated_at?: string | null
           visibility?: string | null
