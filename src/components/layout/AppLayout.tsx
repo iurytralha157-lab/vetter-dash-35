@@ -49,7 +49,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         }}
       >
         <div className="h-full overflow-y-auto scrollbar-thin">
-          <div className="p-3 sm:p-4 lg:p-6 min-h-full">
+          <div className="px-3 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 min-h-full">
             <div className="max-w-screen-2xl mx-auto">
               {children}
             </div>
