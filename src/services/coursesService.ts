@@ -341,5 +341,98 @@ export const coursesService = {
 
     if (error) throw error;
     return data as CourseLesson;
+  },
+
+  async updateModule(moduleId: string, title: string, description?: string): Promise<CourseModule> {
+    const { data, error } = await supabase
+      .from('course_modules')
+      .update({ title, description })
+      .eq('id', moduleId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as CourseModule;
+  },
+
+  async deleteModule(moduleId: string): Promise<void> {
+    // First delete all lessons in this module
+    const { error: lessonsError } = await supabase
+      .from('course_lessons')
+      .delete()
+      .eq('module_id', moduleId);
+
+    if (lessonsError) throw lessonsError;
+
+    // Then delete the module
+    const { error } = await supabase
+      .from('course_modules')
+      .delete()
+      .eq('id', moduleId);
+
+    if (error) throw error;
+  },
+
+  async updateLesson(lessonId: string, lesson: Partial<CourseLesson>): Promise<CourseLesson> {
+    const { data, error } = await supabase
+      .from('course_lessons')
+      .update({
+        title: lesson.title,
+        description: lesson.description,
+        video_url: lesson.video_url,
+        content_html: lesson.content_html,
+        duration_minutes: lesson.duration_minutes
+      })
+      .eq('id', lessonId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as CourseLesson;
+  },
+
+  async deleteLesson(lessonId: string): Promise<void> {
+    const { error } = await supabase
+      .from('course_lessons')
+      .delete()
+      .eq('id', lessonId);
+
+    if (error) throw error;
+  },
+
+  async deleteCourse(courseId: string): Promise<void> {
+    // Get all modules
+    const { data: modules } = await supabase
+      .from('course_modules')
+      .select('id')
+      .eq('course_id', courseId);
+
+    if (modules && modules.length > 0) {
+      const moduleIds = modules.map(m => m.id);
+      
+      // Delete all lessons
+      const { error: lessonsError } = await supabase
+        .from('course_lessons')
+        .delete()
+        .in('module_id', moduleIds);
+
+      if (lessonsError) throw lessonsError;
+
+      // Delete all modules
+      const { error: modulesError } = await supabase
+        .from('course_modules')
+        .delete()
+        .eq('course_id', courseId);
+
+      if (modulesError) throw modulesError;
+    }
+
+    // Delete the course
+    const { error } = await supabase
+      .from('courses')
+      .delete()
+      .eq('id', courseId);
+
+    if (error) throw error;
   }
 };
