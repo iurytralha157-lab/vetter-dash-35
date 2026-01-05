@@ -32,11 +32,8 @@ export const navigationItems: NavigationItem[] = [
   { title: "Demandas", url: "/demandas", icon: Kanban },
   { title: "VFeed", url: "/vfeed", icon: Rss },
   { title: "VAcademy", url: "/vacademy", icon: GraduationCap },
-  { title: "Smart Checklist", url: "/checklist", icon: Activity, roles: ['admin', 'gestor'] },
-  { title: pt.nav.users, url: "/usuarios", icon: ShieldCheck, roles: ['admin'] },
-  { title: "Aprovações", url: "/admin/aprovacoes", icon: UserCheck, roles: ['admin'] },
   { title: pt.nav.reportN8n, url: "/relatorio-n8n", icon: Webhook, roles: ['admin'] },
-  { title: pt.settings.title, url: "/configuracoes", icon: Settings, roles: ['admin'] },
+  { title: pt.settings.title, url: "/configuracoes", icon: Settings },
 ];
 
 export const filterNavigationByRole = (items: NavigationItem[], userRole: UserRole | null): NavigationItem[] => {

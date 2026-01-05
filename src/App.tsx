@@ -16,18 +16,15 @@ import ClienteEdit from "./pages/ClienteEdit";
 import Training from "./pages/Training";
 import TrainingDetail from "./pages/TrainingDetail";
 import AddTraining from "./pages/AddTraining";
-import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import RelatorioN8n from "./pages/RelatorioN8n";
 import Demandas from "./pages/Demandas";
 import NotFound from "./pages/NotFound";
 import PendingApproval from "./pages/PendingApproval";
 import BlockedAccount from "./pages/BlockedAccount";
-import UserApprovals from "./pages/admin/UserApprovals";
 import VFeed from "./pages/VFeed";
 import VAcademy from "./pages/VAcademy";
 import CourseDetail from "./pages/CourseDetail";
-import SmartChecklist from "./pages/SmartChecklist";
 
 const queryClient = new QueryClient();
 
@@ -97,57 +94,9 @@ const App = () => (
                 <AddTraining />
               </ProtectedRoute>
             } />
-            <Route path="/usuarios" element={
-              <ProtectedRoute>
-                <Users />
-              </ProtectedRoute>
-            } />
             <Route path="/configuracoes" element={
               <ProtectedRoute>
                 <Settings />
-              </ProtectedRoute>
-            } />
-            <Route path="/relatorio-n8n" element={
-              <ProtectedRoute>
-                <RelatorioN8n />
-              </ProtectedRoute>
-            } />
-            <Route path="/demandas" element={
-              <ProtectedRoute>
-                <Demandas />
-              </ProtectedRoute>
-            } />
-            
-            {/* VFeed - Community */}
-            <Route path="/vfeed" element={
-              <ProtectedRoute>
-                <VFeed />
-              </ProtectedRoute>
-            } />
-            
-            {/* VAcademy - Courses */}
-            <Route path="/vacademy" element={
-              <ProtectedRoute>
-                <VAcademy />
-              </ProtectedRoute>
-            } />
-            <Route path="/vacademy/:courseId" element={
-              <ProtectedRoute>
-                <CourseDetail />
-              </ProtectedRoute>
-            } />
-            
-            {/* Smart Checklist */}
-            <Route path="/checklist" element={
-              <ProtectedRoute>
-                <SmartChecklist />
-              </ProtectedRoute>
-            } />
-            
-            {/* Admin Routes */}
-            <Route path="/admin/aprovacoes" element={
-              <ProtectedRoute requireAdmin>
-                <UserApprovals />
               </ProtectedRoute>
             } />
             

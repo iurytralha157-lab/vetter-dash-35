@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Settings as SettingsIcon, Webhook, Bell, Building, Loader2, ExternalLink, User } from "lucide-react";
+import { Settings as SettingsIcon, Webhook, Bell, Building, Loader2, ExternalLink, User, Users, UserCheck } from "lucide-react";
 import { pt } from "@/i18n/pt";
 import { systemSettingsService, SystemSetting } from "@/services/systemSettingsService";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +18,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProfilePhotoUpload } from "@/components/settings/ProfilePhotoUpload";
 import { OrganizationLogoUpload } from "@/components/settings/OrganizationLogoUpload";
+import { UsersTab } from "@/components/settings/UsersTab";
+import { ApprovalsTab } from "@/components/settings/ApprovalsTab";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -208,22 +210,34 @@ export default function Settings() {
         />
 
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-6' : 'grid-cols-4'}`}>
             <TabsTrigger value="profile" className="flex items-center gap-2">
               <User className="h-4 w-4" />
-              Perfil
+              <span className="hidden sm:inline">Perfil</span>
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="users" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">Usuários</span>
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="approvals" className="flex items-center gap-2">
+                <UserCheck className="h-4 w-4" />
+                <span className="hidden sm:inline">Aprovações</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="webhooks" className="flex items-center gap-2">
               <Webhook className="h-4 w-4" />
-              Webhooks
+              <span className="hidden sm:inline">Webhooks</span>
             </TabsTrigger>
             <TabsTrigger value="notifications" className="flex items-center gap-2">
               <Bell className="h-4 w-4" />
-              Notificações
+              <span className="hidden sm:inline">Notificações</span>
             </TabsTrigger>
             <TabsTrigger value="general" className="flex items-center gap-2">
               <SettingsIcon className="h-4 w-4" />
-              {pt.settings.general}
+              <span className="hidden sm:inline">{pt.settings.general}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -242,6 +256,20 @@ export default function Settings() {
               />
             )}
           </TabsContent>
+
+          {/* Users Tab - Admin only */}
+          {isAdmin && (
+            <TabsContent value="users" className="space-y-6">
+              <UsersTab />
+            </TabsContent>
+          )}
+
+          {/* Approvals Tab - Admin only */}
+          {isAdmin && (
+            <TabsContent value="approvals" className="space-y-6">
+              <ApprovalsTab />
+            </TabsContent>
+          )}
 
           {/* Webhooks Tab */}
           <TabsContent value="webhooks" className="space-y-6">
