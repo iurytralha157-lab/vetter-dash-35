@@ -1,18 +1,19 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Heart, MessageCircle, Send, Pin, MoreVertical, Trash2 } from "lucide-react";
+import { Heart, MessageCircle, Send, Pin, MoreVertical, Trash2, Image, Video, X, Loader2 } from "lucide-react";
 import { communityService, CommunityPost, CommunityComment } from "@/services/communityService";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -127,15 +128,26 @@ function PostCard({ post, onUpdate }: { post: CommunityPost; onUpdate: () => voi
 
         {/* Media */}
         {post.media_urls && post.media_urls.length > 0 && (
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            {post.media_urls.map((url, i) => (
-              <img 
-                key={i} 
-                src={url} 
-                alt="Mídia" 
-                className="rounded-lg w-full h-48 object-cover"
-              />
-            ))}
+          <div className={`grid gap-2 mb-4 ${post.media_urls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            {post.media_urls.map((url, i) => {
+              const isVideo = url.includes('.mp4') || url.includes('.webm') || url.includes('.mov');
+              return isVideo ? (
+                <video 
+                  key={i} 
+                  src={url} 
+                  controls
+                  className="rounded-lg w-full max-h-96 object-contain bg-black"
+                />
+              ) : (
+                <img 
+                  key={i} 
+                  src={url} 
+                  alt="Mídia" 
+                  className="rounded-lg w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => window.open(url, '_blank')}
+                />
+              );
+            })}
           </div>
         )}
 
@@ -200,27 +212,115 @@ function PostCard({ post, onUpdate }: { post: CommunityPost; onUpdate: () => voi
 }
 
 export default function VFeed() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [newPost, setNewPost] = useState("");
   const [isPosting, setIsPosting] = useState(false);
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const { data: posts, isLoading } = useQuery({
     queryKey: ['community-posts'],
     queryFn: () => communityService.getPosts()
   });
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Limite de 4 arquivos
+    if (mediaFiles.length + files.length > 4) {
+      toast.error('Máximo de 4 arquivos por post');
+      return;
+    }
+
+    // Validar tamanho (máximo 50MB por arquivo)
+    const maxSize = 50 * 1024 * 1024;
+    const invalidFiles = files.filter(f => f.size > maxSize);
+    if (invalidFiles.length > 0) {
+      toast.error('Arquivo muito grande (máximo 50MB)');
+      return;
+    }
+
+    // Criar previews
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setMediaPreviews(prev => [...prev, e.target?.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    setMediaFiles(prev => [...prev, ...files]);
+    e.target.value = ''; // Reset input
+  };
+
+  const removeMedia = (index: number) => {
+    setMediaFiles(prev => prev.filter((_, i) => i !== index));
+    setMediaPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadMedia = async (): Promise<string[]> => {
+    if (!user || mediaFiles.length === 0) return [];
+
+    const uploadedUrls: string[] = [];
+
+    for (const file of mediaFiles) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      const { error } = await supabase.storage
+        .from('community-media')
+        .upload(fileName, file);
+
+      if (error) {
+        console.error('Upload error:', error);
+        throw new Error('Erro ao fazer upload do arquivo');
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('community-media')
+        .getPublicUrl(fileName);
+
+      uploadedUrls.push(urlData.publicUrl);
+    }
+
+    return uploadedUrls;
+  };
+
   const handleCreatePost = async () => {
-    if (!newPost.trim()) return;
+    if (!newPost.trim() && mediaFiles.length === 0) return;
     setIsPosting(true);
+    setIsUploading(mediaFiles.length > 0);
+
     try {
-      await communityService.createPost(newPost);
+      let mediaUrls: string[] = [];
+      
+      if (mediaFiles.length > 0) {
+        mediaUrls = await uploadMedia();
+      }
+
+      const postType = mediaFiles.some(f => f.type.startsWith('video/')) 
+        ? 'video' 
+        : mediaFiles.length > 0 
+          ? 'image' 
+          : 'text';
+
+      await communityService.createPost(newPost, mediaUrls, postType);
       setNewPost("");
+      setMediaFiles([]);
+      setMediaPreviews([]);
       queryClient.invalidateQueries({ queryKey: ['community-posts'] });
       toast.success('Post publicado!');
     } catch (error) {
+      console.error('Erro ao publicar:', error);
       toast.error('Erro ao publicar');
     } finally {
       setIsPosting(false);
+      setIsUploading(false);
     }
   };
 
@@ -241,12 +341,85 @@ export default function VFeed() {
               onChange={(e) => setNewPost(e.target.value)}
               className="min-h-[100px] mb-3"
             />
-            <div className="flex justify-end">
+
+            {/* Media Previews */}
+            {mediaPreviews.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                {mediaPreviews.map((preview, index) => (
+                  <div key={index} className="relative group">
+                    {mediaFiles[index]?.type.startsWith('video/') ? (
+                      <video 
+                        src={preview} 
+                        className="rounded-lg w-full h-32 object-cover"
+                      />
+                    ) : (
+                      <img 
+                        src={preview} 
+                        alt="Preview" 
+                        className="rounded-lg w-full h-32 object-cover"
+                      />
+                    )}
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => removeMedia(index)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Hidden file inputs */}
+            <input
+              type="file"
+              ref={imageInputRef}
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => handleFileSelect(e, 'image')}
+            />
+            <input
+              type="file"
+              ref={videoInputRef}
+              accept="video/*"
+              className="hidden"
+              onChange={(e) => handleFileSelect(e, 'video')}
+            />
+
+            <div className="flex items-center justify-between">
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={mediaFiles.length >= 4}
+                >
+                  <Image className="h-4 w-4 mr-1" />
+                  Foto
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => videoInputRef.current?.click()}
+                  disabled={mediaFiles.length >= 4}
+                >
+                  <Video className="h-4 w-4 mr-1" />
+                  Vídeo
+                </Button>
+              </div>
               <Button 
                 onClick={handleCreatePost} 
-                disabled={!newPost.trim() || isPosting}
+                disabled={(!newPost.trim() && mediaFiles.length === 0) || isPosting}
               >
-                {isPosting ? 'Publicando...' : 'Publicar'}
+                {isUploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    Enviando...
+                  </>
+                ) : isPosting ? 'Publicando...' : 'Publicar'}
               </Button>
             </div>
           </CardContent>
