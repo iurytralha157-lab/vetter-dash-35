@@ -62,20 +62,20 @@ export function MobileDrawer() {
       >
         <div className="flex flex-col h-full">
           <SheetHeader className="p-6 border-b border-border">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center">
               {logoUrl ? (
                 <img 
                   src={logoUrl} 
                   alt={systemName || 'Logo'} 
-                  className="h-10 w-10 rounded-xl object-contain"
+                  className="h-10 object-contain"
                 />
               ) : (
                 <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0">
                   <span className="text-white font-bold text-lg">V</span>
                 </div>
               )}
-              <SheetTitle className="font-semibold text-xl text-foreground">
-                {systemName || 'VMax'}
+              <SheetTitle className="sr-only">
+                {systemName || 'Menu'}
               </SheetTitle>
             </div>
           </SheetHeader>
