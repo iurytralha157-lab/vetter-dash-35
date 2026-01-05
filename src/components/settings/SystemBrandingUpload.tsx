@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import { Upload, Trash2, Building2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +14,7 @@ export function SystemBrandingUpload() {
   const [saving, setSaving] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [systemName, setSystemName] = useState('MetaFlow');
+  const [logoSize, setLogoSize] = useState(40);
   const [brandingId, setBrandingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,6 +33,7 @@ export function SystemBrandingUpload() {
         setBrandingId(data.id);
         setLogoUrl(data.logo_url);
         setSystemName(data.name || 'MetaFlow');
+        setLogoSize(data.logo_size || 40);
       }
     } catch (error) {
       console.error('Error loading branding:', error);
@@ -43,7 +46,6 @@ export function SystemBrandingUpload() {
     const file = e.target.files?.[0];
     if (!file || !brandingId) return;
 
-    // Validate
     if (file.size > 2 * 1024 * 1024) {
       toast({
         title: "Arquivo muito grande",
@@ -69,19 +71,16 @@ export function SystemBrandingUpload() {
       const fileName = `system-logo-${Date.now()}.${fileExt}`;
       const filePath = `branding/${fileName}`;
 
-      // Upload to org-logos bucket (public)
       const { error: uploadError } = await supabase.storage
         .from('org-logos')
         .upload(filePath, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('org-logos')
         .getPublicUrl(filePath);
 
-      // Update database
       const { error: updateError } = await supabase
         .from('system_branding')
         .update({ logo_url: publicUrl, updated_at: new Date().toISOString() })
@@ -113,11 +112,9 @@ export function SystemBrandingUpload() {
     setSaving(true);
 
     try {
-      // Remove from storage
       const path = logoUrl.split('/').slice(-2).join('/');
       await supabase.storage.from('org-logos').remove([path]);
 
-      // Update database
       await supabase
         .from('system_branding')
         .update({ logo_url: null, updated_at: new Date().toISOString() })
@@ -167,6 +164,23 @@ export function SystemBrandingUpload() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveSize = async (newSize: number) => {
+    if (!brandingId) return;
+
+    setLogoSize(newSize);
+
+    try {
+      const { error } = await supabase
+        .from('system_branding')
+        .update({ logo_size: newSize, updated_at: new Date().toISOString() })
+        .eq('id', brandingId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving logo size:', error);
     }
   };
 
@@ -251,6 +265,35 @@ export function SystemBrandingUpload() {
           </div>
         </div>
 
+        {/* Logo Size Control */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Label>Tamanho da Logo</Label>
+            <span className="text-sm font-mono text-muted-foreground">{logoSize}px</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <Slider
+              value={[logoSize]}
+              onValueChange={(value) => handleSaveSize(value[0])}
+              min={24}
+              max={120}
+              step={4}
+              className="flex-1"
+            />
+            <Input
+              type="number"
+              value={logoSize}
+              onChange={(e) => handleSaveSize(Number(e.target.value))}
+              min={24}
+              max={120}
+              className="w-20 text-center"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Define o tamanho da logo na sidebar e tela de login (24px - 120px)
+          </p>
+        </div>
+
         {/* System Name */}
         <div className="space-y-2">
           <Label htmlFor="system-name">Nome do Sistema</Label>
@@ -273,18 +316,23 @@ export function SystemBrandingUpload() {
 
         {/* Preview */}
         <div className="pt-4 border-t border-border">
-          <Label className="text-muted-foreground text-sm">Preview</Label>
+          <Label className="text-muted-foreground text-sm">Preview da Sidebar</Label>
           <div className="mt-3 flex items-center gap-3 p-4 rounded-xl bg-secondary/30">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center overflow-hidden">
+            <div 
+              className="rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center overflow-hidden"
+              style={{ width: logoSize, height: logoSize }}
+            >
               {logoUrl ? (
-                <img src={logoUrl} alt="Logo" className="h-full w-full object-contain p-1" />
+                <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
               ) : (
-                <span className="text-primary-foreground font-bold text-sm">
+                <span 
+                  className="text-primary-foreground font-bold"
+                  style={{ fontSize: logoSize * 0.4 }}
+                >
                   {systemName.charAt(0).toUpperCase()}
                 </span>
               )}
             </div>
-            <span className="font-bold text-lg">{systemName}</span>
           </div>
         </div>
       </CardContent>

@@ -20,7 +20,7 @@ const AuthPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   
   const { signIn, signUp, user } = useAuth();
-  const { logoUrl, name: systemName } = useSystemBranding();
+  const { logoUrl, name: systemName, logoSize } = useSystemBranding();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -73,11 +73,17 @@ const AuthPage = () => {
         <div className="surface-elevated rounded-3xl p-8 shadow-2xl">
           {/* Logo */}
           <div className="flex justify-center mb-8">
-            <div className="h-12 w-12 rounded-2xl bg-gradient-primary flex items-center justify-center overflow-hidden">
+            <div 
+              className="rounded-2xl bg-gradient-primary flex items-center justify-center overflow-hidden"
+              style={{ width: logoSize, height: logoSize }}
+            >
               {logoUrl ? (
-                <img src={logoUrl} alt="Logo" className="h-full w-full object-contain p-1" />
+                <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
               ) : (
-                <span className="text-primary-foreground font-bold text-xl">
+                <span 
+                  className="text-primary-foreground font-bold"
+                  style={{ fontSize: logoSize * 0.4 }}
+                >
                   {systemName.charAt(0).toUpperCase()}
                 </span>
               )}
