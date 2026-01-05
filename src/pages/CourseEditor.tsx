@@ -584,13 +584,16 @@ export default function CourseEditor() {
                 />
               </div>
               <div>
-                <Label htmlFor="lessonVideo">URL do Vídeo</Label>
+                <Label htmlFor="lessonVideo">URL do Vídeo (YouTube)</Label>
                 <Input
                   id="lessonVideo"
                   value={lessonForm.video_url}
                   onChange={(e) => setLessonForm(prev => ({ ...prev, video_url: e.target.value }))}
-                  placeholder="https://youtube.com/embed/... ou https://vimeo.com/..."
+                  placeholder="Cole qualquer link do YouTube (ex: youtube.com/watch?v=... ou youtu.be/...)"
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  O vídeo será exibido de forma protegida, sem opção de download.
+                </p>
               </div>
               <div>
                 <Label htmlFor="lessonDuration">Duração (minutos)</Label>
