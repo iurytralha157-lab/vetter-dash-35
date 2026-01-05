@@ -99,6 +99,31 @@ const App = () => (
                 <Settings />
               </ProtectedRoute>
             } />
+            <Route path="/demandas" element={
+              <ProtectedRoute>
+                <Demandas />
+              </ProtectedRoute>
+            } />
+            <Route path="/vfeed" element={
+              <ProtectedRoute>
+                <VFeed />
+              </ProtectedRoute>
+            } />
+            <Route path="/vacademy" element={
+              <ProtectedRoute>
+                <VAcademy />
+              </ProtectedRoute>
+            } />
+            <Route path="/vacademy/:id" element={
+              <ProtectedRoute>
+                <CourseDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/relatorio-n8n" element={
+              <ProtectedRoute>
+                <RelatorioN8n />
+              </ProtectedRoute>
+            } />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
