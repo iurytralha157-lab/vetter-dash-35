@@ -24,6 +24,10 @@ import NotFound from "./pages/NotFound";
 import PendingApproval from "./pages/PendingApproval";
 import BlockedAccount from "./pages/BlockedAccount";
 import UserApprovals from "./pages/admin/UserApprovals";
+import VFeed from "./pages/VFeed";
+import VAcademy from "./pages/VAcademy";
+import CourseDetail from "./pages/CourseDetail";
+import SmartChecklist from "./pages/SmartChecklist";
 
 const queryClient = new QueryClient();
 
@@ -111,6 +115,32 @@ const App = () => (
             <Route path="/demandas" element={
               <ProtectedRoute>
                 <Demandas />
+              </ProtectedRoute>
+            } />
+            
+            {/* VFeed - Community */}
+            <Route path="/vfeed" element={
+              <ProtectedRoute>
+                <VFeed />
+              </ProtectedRoute>
+            } />
+            
+            {/* VAcademy - Courses */}
+            <Route path="/vacademy" element={
+              <ProtectedRoute>
+                <VAcademy />
+              </ProtectedRoute>
+            } />
+            <Route path="/vacademy/:courseId" element={
+              <ProtectedRoute>
+                <CourseDetail />
+              </ProtectedRoute>
+            } />
+            
+            {/* Smart Checklist */}
+            <Route path="/checklist" element={
+              <ProtectedRoute>
+                <SmartChecklist />
               </ProtectedRoute>
             } />
             

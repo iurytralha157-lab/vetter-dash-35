@@ -11,7 +11,9 @@ import {
   Webhook,
   Kanban,
   Settings,
-  UserCheck
+  UserCheck,
+  Rss,
+  Activity
 } from "lucide-react";
 import { pt } from "@/i18n/pt";
 import { UserRole } from "@/hooks/useUserRole";
@@ -28,7 +30,9 @@ export const navigationItems: NavigationItem[] = [
   { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Contas", url: "/contas", icon: Building2 },
   { title: "Demandas", url: "/demandas", icon: Kanban },
-  { title: pt.nav.training, url: "/capacitacao", icon: GraduationCap, roles: ['admin'] },
+  { title: "VFeed", url: "/vfeed", icon: Rss },
+  { title: "VAcademy", url: "/vacademy", icon: GraduationCap },
+  { title: "Smart Checklist", url: "/checklist", icon: Activity, roles: ['admin', 'gestor'] },
   { title: pt.nav.users, url: "/usuarios", icon: ShieldCheck, roles: ['admin'] },
   { title: "Aprovações", url: "/admin/aprovacoes", icon: UserCheck, roles: ['admin'] },
   { title: pt.nav.reportN8n, url: "/relatorio-n8n", icon: Webhook, roles: ['admin'] },
