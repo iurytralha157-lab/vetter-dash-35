@@ -185,17 +185,19 @@ export function FeedPostCard({ post, onUpdate, onViewProfile }: FeedPostCardProp
                 
                 return isVideo ? (
                   <video 
-                    src={url} 
                     controls
                     className="w-full max-h-[600px] object-contain bg-black"
                     playsInline
-                    preload="metadata"
-                    onError={(e) => {
-                      console.error('Erro ao carregar vídeo:', url);
-                    }}
+                    preload="auto"
                   >
-                    <source src={url} type={lowerUrl.includes('.mov') ? 'video/quicktime' : lowerUrl.includes('.webm') ? 'video/webm' : 'video/mp4'} />
-                    Seu navegador não suporta este formato de vídeo.
+                    <source 
+                      src={url} 
+                      type={
+                        lowerUrl.includes('.mov') ? 'video/mp4' : 
+                        lowerUrl.includes('.webm') ? 'video/webm' : 
+                        'video/mp4'
+                      } 
+                    />
                   </video>
                 ) : (
                   <Dialog>
