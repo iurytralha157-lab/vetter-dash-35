@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { PollDisplay } from "./PollDisplay";
 import { RenderContentWithMentions } from "./RenderContentWithMentions";
+import { VideoPlayer } from "./VideoPlayer";
 
 interface FeedPostCardProps {
   post: CommunityPost & { poll_options?: string[] | null; post_category?: string };
@@ -184,21 +185,7 @@ export function FeedPostCard({ post, onUpdate, onViewProfile }: FeedPostCardProp
                 const isVideo = lowerUrl.includes('.mp4') || lowerUrl.includes('.webm') || lowerUrl.includes('.mov') || lowerUrl.includes('.avi') || lowerUrl.includes('.mkv');
                 
                 return isVideo ? (
-                  <video 
-                    controls
-                    className="w-full max-h-[600px] object-contain bg-black"
-                    playsInline
-                    preload="auto"
-                  >
-                    <source 
-                      src={url} 
-                      type={
-                        lowerUrl.includes('.mov') ? 'video/mp4' : 
-                        lowerUrl.includes('.webm') ? 'video/webm' : 
-                        'video/mp4'
-                      } 
-                    />
-                  </video>
+                  <VideoPlayer url={url} className="w-full max-h-[600px]" />
                 ) : (
                   <Dialog>
                     <DialogTrigger asChild>
@@ -228,15 +215,9 @@ export function FeedPostCard({ post, onUpdate, onViewProfile }: FeedPostCardProp
                   const lowerUrl = url.toLowerCase();
                   const isVideo = lowerUrl.includes('.mp4') || lowerUrl.includes('.webm') || lowerUrl.includes('.mov') || lowerUrl.includes('.avi') || lowerUrl.includes('.mkv');
                   return isVideo ? (
-                    <video 
-                      key={i} 
-                      controls
-                      playsInline
-                      preload="metadata"
-                      className="w-full aspect-square object-cover bg-black"
-                    >
-                      <source src={url} type={lowerUrl.includes('.mov') ? 'video/quicktime' : lowerUrl.includes('.webm') ? 'video/webm' : 'video/mp4'} />
-                    </video>
+                    <div key={i} className="aspect-square">
+                      <VideoPlayer url={url} className="w-full h-full" />
+                    </div>
                   ) : (
                     <Dialog key={i}>
                       <DialogTrigger asChild>
