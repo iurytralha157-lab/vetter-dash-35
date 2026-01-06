@@ -1,23 +1,20 @@
+import ReactPlayer from 'react-player';
+
 interface VideoPlayerProps {
   url: string;
   className?: string;
 }
 
 export function VideoPlayer({ url, className = "" }: VideoPlayerProps) {
-  // Player simples - sem estado de erro para sempre mostrar o vídeo
-  // O navegador mostrará seus próprios controles de erro se necessário
-  
   return (
     <div className={`relative bg-black ${className}`}>
-      <video 
-        controls
-        playsInline
-        preload="metadata"
-        className="w-full h-full object-contain"
+      <ReactPlayer
         src={url}
-      >
-        Seu navegador não suporta este formato de vídeo.
-      </video>
+        controls
+        width="100%"
+        height="100%"
+        playsInline
+      />
     </div>
   );
 }
