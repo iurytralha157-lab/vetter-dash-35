@@ -177,41 +177,53 @@ export function FeedPostCard({ post, onUpdate, onViewProfile }: FeedPostCardProp
         {post.media_urls && post.media_urls.length > 0 && (
           <div className="relative">
             {post.media_urls.length === 1 ? (
-              // Single image - full width
-              post.media_urls[0].includes('.mp4') || post.media_urls[0].includes('.webm') ? (
-                <video 
-                  src={post.media_urls[0]} 
-                  controls
-                  className="w-full max-h-[600px] object-contain bg-black"
-                />
-              ) : (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <img 
-                      src={post.media_urls[0]} 
-                      alt="Mídia" 
-                      className="w-full max-h-[600px] object-contain bg-black cursor-pointer hover:opacity-95 transition-opacity"
-                    />
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl p-0 bg-transparent border-none">
-                    <img 
-                      src={post.media_urls[0]} 
-                      alt="Mídia" 
-                      className="w-full h-auto rounded-lg"
-                    />
-                  </DialogContent>
-                </Dialog>
-              )
+              // Single media - full width
+              (() => {
+                const url = post.media_urls[0];
+                const lowerUrl = url.toLowerCase();
+                const isVideo = lowerUrl.includes('.mp4') || lowerUrl.includes('.webm') || lowerUrl.includes('.mov') || lowerUrl.includes('.avi') || lowerUrl.includes('.mkv');
+                
+                return isVideo ? (
+                  <video 
+                    src={url} 
+                    controls
+                    className="w-full max-h-[600px] object-contain bg-black"
+                    playsInline
+                  />
+                ) : (
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <img 
+                        src={url} 
+                        alt="Mídia" 
+                        className="w-full max-h-[600px] object-contain bg-black cursor-pointer hover:opacity-95 transition-opacity"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).alt = 'Erro ao carregar imagem';
+                        }}
+                      />
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl p-0 bg-transparent border-none">
+                      <img 
+                        src={url} 
+                        alt="Mídia" 
+                        className="w-full h-auto rounded-lg"
+                      />
+                    </DialogContent>
+                  </Dialog>
+                );
+              })()
             ) : (
-              // Multiple images - grid
+              // Multiple media - grid
               <div className="grid grid-cols-2 gap-0.5">
                 {post.media_urls.map((url, i) => {
-                  const isVideo = url.includes('.mp4') || url.includes('.webm') || url.includes('.mov');
+                  const lowerUrl = url.toLowerCase();
+                  const isVideo = lowerUrl.includes('.mp4') || lowerUrl.includes('.webm') || lowerUrl.includes('.mov') || lowerUrl.includes('.avi') || lowerUrl.includes('.mkv');
                   return isVideo ? (
                     <video 
                       key={i} 
                       src={url} 
                       controls
+                      playsInline
                       className="w-full aspect-square object-cover bg-black"
                     />
                   ) : (
@@ -221,6 +233,9 @@ export function FeedPostCard({ post, onUpdate, onViewProfile }: FeedPostCardProp
                           src={url} 
                           alt="Mídia" 
                           className="w-full aspect-square object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).alt = 'Erro ao carregar';
+                          }}
                         />
                       </DialogTrigger>
                       <DialogContent className="max-w-4xl p-0 bg-transparent border-none">
