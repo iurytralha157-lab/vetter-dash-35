@@ -126,12 +126,24 @@ export default function VFeed() {
     const uploadedUrls: string[] = [];
 
     for (const file of mediaFiles) {
-      const fileExt = file.name.split('.').pop();
+      const fileExt = file.name.split('.').pop()?.toLowerCase();
       const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      // Define content type correto para vídeos
+      const contentType = file.type || (
+        fileExt === 'mov' ? 'video/quicktime' :
+        fileExt === 'mp4' ? 'video/mp4' :
+        fileExt === 'webm' ? 'video/webm' :
+        fileExt === 'avi' ? 'video/x-msvideo' :
+        undefined
+      );
 
       const { error } = await supabase.storage
         .from('community-media')
-        .upload(fileName, file);
+        .upload(fileName, file, {
+          contentType: contentType,
+          cacheControl: '3600'
+        });
 
       if (error) {
         console.error('Upload error:', error);
