@@ -113,7 +113,7 @@ export function ProfilePhotoUpload({ currentAvatarUrl, onUpdate }: ProfilePhotoU
           Foto de Perfil
         </CardTitle>
         <CardDescription>
-          Sua foto será exibida no VFeed e em todo o sistema
+          Sua foto será exibida em todo o sistema
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Building2, Kanban, Rss } from "lucide-react";
+import { LayoutDashboard, Building2, Kanban } from "lucide-react";
 import { MobileDrawer } from "./MobileDrawer";
 import { useUserRole, UserRole } from "@/hooks/useUserRole";
 
@@ -11,33 +11,15 @@ interface BottomNavItem {
 }
 
 const bottomNavItems: BottomNavItem[] = [
-  { 
-    title: "Dashboard", 
-    url: "/dashboard", 
-    icon: LayoutDashboard 
-  },
-  { 
-    title: "Contas", 
-    url: "/contas", 
-    icon: Building2 
-  },
-  { 
-    title: "Demandas", 
-    url: "/demandas", 
-    icon: Kanban 
-  },
-  { 
-    title: "VFeed", 
-    url: "/vfeed", 
-    icon: Rss 
-  },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Contas", url: "/contas", icon: Building2 },
+  { title: "Demandas", url: "/demandas", icon: Kanban },
 ];
 
 export function BottomNavigation() {
   const location = useLocation();
   const { role } = useUserRole();
 
-  // Filtrar itens por role
   const filteredItems = bottomNavItems.filter(item => {
     if (!item.roles || item.roles.length === 0) return true;
     if (!role) return false;
@@ -55,11 +37,9 @@ export function BottomNavigation() {
   return (
     <nav 
       className="lg:hidden fixed bottom-0 inset-x-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
-      style={{
-        paddingBottom: 'env(safe-area-inset-bottom)',
-      }}
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="grid grid-cols-5 h-16">
+      <div className="grid grid-cols-4 h-16">
         {filteredItems.map((item) => {
           const active = isActive(item.url);
           return (
@@ -82,7 +62,6 @@ export function BottomNavigation() {
           );
         })}
         
-        {/* More menu item */}
         <div className="flex flex-col items-center justify-center gap-1 px-1 py-2">
           <MobileDrawer />
           <span className="text-xs font-medium text-muted-foreground">
