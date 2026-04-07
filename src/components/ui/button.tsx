@@ -9,14 +9,14 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md hover:shadow-lg active:scale-95",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-md hover:shadow-lg active:scale-95",
-        outline: "border border-border bg-transparent hover:bg-secondary/50 hover:text-foreground shadow-sm hover:shadow-md active:scale-95",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 shadow-sm hover:shadow-md active:scale-95",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 active:scale-95",
+        outline: "border border-border bg-transparent hover:bg-secondary/50 hover:text-foreground active:scale-95",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-95",
         ghost: "hover:bg-secondary/50 hover:text-foreground active:scale-95",
         link: "text-primary underline-offset-4 hover:underline hover:text-primary/80",
-        apple: "bg-gradient-primary text-primary-foreground hover:shadow-glow active:scale-95 font-medium",
-        minimal: "bg-surface-elevated border border-border hover:bg-secondary/50 shadow-sm hover:shadow-md active:scale-95",
+        apple: "bg-gradient-primary text-primary-foreground active:scale-95 font-medium",
+        minimal: "bg-surface-elevated border border-border hover:bg-secondary/50 active:scale-95",
       },
       size: {
         default: "h-11 px-6 py-3",
