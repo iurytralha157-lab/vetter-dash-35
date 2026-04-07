@@ -167,7 +167,7 @@ export default function ContasCliente() {
         account.telefone.includes(searchTerm) ||
         (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      const matchesCliente = filterCliente === "Todos os Clientes" || account.cliente_id === filterCliente;
+      
 
       const metaConfigured = !!(account.meta_account_id && account.meta_account_id.trim().length > 0);
       const googleConfigured = !!(account.google_ads_id && account.google_ads_id.trim().length > 0);
@@ -178,9 +178,9 @@ export default function ContasCliente() {
         : activePill === "google" ? (account.usa_google_ads || googleConfigured)
         : account.status === activePill;
 
-      return matchesSearch && matchesCliente && matchesPill;
+      return matchesSearch && matchesPill;
     });
-  }, [accounts, searchTerm, filterCliente, activePill]);
+  }, [accounts, searchTerm, activePill]);
 
   const handleCreateAccount = () => { setEditingAccount(null); setShowModernForm(true); };
   const handleEditAccount = (account: AccountData) => { setEditingAccount(account); setShowModernForm(true); };
