@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ModernAccountForm } from "@/components/forms/ModernAccountForm";
@@ -94,7 +94,7 @@ export default function ContasCliente() {
   });
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterCliente, setFilterCliente] = useState("Todos os Clientes");
+  
   const [activePill, setActivePill] = useState<FilterKey>("Ativo");
 
   const [showModernForm, setShowModernForm] = useState(false);
@@ -167,7 +167,7 @@ export default function ContasCliente() {
         account.telefone.includes(searchTerm) ||
         (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      const matchesCliente = filterCliente === "Todos os Clientes" || account.cliente_id === filterCliente;
+      
 
       const metaConfigured = !!(account.meta_account_id && account.meta_account_id.trim().length > 0);
       const googleConfigured = !!(account.google_ads_id && account.google_ads_id.trim().length > 0);
@@ -178,9 +178,9 @@ export default function ContasCliente() {
         : activePill === "google" ? (account.usa_google_ads || googleConfigured)
         : account.status === activePill;
 
-      return matchesSearch && matchesCliente && matchesPill;
+      return matchesSearch && matchesPill;
     });
-  }, [accounts, searchTerm, filterCliente, activePill]);
+  }, [accounts, searchTerm, activePill]);
 
   const handleCreateAccount = () => { setEditingAccount(null); setShowModernForm(true); };
   const handleEditAccount = (account: AccountData) => { setEditingAccount(account); setShowModernForm(true); };
@@ -188,17 +188,17 @@ export default function ContasCliente() {
 
   const handleAccountSubmit = async (data: any) => {
     try {
+      // Get current user ID for gestor_id
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const accountData = {
         nome_cliente: data.nome_cliente,
-        nome_empresa: data.nome_empresa,
-        telefone: data.telefone,
+        telefone: data.telefone || '',
         email: data.email || null,
-        cliente_id: data.cliente_id,
-        gestor_id: data.gestor_id,
-        status: data.status,
-        observacoes: data.observacoes || null,
+        gestor_id: user?.id || null,
+        status: 'Ativo',
         canais: data.canais || [],
-        canal_relatorio: data.canal_relatorio,
+        canal_relatorio: 'WhatsApp',
         horario_relatorio: data.horario_relatorio,
         id_grupo: data.id_grupo || null,
         usa_meta_ads: data.usa_meta_ads || false,
@@ -207,40 +207,13 @@ export default function ContasCliente() {
         meta_page_id: data.meta_page_id || null,
         budget_mensal_meta: data.budget_mensal_meta || 0,
         saldo_meta: data.saldo_meta || 0,
-        monitorar_saldo_meta: data.monitorar_saldo_meta || false,
-        alerta_saldo_baixo: data.alerta_saldo_baixo || null,
+        alerta_saldo_baixo: data.alerta_saldo_baixo || 200,
         modo_saldo_meta: data.modo_saldo_meta || null,
-        ativar_campanhas_meta: data.ativar_campanhas_meta || false,
-        link_meta: data.link_meta || null,
-        utm_padrao: data.utm_padrao || null,
-        webhook_meta: data.webhook_meta || null,
-        pixel_meta: data.pixel_meta || null,
         usa_google_ads: data.usa_google_ads || false,
         google_ads_id: data.google_ads_id || null,
         budget_mensal_google: data.budget_mensal_google || 0,
-        conversoes: data.conversoes || [],
-        link_google: data.link_google || null,
-        webhook_google: data.webhook_google || null,
-        traqueamento_ativo: data.traqueamento_ativo || false,
-        ga4_stream_id: data.ga4_stream_id || null,
-        gtm_id: data.gtm_id || null,
-        typebot_ativo: data.typebot_ativo || false,
-        typebot_url: data.typebot_url || null,
-        budget_mensal_global: data.budget_mensal_global || null,
-        forma_pagamento: data.forma_pagamento || null,
-        centro_custo: data.centro_custo || null,
-        contrato_inicio: data.contrato_inicio || null,
-        contrato_renovacao: data.contrato_renovacao || null,
-        papel_padrao: data.papel_padrao || null,
-        usuarios_vinculados: data.usuarios_vinculados || [],
-        ocultar_ranking: data.ocultar_ranking || false,
-        somar_metricas: data.somar_metricas || true,
-        usa_crm_externo: data.usa_crm_externo || false,
-        url_crm: data.url_crm || null,
-        notificacao_saldo_baixo: data.notificacao_saldo_baixo || false,
-        notificacao_erro_sync: data.notificacao_erro_sync || false,
-        notificacao_leads_diarios: data.notificacao_leads_diarios || false,
-        templates_padrao: data.templates_padrao || [],
+        notificacao_saldo_baixo: data.notificacao_saldo_baixo ?? true,
+        notificacao_erro_sync: data.notificacao_erro_sync ?? true,
         link_drive: data.link_drive || null,
         updated_at: new Date().toISOString(),
       };
@@ -355,17 +328,6 @@ export default function ContasCliente() {
               className="pl-10 h-10 rounded-xl border-border"
             />
           </div>
-          <Select value={filterCliente} onValueChange={setFilterCliente}>
-            <SelectTrigger className="w-full sm:w-[220px] h-10 rounded-xl border-border">
-              <SelectValue placeholder="Todos os Clientes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Todos os Clientes">Todos os Clientes</SelectItem>
-              {clientes.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
 
         {/* Results counter */}
@@ -426,7 +388,6 @@ export default function ContasCliente() {
                       </div>
 
                       <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1"><Building2 className="h-3 w-3" />{account.cliente_nome}</span>
                         <span className="flex items-center gap-1"><User className="h-3 w-3" />{account.gestor_name}</span>
                       </div>
 
@@ -512,14 +473,10 @@ export default function ContasCliente() {
           initialData={
             editingAccount
               ? {
-                  cliente_id: editingAccount.cliente_id,
                   nome_cliente: editingAccount.nome_cliente,
                   telefone: editingAccount.telefone,
                   email: editingAccount.email || "",
-                  status: editingAccount.status as "Ativo" | "Pausado" | "Arquivado",
-                  observacoes: editingAccount.observacoes || "",
                   canais: editingAccount.canais || [],
-                  canal_relatorio: (editingAccount.canal_relatorio as "WhatsApp" | "Email" | "Ambos") || "WhatsApp",
                   horario_relatorio: editingAccount.horario_relatorio || "09:00",
                   usa_meta_ads: editingAccount.usa_meta_ads || false,
                   meta_account_id: editingAccount.meta_account_id || "",
@@ -528,6 +485,8 @@ export default function ContasCliente() {
                   google_ads_id: editingAccount.google_ads_id || "",
                   budget_mensal_meta: editingAccount.budget_mensal_meta || 0,
                   budget_mensal_google: editingAccount.budget_mensal_google || 0,
+                  id_grupo: (editingAccount as any).id_grupo || "",
+                  link_drive: editingAccount.link_drive || "",
                 }
               : undefined
           }

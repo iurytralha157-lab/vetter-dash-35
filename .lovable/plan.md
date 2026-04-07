@@ -1,65 +1,45 @@
-## Plano de Remoção - VFeed e VAcademy
+## Plano de Simplificação - Contas & Onboarding
 
-### 1. Arquivos a DELETAR
+### 1. Remover Onboarding Público
+- Remover rota `/onboarding` do App.tsx
+- Desativar/remover página `ClientOnboarding.tsx` e componentes relacionados (StepContato, StepIdentificacao, StepNichoRegiao, StepEquipe, StepGestores, StepOrcamento, StepRevisao)
 
-**VFeed - Páginas e Componentes:**
-- `src/pages/VFeed.tsx`
-- `src/components/feed/FeedPostCard.tsx`
-- `src/components/feed/FeedSearchFilter.tsx`
-- `src/components/feed/MentionInput.tsx`
-- `src/components/feed/PollCreator.tsx`
-- `src/components/feed/PollDisplay.tsx`
-- `src/components/feed/PostTypeSelector.tsx`
-- `src/components/feed/RenderContentWithMentions.tsx`
-- `src/components/feed/UserProfileSheet.tsx`
-- `src/components/feed/VideoPlayer.tsx`
-- `src/services/communityService.ts`
+### 2. Simplificar Formulário de Nova Conta (ClientForm / ModernAccountForm)
+**Campos a MANTER:**
+- Nome da conta (obrigatório)
+- Telefone (opcional, não obrigatório)
+- ID do Grupo (obrigatório) — corrigir bug de não exibir valor salvo ao editar
+- Link do Drive (opcional)
+- Canais de anúncio (Meta/Google)
+- Horário do relatório
+- Notificação de saldo baixo (toggle)
+- Erro de sincronização (toggle)
+- Saldo Meta atual
+- Alerta saldo baixo (default: R$ 200)
+- Budget mensal Meta
+- Google Ads ID / Budget Google
 
-**VAcademy - Páginas e Componentes:**
-- `src/pages/VAcademy.tsx`
-- `src/pages/CourseDetail.tsx`
-- `src/pages/CourseEditor.tsx`
-- `src/pages/Training.tsx`
-- `src/pages/TrainingDetail.tsx`
-- `src/pages/AddTraining.tsx`
-- `src/components/courses/SecureVideoPlayer.tsx`
-- `src/services/coursesService.ts`
-- `src/mocks/trainingService.ts`
+**Campos a REMOVER:**
+- Gestor Responsável → auto-assign para o usuário logado
+- Cliente → remover do formulário
+- Observações
+- Canal do Relatório → hardcode "WhatsApp"
+- Templates Padrão (inteiro)
+- Notificação Leads Diários
+- UTM Padrão
+- Link Meta Ads
+- Webhook (receber dados de conversão)
+- Permitir ativação automática de campanhas
+- Monitorar saldo (já é automático)
+- Seção Analytics/Rastreamento inteira (Pixel, GA4, GTM, Typebot)
+- Seção Financeiro (forma pagamento, centro custo, contrato)
+- Seção Permissões (papel padrão, usuários vinculados, ranking, métricas)
 
-### 2. Arquivos a EDITAR
+### 3. Defaults automáticos
+- Status: sempre "Ativo"
+- Gestor: usuário logado
+- Canal relatório: "WhatsApp"
+- Alerta saldo baixo: 200
 
-- **`src/App.tsx`** - Remover imports e rotas do VFeed, VAcademy, Training, CourseDetail, CourseEditor
-- **`src/components/layout/navigationConfig.ts`** - Remover itens "VFeed" e "VAcademy" da navegação
-- **`src/components/layout/BottomNavigation.tsx`** - Remover item "VFeed" da barra inferior mobile
-
-### 3. Banco de Dados - Tabelas a DROPAR (via migration)
-
-**VFeed:**
-- `community_posts`
-- `community_comments`
-- `community_likes`
-- `community_poll_votes`
-
-**VAcademy:**
-- `courses`
-- `course_modules`
-- `course_lessons`
-
-**Storage bucket:**
-- `community-media`
-- `course-media`
-
-### 4. Edge Functions relacionadas
-- Nenhuma edge function específica do VFeed/VAcademy identificada (apenas `notify_new_post` trigger no banco)
-
-### 5. Triggers/Functions do banco a remover
-- `notify_new_post()` (trigger de notificação de posts)
-- `update_post_comments_count()` 
-- `update_post_likes_count()`
-- `create_mention_notification()`
-- `create_comment_mention_notification()`
-
-### ⚠️ Cuidados
-- Não afetar o sistema de notificações geral (`user_notifications` continua existindo)
-- Não afetar autenticação, dashboard, demandas, contas ou configurações
-- Remover imports não utilizados para evitar erros de build
+### 4. Corrigir bugs
+- ID do Grupo não aparece ao editar conta existente
