@@ -224,14 +224,10 @@ export default function ClientDetailPage() {
 
         {/* TABS */}
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-muted/50">
+          <TabsList className="grid w-full grid-cols-2 bg-muted/50">
             <TabsTrigger value="dashboard" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="campanhas" className="gap-2">
-              <Activity className="h-4 w-4" />
-              Campanhas
             </TabsTrigger>
             <TabsTrigger value="detalhes" className="gap-2">
               <User className="h-4 w-4" />
