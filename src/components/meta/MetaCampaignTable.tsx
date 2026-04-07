@@ -113,57 +113,7 @@ export function MetaCampaignTable({ campaigns, loading }: MetaCampaignTableProps
               <TableHead className="text-right">Gasto</TableHead>
               <TableHead className="text-right">Impressões</TableHead>
               <TableHead className="text-right">Cliques</TableHead>
-              <TableHead className="text-right">CTR</TableHead>
-              <TableHead className="text-right">CPC</TableHead>
               <TableHead className="text-right">Hookrate</TableHead>
-              <TableHead className="text-right">Leads</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {campaigns.map((campaign) => (
-              <TableRow 
-                key={campaign.id} 
-                className="hover:bg-muted/30 cursor-pointer"
-                onClick={() => handleCampaignClick(campaign)}
-              >
-                <TableCell className="font-medium max-w-xs truncate">
-                  {campaign.name}
-                </TableCell>
-                <TableCell>
-                  <MetaStatusBadge status={campaign.status} />
-                </TableCell>
-                <TableCell className="text-right text-sm">
-                  {campaign.daily_budget 
-                    ? `${formatCurrency(campaign.daily_budget)}/dia`
-                    : campaign.lifetime_budget 
-                      ? formatCurrency(campaign.lifetime_budget)
-                      : '-'
-                  }
-                </TableCell>
-                <TableCell className="text-right font-semibold">
-                  {campaign.insights ? formatCurrency(campaign.insights.spend) : '-'}
-                </TableCell>
-                <TableCell className="text-right">
-                  {campaign.insights ? formatNumber(campaign.insights.impressions) : '-'}
-                </TableCell>
-                <TableCell className="text-right">
-                  {campaign.insights ? formatNumber(campaign.insights.clicks) : '-'}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    {campaign.insights && getPerformanceIndicator(campaign.insights.ctr)}
-                    <span>{campaign.insights ? `${campaign.insights.ctr.toFixed(2)}%` : '-'}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  {campaign.insights ? formatCurrency(campaign.insights.cpc) : '-'}
-                </TableCell>
-                <TableCell className="text-right">
-                  {campaign.insights && campaign.insights.impressions > 0
-                    ? `${((campaign.insights.clicks / campaign.insights.impressions) * 100).toFixed(2)}%`
-                    : '-'}
-                </TableCell>
                 <TableCell className="text-right font-semibold">
                   {campaign.insights ? formatNumber(campaign.insights.conversions) : '-'}
                 </TableCell>
