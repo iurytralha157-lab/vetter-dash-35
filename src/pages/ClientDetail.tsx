@@ -14,6 +14,7 @@ import { MetaPeriodFilter, type MetaPeriod } from "@/components/meta/MetaPeriodF
 import { MetaMetricsGrid } from "@/components/meta/MetaMetricsGrid";
 import { MetaCampaignTable } from "@/components/meta/MetaCampaignTable";
 import { MetaCampaignDetailDialog } from "@/components/meta/MetaCampaignDetailDialog";
+import { MetaStatusBadge } from "@/components/meta/MetaStatusBadge";
 import { ModernAccountForm } from "@/components/forms/ModernAccountForm";
 import { metaAdsService } from "@/services/metaAdsService";
 import type { MetaAdsResponse, MetaCampaign, MetaAccountMetrics } from "@/types/meta";
