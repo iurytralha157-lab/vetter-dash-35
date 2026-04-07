@@ -111,7 +111,14 @@ export default function ClientDetailPage() {
   }, [metaAccountId, period]);
 
   const orderedCampaigns = useMemo(() => {
-    return [...campaigns].sort((a, b) => getLeads(b) - getLeads(a));
+    return [...campaigns].sort((a, b) => {
+      // Ativas primeiro
+      const aActive = a.status === 'ACTIVE' ? 0 : 1;
+      const bActive = b.status === 'ACTIVE' ? 0 : 1;
+      if (aActive !== bActive) return aActive - bActive;
+      // Depois por leads (mais leads primeiro)
+      return getLeads(b) - getLeads(a);
+    });
   }, [campaigns]);
 
   const kpis = useMemo(() => {
@@ -407,18 +414,14 @@ export default function ClientDetailPage() {
                               return (
                                 <tr 
                                   key={campaign.id} 
-                                  className="border-b border-border hover:bg-muted/50 transition-colors"
+                                  className="border-b border-border hover:bg-muted/50 transition-colors cursor-pointer"
+                                  onClick={() => handleCampaignClick(campaign)}
                                 >
                                   <td className="py-4 px-4 font-medium max-w-xs truncate">
                                     {campaign.name}
                                   </td>
                                   <td className="py-4 px-4 text-right">
-                                    <Badge 
-                                      variant={campaign.status === 'ACTIVE' ? 'default' : 'secondary'}
-                                      className="text-xs"
-                                    >
-                                      {campaign.status}
-                                    </Badge>
+                                    <MetaStatusBadge status={campaign.status} />
                                   </td>
                                   <td className="py-4 px-4 text-right text-muted-foreground">
                                     {formatNumber(campaign.insights?.impressions || 0)}
@@ -439,7 +442,10 @@ export default function ClientDetailPage() {
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => handleCampaignClick(campaign)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCampaignClick(campaign);
+                                      }}
                                     >
                                       <Eye className="h-4 w-4" />
                                     </Button>
