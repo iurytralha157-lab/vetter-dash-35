@@ -328,17 +328,6 @@ export default function ContasCliente() {
               className="pl-10 h-10 rounded-xl border-border"
             />
           </div>
-          <Select value={filterCliente} onValueChange={setFilterCliente}>
-            <SelectTrigger className="w-full sm:w-[220px] h-10 rounded-xl border-border">
-              <SelectValue placeholder="Todos os Clientes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Todos os Clientes">Todos os Clientes</SelectItem>
-              {clientes.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
 
         {/* Results counter */}
@@ -399,7 +388,6 @@ export default function ContasCliente() {
                       </div>
 
                       <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1"><Building2 className="h-3 w-3" />{account.cliente_nome}</span>
                         <span className="flex items-center gap-1"><User className="h-3 w-3" />{account.gestor_name}</span>
                       </div>
 
