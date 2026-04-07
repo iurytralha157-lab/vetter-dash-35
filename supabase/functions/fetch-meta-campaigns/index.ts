@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
       ? `date_preset=${datePreset}` 
       : `time_range={"since":"${since}","until":"${until}"}`;
     
-    const insightsUrl = `${META_BASE_URL}/${formattedAccountId}/insights?fields=impressions,reach,clicks,spend,ctr,cpc,cpm,actions,cost_per_action_type&${insightsTimeParam}&time_increment=1&action_report_time=impression&access_token=${accessToken}`;
+    const insightsUrl = `${META_BASE_URL}/${formattedAccountId}/insights?fields=impressions,reach,clicks,spend,ctr,cpc,cpm,actions,cost_per_action_type&${insightsTimeParam}&action_report_time=impression&access_token=${accessToken}`;
     
     console.log('Fetching account insights from Meta API...');
     const insightsResponse = await fetch(insightsUrl);
@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
             ? `date_preset=${datePreset}` 
             : `time_range={"since":"${since}","until":"${until}"}`;
           
-          const campaignInsightsUrl = `${META_BASE_URL}/${campaign.id}/insights?fields=impressions,reach,clicks,spend,ctr,cpc,cpm,actions,cost_per_action_type&${campaignTimeParam}&time_increment=1&action_report_time=impression&access_token=${accessToken}`;
+          const campaignInsightsUrl = `${META_BASE_URL}/${campaign.id}/insights?fields=impressions,reach,clicks,spend,ctr,cpc,cpm,actions,cost_per_action_type&${campaignTimeParam}&action_report_time=impression&access_token=${accessToken}`;
           
           const response = await fetch(campaignInsightsUrl);
           if (!response.ok) {

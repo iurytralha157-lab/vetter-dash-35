@@ -113,8 +113,6 @@ export function MetaCampaignTable({ campaigns, loading }: MetaCampaignTableProps
               <TableHead className="text-right">Gasto</TableHead>
               <TableHead className="text-right">Impressões</TableHead>
               <TableHead className="text-right">Cliques</TableHead>
-              <TableHead className="text-right">CTR</TableHead>
-              <TableHead className="text-right">CPC</TableHead>
               <TableHead className="text-right">Hookrate</TableHead>
               <TableHead className="text-right">Leads</TableHead>
               <TableHead className="text-right">Ações</TableHead>
@@ -149,15 +147,6 @@ export function MetaCampaignTable({ campaigns, loading }: MetaCampaignTableProps
                 </TableCell>
                 <TableCell className="text-right">
                   {campaign.insights ? formatNumber(campaign.insights.clicks) : '-'}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    {campaign.insights && getPerformanceIndicator(campaign.insights.ctr)}
-                    <span>{campaign.insights ? `${campaign.insights.ctr.toFixed(2)}%` : '-'}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  {campaign.insights ? formatCurrency(campaign.insights.cpc) : '-'}
                 </TableCell>
                 <TableCell className="text-right">
                   {campaign.insights && campaign.insights.impressions > 0

@@ -224,14 +224,10 @@ export default function ClientDetailPage() {
 
         {/* TABS */}
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-muted/50">
+          <TabsList className="grid w-full grid-cols-2 bg-muted/50">
             <TabsTrigger value="dashboard" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="campanhas" className="gap-2">
-              <Activity className="h-4 w-4" />
-              Campanhas
             </TabsTrigger>
             <TabsTrigger value="detalhes" className="gap-2">
               <User className="h-4 w-4" />
@@ -395,9 +391,8 @@ export default function ClientDetailPage() {
                               <th className="text-right py-3 px-4 font-medium text-sm">Status</th>
                               <th className="text-right py-3 px-4 font-medium text-sm">Impressões</th>
                               <th className="text-right py-3 px-4 font-medium text-sm">Cliques</th>
-                              <th className="text-right py-3 px-4 font-medium text-sm">CTR</th>
                               <th className="text-right py-3 px-4 font-medium text-sm">Gasto</th>
-                              <th className="text-right py-3 px-4 font-medium text-sm">Conversões</th>
+                              <th className="text-right py-3 px-4 font-medium text-sm">Leads</th>
                               <th className="text-right py-3 px-4 font-medium text-sm">CPL</th>
                               <th className="text-right py-3 px-4 font-medium text-sm">Ações</th>
                             </tr>
@@ -430,9 +425,6 @@ export default function ClientDetailPage() {
                                   </td>
                                   <td className="py-4 px-4 text-right text-primary font-semibold">
                                     {formatNumber(campaign.insights?.clicks || 0)}
-                                  </td>
-                                  <td className="py-4 px-4 text-right">
-                                    {ctr.toFixed(2)}%
                                   </td>
                                   <td className="py-4 px-4 text-right">
                                     {currency(spend)}
@@ -470,33 +462,7 @@ export default function ClientDetailPage() {
             )}
           </TabsContent>
 
-          {/* TAB: CAMPANHAS (Original) */}
-          <TabsContent value="campanhas" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Campanhas Ativas</CardTitle>
-                <CardDescription className="mt-1">
-                  {orderedCampaigns.length} campanhas no período selecionado
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                {loading ? (
-                  <div className="p-6 space-y-3">
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                  </div>
-                ) : orderedCampaigns.length > 0 ? (
-                  <MetaCampaignTable campaigns={orderedCampaigns} loading={loading} />
-                ) : (
-                  <div className="p-12 text-center text-muted-foreground">
-                    <Target className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                    <p>Nenhuma campanha encontrada no período selecionado</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+
 
           {/* TAB: DETALHES (Original) */}
           <TabsContent value="detalhes" className="mt-6 space-y-6">

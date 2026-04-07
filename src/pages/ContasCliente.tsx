@@ -95,7 +95,7 @@ export default function ContasCliente() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCliente, setFilterCliente] = useState("Todos os Clientes");
-  const [activePill, setActivePill] = useState<FilterKey>("todos");
+  const [activePill, setActivePill] = useState<FilterKey>("Ativo");
 
   const [showModernForm, setShowModernForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountData | null>(null);
