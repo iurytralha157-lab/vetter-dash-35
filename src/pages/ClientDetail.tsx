@@ -391,9 +391,8 @@ export default function ClientDetailPage() {
                               <th className="text-right py-3 px-4 font-medium text-sm">Status</th>
                               <th className="text-right py-3 px-4 font-medium text-sm">Impressões</th>
                               <th className="text-right py-3 px-4 font-medium text-sm">Cliques</th>
-                              <th className="text-right py-3 px-4 font-medium text-sm">CTR</th>
                               <th className="text-right py-3 px-4 font-medium text-sm">Gasto</th>
-                              <th className="text-right py-3 px-4 font-medium text-sm">Conversões</th>
+                              <th className="text-right py-3 px-4 font-medium text-sm">Leads</th>
                               <th className="text-right py-3 px-4 font-medium text-sm">CPL</th>
                               <th className="text-right py-3 px-4 font-medium text-sm">Ações</th>
                             </tr>
