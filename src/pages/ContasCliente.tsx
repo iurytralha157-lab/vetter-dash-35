@@ -1,7 +1,3 @@
-// src/pages/ContasCliente.tsx — HERO premium + filtros (inclui Meta/Google) + remove KPI cards
-// Mantém o texto "Gerencie status..." (como você pediu)
-// Move mini-métricas para dentro do card, abaixo do nome
-
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -17,7 +13,6 @@ import { ModernAccountForm } from "@/components/forms/ModernAccountForm";
 import {
   Search,
   Plus,
-  Users,
   Building2,
   RefreshCw,
   MoreVertical,
@@ -29,11 +24,7 @@ import {
   User,
   Pause,
   Play,
-  Sparkles,
-  ShieldCheck,
   Wallet,
-  TrendingUp,
-  Target,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -42,7 +33,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface AccountData {
   id: string;
@@ -55,8 +45,6 @@ interface AccountData {
   observacoes: string | null;
   created_at: string;
   updated_at: string;
-
-  // Canais/IDs
   usa_meta_ads?: boolean;
   meta_account_id?: string;
   saldo_meta?: number;
@@ -64,18 +52,12 @@ interface AccountData {
   usa_google_ads?: boolean;
   google_ads_id?: string;
   budget_mensal_google?: number;
-
-  // Outros
   link_drive?: string;
   canal_relatorio?: string;
   horario_relatorio?: string;
-
-  // Calculados
   gestor_name?: string;
   cliente_nome?: string;
   total_budget?: number;
-  leads_mes?: number;
-  conversoes_mes?: number;
 }
 
 interface StatsData {
@@ -85,10 +67,8 @@ interface StatsData {
   arquivados: number;
   metaAds: number;
   googleAds: number;
-  saldoTotal: number;
 }
 
-// Pills agora incluem Meta/Google como filtros
 const FILTER_PILLS = [
   { key: "todos", label: "Todos" },
   { key: "Ativo", label: "Ativos" },
@@ -104,38 +84,23 @@ export default function ContasCliente() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Estados (inalterados na lógica de dados)
   const [accounts, setAccounts] = useState<AccountData[]>([]);
-  const [managers, setManagers] = useState<any[]>([]);
   const [clientes, setClientes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const [stats, setStats] = useState<StatsData>({
-    total: 0,
-    ativos: 0,
-    pausados: 0,
-    arquivados: 0,
-    metaAds: 0,
-    googleAds: 0,
-    saldoTotal: 0,
+    total: 0, ativos: 0, pausados: 0, arquivados: 0, metaAds: 0, googleAds: 0,
   });
 
   const [searchTerm, setSearchTerm] = useState("");
-  // Mantém selects, mas agora o "status" principal vem das pills
-  const [filterStatus, setFilterStatus] = useState("Todos os Status");
-  const [filterGestor, setFilterGestor] = useState("Todos os Gestores");
   const [filterCliente, setFilterCliente] = useState("Todos os Clientes");
-
-  // Novo: filtro por pill (inclui meta/google)
   const [activePill, setActivePill] = useState<FilterKey>("todos");
 
   const [showModernForm, setShowModernForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountData | null>(null);
 
-  useEffect(() => {
-    loadAccountsData();
-  }, []);
+  useEffect(() => { loadAccountsData(); }, []);
 
   const loadAccountsData = async () => {
     try {
@@ -143,15 +108,7 @@ export default function ContasCliente() {
 
       const { data: accountsData, error: accountsError } = await supabase
         .from("accounts")
-        .select(
-          `
-          *,
-          gestor:profiles!gestor_id(
-            id,
-            name
-          )
-        `,
-        )
+        .select(`*, gestor:profiles!gestor_id(id, name)`)
         .order("created_at", { ascending: false });
 
       if (accountsError) throw accountsError;
@@ -165,14 +122,11 @@ export default function ContasCliente() {
 
       const processedAccounts: AccountData[] = (accountsData || []).map((account: any) => {
         const cliente = clientesData?.find((c: any) => c.id === account.cliente_id);
-
         return {
           ...account,
           gestor_name: account.gestor?.name || "Sem gestor",
           cliente_nome: cliente?.nome || "Cliente não vinculado",
           total_budget: (account.budget_mensal_meta || 0) + (account.budget_mensal_google || 0),
-          leads_mes: Math.floor(Math.random() * 150) + 20,
-          conversoes_mes: Math.floor(Math.random() * 30) + 5,
         };
       });
 
@@ -183,7 +137,6 @@ export default function ContasCliente() {
         arquivados: processedAccounts.filter((a) => a.status === "Arquivado").length,
         metaAds: processedAccounts.filter((a) => a.usa_meta_ads || !!a.meta_account_id).length,
         googleAds: processedAccounts.filter((a) => a.usa_google_ads || !!a.google_ads_id).length,
-        saldoTotal: processedAccounts.reduce((sum, a) => sum + (a.saldo_meta || 0), 0),
       };
 
       setAccounts(processedAccounts);
@@ -191,72 +144,47 @@ export default function ContasCliente() {
       setStats(calculateStats);
     } catch (error: any) {
       console.error("Erro ao carregar contas:", error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar as contas",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Não foi possível carregar as contas", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
-  // Contagem dos pills (inclui Meta/Google)
-  const pillCounts = useMemo(() => {
-    return {
-      todos: stats.total,
-      Ativo: stats.ativos,
-      Pausado: stats.pausados,
-      Arquivado: stats.arquivados,
-      meta: stats.metaAds,
-      google: stats.googleAds,
-    } as Record<FilterKey, number>;
-  }, [stats]);
+  const pillCounts = useMemo(() => ({
+    todos: stats.total,
+    Ativo: stats.ativos,
+    Pausado: stats.pausados,
+    Arquivado: stats.arquivados,
+    meta: stats.metaAds,
+    google: stats.googleAds,
+  } as Record<FilterKey, number>), [stats]);
 
-  // FILTROS — mantém o que você já tinha e adiciona filtro por pill
-  const filteredAccounts = accounts.filter((account) => {
-    const matchesSearch =
-      !searchTerm ||
-      account.nome_cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      account.telefone.includes(searchTerm) ||
-      (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredAccounts = useMemo(() => {
+    return accounts.filter((account) => {
+      const matchesSearch =
+        !searchTerm ||
+        account.nome_cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        account.telefone.includes(searchTerm) ||
+        (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    // Select de status (se você quiser usar junto)
-    const matchesStatusSelect = filterStatus === "Todos os Status" || account.status === filterStatus;
+      const matchesCliente = filterCliente === "Todos os Clientes" || account.cliente_id === filterCliente;
 
-    const matchesGestor = filterGestor === "Todos os Gestores" || true; // (mantido)
-    const matchesCliente = filterCliente === "Todos os Clientes" || account.cliente_id === filterCliente;
+      const metaConfigured = !!(account.meta_account_id && account.meta_account_id.trim().length > 0);
+      const googleConfigured = !!(account.google_ads_id && account.google_ads_id.trim().length > 0);
 
-    // Pill ativa (novo)
-    const metaConfigured = !!(account.meta_account_id && account.meta_account_id.trim().length > 0);
-    const googleConfigured = !!(account.google_ads_id && account.google_ads_id.trim().length > 0);
+      const matchesPill =
+        activePill === "todos" ? true
+        : activePill === "meta" ? (account.usa_meta_ads || metaConfigured)
+        : activePill === "google" ? (account.usa_google_ads || googleConfigured)
+        : account.status === activePill;
 
-    const matchesPill =
-      activePill === "todos"
-        ? true
-        : activePill === "meta"
-          ? (account.usa_meta_ads || metaConfigured)
-          : activePill === "google"
-            ? (account.usa_google_ads || googleConfigured)
-            : account.status === activePill;
+      return matchesSearch && matchesCliente && matchesPill;
+    });
+  }, [accounts, searchTerm, filterCliente, activePill]);
 
-    return matchesSearch && matchesStatusSelect && matchesGestor && matchesCliente && matchesPill;
-  });
-
-  // AÇÕES (inalteradas)
-  const handleCreateAccount = () => {
-    setEditingAccount(null);
-    setShowModernForm(true);
-  };
-
-  const handleEditAccount = (account: AccountData) => {
-    setEditingAccount(account);
-    setShowModernForm(true);
-  };
-
-  const handleViewAccount = (accountId: string) => {
-    navigate(`/contas/${accountId}`);
-  };
+  const handleCreateAccount = () => { setEditingAccount(null); setShowModernForm(true); };
+  const handleEditAccount = (account: AccountData) => { setEditingAccount(account); setShowModernForm(true); };
+  const handleViewAccount = (accountId: string) => { navigate(`/contas/${accountId}`); };
 
   const handleAccountSubmit = async (data: any) => {
     try {
@@ -273,7 +201,6 @@ export default function ContasCliente() {
         canal_relatorio: data.canal_relatorio,
         horario_relatorio: data.horario_relatorio,
         id_grupo: data.id_grupo || null,
-        // Meta
         usa_meta_ads: data.usa_meta_ads || false,
         meta_account_id: data.meta_account_id || null,
         meta_business_id: data.meta_business_id || null,
@@ -288,38 +215,32 @@ export default function ContasCliente() {
         utm_padrao: data.utm_padrao || null,
         webhook_meta: data.webhook_meta || null,
         pixel_meta: data.pixel_meta || null,
-        // Google
         usa_google_ads: data.usa_google_ads || false,
         google_ads_id: data.google_ads_id || null,
         budget_mensal_google: data.budget_mensal_google || 0,
         conversoes: data.conversoes || [],
         link_google: data.link_google || null,
         webhook_google: data.webhook_google || null,
-        // Analytics
         traqueamento_ativo: data.traqueamento_ativo || false,
         ga4_stream_id: data.ga4_stream_id || null,
         gtm_id: data.gtm_id || null,
         typebot_ativo: data.typebot_ativo || false,
         typebot_url: data.typebot_url || null,
-        // Financeiro
         budget_mensal_global: data.budget_mensal_global || null,
         forma_pagamento: data.forma_pagamento || null,
         centro_custo: data.centro_custo || null,
         contrato_inicio: data.contrato_inicio || null,
         contrato_renovacao: data.contrato_renovacao || null,
-        // Permissões
         papel_padrao: data.papel_padrao || null,
         usuarios_vinculados: data.usuarios_vinculados || [],
         ocultar_ranking: data.ocultar_ranking || false,
         somar_metricas: data.somar_metricas || true,
         usa_crm_externo: data.usa_crm_externo || false,
         url_crm: data.url_crm || null,
-        // Notificações
         notificacao_saldo_baixo: data.notificacao_saldo_baixo || false,
         notificacao_erro_sync: data.notificacao_erro_sync || false,
         notificacao_leads_diarios: data.notificacao_leads_diarios || false,
         templates_padrao: data.templates_padrao || [],
-        // Outros
         link_drive: data.link_drive || null,
         updated_at: new Date().toISOString(),
       };
@@ -329,10 +250,7 @@ export default function ContasCliente() {
         if (error) throw error;
         toast({ title: "Sucesso", description: "Conta atualizada com sucesso" });
       } else {
-        const { error } = await supabase.from("accounts").insert({
-          ...accountData,
-          created_at: new Date().toISOString(),
-        });
+        const { error } = await supabase.from("accounts").insert({ ...accountData, created_at: new Date().toISOString() });
         if (error) throw error;
         toast({ title: "Sucesso", description: "Conta criada com sucesso" });
       }
@@ -342,74 +260,37 @@ export default function ContasCliente() {
       setEditingAccount(null);
     } catch (error: any) {
       console.error("Erro ao salvar conta:", error);
-      toast({
-        title: "Erro",
-        description: `Não foi possível salvar a conta: ${error.message}`,
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: `Não foi possível salvar a conta: ${error.message}`, variant: "destructive" });
     }
   };
 
   const handleToggleStatus = async (account: AccountData, e: React.MouseEvent) => {
     e.stopPropagation();
     const newStatus = account.status === "Ativo" ? "Pausado" : "Ativo";
-
     try {
-      const { error } = await supabase
-        .from("accounts")
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq("id", account.id);
-
+      const { error } = await supabase.from("accounts").update({ status: newStatus, updated_at: new Date().toISOString() }).eq("id", account.id);
       if (error) throw error;
-
-      toast({
-        title: "Sucesso",
-        description: `Conta ${newStatus === "Ativo" ? "ativada" : "pausada"} com sucesso`,
-      });
-
+      toast({ title: "Sucesso", description: `Conta ${newStatus === "Ativo" ? "ativada" : "pausada"} com sucesso` });
       await loadAccountsData();
     } catch (error: any) {
       console.error("Erro ao alterar status:", error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível alterar o status da conta",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Não foi possível alterar o status da conta", variant: "destructive" });
     }
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadAccountsData();
-    setRefreshing(false);
-  };
+  const handleRefresh = async () => { setRefreshing(true); await loadAccountsData(); setRefreshing(false); };
 
-  const getInitials = (name: string) =>
-    name
-      .split(" ")
-      .map((w) => w[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-
+  const getInitials = (name: string) => name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
   const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString("pt-BR");
-
-  const formatMoney = (value?: number) => {
-    const v = Number(value || 0);
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
-  };
+  const formatMoney = (value?: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0));
 
   if (loading) {
     return (
       <AppLayout>
-        <div className="space-y-6">
-          <div className="h-40 bg-muted/30 rounded-2xl animate-pulse border border-border/40" />
-          <div className="h-20 bg-muted/30 rounded-2xl animate-pulse border border-border/40" />
-          <div className="space-y-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-20 bg-muted/30 rounded-2xl animate-pulse border border-border/40" />
-            ))}
-          </div>
+        <div className="space-y-4 p-2">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-20 bg-muted/30 rounded-xl animate-pulse border border-border/40" />
+          ))}
         </div>
       </AppLayout>
     );
@@ -417,420 +298,242 @@ export default function ContasCliente() {
 
   return (
     <AppLayout>
-      <TooltipProvider delayDuration={200}>
-        <div className="space-y-6">
-          {/* HERO premium */}
-          <Card className="surface-elevated overflow-hidden border-border/60">
-            <CardContent className="p-0">
-              <div className="relative">
-                {/* textura / grid */}
-                <div
-                  className="absolute inset-0 opacity-[0.35]"
-                  style={{
-                    backgroundImage:
-                      "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.08) 1px, transparent 0)",
-                    backgroundSize: "18px 18px",
-                  }}
-                />
-                {/* gradiente/glow */}
-                <div className="absolute inset-0 bg-gradient-to-r from-primary/25 via-transparent to-emerald-500/15" />
-                <div className="absolute -top-28 -left-28 h-72 w-72 rounded-full bg-primary/25 blur-3xl" />
-                <div className="absolute -bottom-28 -right-28 h-72 w-72 rounded-full bg-emerald-500/15 blur-3xl" />
-
-                <div className="relative px-6 py-7 md:px-8 md:py-8 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-                  <div className="max-w-3xl">
-                    <div className="inline-flex items-center gap-2 text-xs text-muted-foreground border border-border/60 bg-background/30 px-3 py-1.5 rounded-full">
-                      <Sparkles className="h-3.5 w-3.5 text-primary" />
-                      Gestão de Contas
-                      <span className="text-[10px] opacity-70">•</span>
-                      <span className="inline-flex items-center gap-1">
-                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" />
-                        Canais, status e integração
-                      </span>
-                    </div>
-
-                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight mt-3">Contas</h1>
-
-                    {/* Pills premium (agora inclui Meta/Google) */}
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {FILTER_PILLS.map((p) => {
-                        const active = activePill === p.key;
-                        const badgeCount = pillCounts[p.key] ?? 0;
-
-                        return (
-                          <button
-                            key={p.key}
-                            onClick={() => {
-                              setActivePill(p.key);
-                              // se clicar num pill de status, sincroniza select também (pra não brigar)
-                              if (p.key === "Ativo" || p.key === "Pausado" || p.key === "Arquivado") {
-                                setFilterStatus(p.key);
-                              }
-                              if (p.key === "todos") setFilterStatus("Todos os Status");
-                              // meta/google não mexe no select de status
-                            }}
-                            className={[
-                              "group inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm border transition",
-                              "shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
-                              active
-                                ? "bg-primary text-primary-foreground border-primary/40"
-                                : "bg-background/30 text-muted-foreground border-border/60 hover:text-foreground hover:bg-background/40",
-                            ].join(" ")}
-                          >
-                            <span>{p.label}</span>
-                            <span
-                              className={[
-                                "text-xs rounded-full px-2 py-0.5 transition",
-                                active ? "bg-primary-foreground/15" : "bg-muted/30 group-hover:bg-muted/40",
-                              ].join(" ")}
-                            >
-                              {badgeCount}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      className="gap-2"
-                      onClick={handleRefresh}
-                      disabled={refreshing}
-                      aria-label="Atualizar"
-                    >
-                      <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-                      Atualizar
-                    </Button>
-
-                    <Button onClick={handleCreateAccount} className="gap-2" aria-label="Nova Conta">
-                      <Plus className="h-4 w-4" />
-                      Nova Conta
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Filtros (sem KPIs cards) */}
-          <Card className="surface-elevated border-border/60">
-            <CardContent className="p-4">
-              <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por conta, e-mail ou telefone…"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 h-11 rounded-xl bg-background/40 border-border/60 focus-visible:ring-primary/30"
-                    aria-label="Buscar contas"
-                  />
-                </div>
-
-                <Select value={filterGestor} onValueChange={setFilterGestor}>
-                  <SelectTrigger className="w-full lg:w-[240px] h-11 rounded-xl bg-background/40 border-border/60">
-                    <SelectValue placeholder="Todos os Gestores" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Todos os Gestores">Todos os Gestores</SelectItem>
-                    {managers.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={filterCliente} onValueChange={setFilterCliente}>
-                  <SelectTrigger className="w-full lg:w-[260px] h-11 rounded-xl bg-background/40 border-border/60">
-                    <SelectValue placeholder="Todos os Clientes" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Todos os Clientes">Todos os Clientes</SelectItem>
-                    {clientes.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* Mantém status select caso queira granular (mas pills já resolvem) */}
-                <Select
-                  value={filterStatus}
-                  onValueChange={(v) => {
-                    setFilterStatus(v);
-                    // sincroniza pill com status quando for status
-                    if (v === "Ativo" || v === "Pausado" || v === "Arquivado") setActivePill(v as any);
-                    if (v === "Todos os Status") setActivePill("todos");
-                  }}
-                >
-                  <SelectTrigger className="w-full lg:w-[220px] h-11 rounded-xl bg-background/40 border-border/60">
-                    <SelectValue placeholder="Todos os Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Todos os Status">Todos os Status</SelectItem>
-                    <SelectItem value="Ativo">Ativos</SelectItem>
-                    <SelectItem value="Pausado">Pausados</SelectItem>
-                    <SelectItem value="Arquivado">Arquivados</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* LISTA DE CONTAS — mini-métricas embaixo do nome */}
-          <div className="space-y-3">
-            {filteredAccounts.map((account) => {
-              const statusColor =
-                account.status === "Ativo"
-                  ? "from-success/70 to-success/10"
-                  : account.status === "Pausado"
-                    ? "from-yellow-500/70 to-yellow-500/10"
-                    : "from-text-muted/70 to-text-muted/10";
-
-              const metaConfigured = !!(account.meta_account_id && account.meta_account_id.trim().length > 0);
-              const googleConfigured = !!(account.google_ads_id && account.google_ads_id.trim().length > 0);
-              const showMetaChip = account.usa_meta_ads || metaConfigured;
-              const showGoogleChip = account.usa_google_ads || googleConfigured;
-
-              return (
-                <Card
-                  key={account.id}
-                  className={[
-                    "surface-elevated relative overflow-hidden transition-all cursor-pointer border-border/60",
-                    "hover:translate-y-[-1px] hover:border-primary/25 hover:shadow-[0_10px_30px_rgba(0,0,0,0.35)]",
-                  ].join(" ")}
-                  onClick={() => handleViewAccount(account.id)}
-                >
-                  <div className={`absolute left-0 top-0 h-full w-1.5 bg-gradient-to-b ${statusColor}`} />
-                  <CardContent className="p-4 md:p-5">
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] items-start gap-4">
-                      {/* ESQUERDA */}
-                      <div className="flex items-start gap-4 min-w-0">
-                        <Avatar className="h-12 w-12 ring-1 ring-border/50 transition mt-0.5">
-                          <AvatarFallback className="bg-primary text-primary-foreground font-bold text-sm">
-                            {getInitials(account.nome_cliente)}
-                          </AvatarFallback>
-                        </Avatar>
-
-                        <div className="min-w-0 flex-1">
-                          {/* Linha 1 */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-semibold text-foreground text-lg truncate">{account.nome_cliente}</h3>
-
-                            <Badge
-                              className={[
-                                "rounded-full",
-                                account.status === "Ativo"
-                                  ? "bg-success text-white"
-                                  : account.status === "Pausado"
-                                    ? "bg-yellow-500 text-black dark:text-white"
-                                    : "bg-text-muted text-white",
-                              ].join(" ")}
-                            >
-                              {account.status}
-                            </Badge>
-
-                            {/* Chips de canal (mais “premium”) */}
-                            <div className="flex items-center gap-2">
-                              {showMetaChip && (
-                                <span
-                                  className={[
-                                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border",
-                                    metaConfigured
-                                      ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
-                                      : "border-border/40 bg-transparent text-text-muted",
-                                  ].join(" ")}
-                                >
-                                  <Facebook className="h-3.5 w-3.5" />
-                                  Meta
-                                </span>
-                              )}
-
-                              {showGoogleChip && (
-                                <span
-                                  className={[
-                                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border",
-                                    googleConfigured
-                                      ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
-                                      : "border-border/40 bg-transparent text-text-muted",
-                                  ].join(" ")}
-                                >
-                                  <Chrome className="h-3.5 w-3.5" />
-                                  Google
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Linha 2: cliente + gestor */}
-                          <div className="mt-1.5 flex flex-wrap items-center gap-4 text-sm text-text-secondary">
-                            <div className="flex items-center gap-1">
-                              <Building2 className="h-3.5 w-3.5" />
-                              <span className="truncate">
-                                {account.cliente_nome !== "Cliente não vinculado"
-                                  ? account.cliente_nome
-                                  : "Cliente não vinculado"}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <User className="h-3.5 w-3.5" />
-                              <span>{account.gestor_name || "Gestor não definido"}</span>
-                            </div>
-                          </div>
-
-                          {/* Linha 3: mini-KPIs embaixo do nome (novo) */}
-                          <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border border-border/60 bg-background/30 text-muted-foreground">
-                              <Wallet className="h-3.5 w-3.5" />
-                              Budget: <span className="text-foreground/90">{formatMoney(account.total_budget)}</span>
-                            </span>
-
-                            <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border border-border/60 bg-background/30 text-muted-foreground">
-                              <TrendingUp className="h-3.5 w-3.5" />
-                              Leads/mês: <span className="text-foreground/90">{account.leads_mes ?? 0}</span>
-                            </span>
-
-                            <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border border-border/60 bg-background/30 text-muted-foreground">
-                              <Target className="h-3.5 w-3.5" />
-                              Conv/mês: <span className="text-foreground/90">{account.conversoes_mes ?? 0}</span>
-                            </span>
-
-                            {!!account.saldo_meta && account.saldo_meta > 0 && (
-                              <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border border-blue-500/25 bg-blue-500/10 text-blue-300">
-                                <Wallet className="h-3.5 w-3.5" />
-                                Saldo Meta:{" "}
-                                <span className="text-blue-100">
-                                  {formatMoney((account.saldo_meta || 0) / 100)}
-                                </span>
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* ATUALIZADO */}
-                      <div className="text-left md:text-right">
-                        <div className="text-xs text-text-tertiary font-medium mb-1">Atualizado</div>
-                        <div className="text-sm text-foreground font-medium">{formatDate(account.updated_at)}</div>
-                      </div>
-
-                      {/* AÇÕES rápidas */}
-                      <div className="flex items-center gap-2 justify-start md:justify-end">
-                        {account.status !== "Ativo" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-10 w-10 p-0 rounded-xl text-emerald-300 hover:bg-emerald-500/10 border-border/60"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleStatus(account, e);
-                            }}
-                            title="Ativar"
-                          >
-                            <Play className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {account.status === "Ativo" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-10 w-10 p-0 rounded-xl text-amber-300 hover:bg-amber-500/10 border-border/60"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleStatus(account, e);
-                            }}
-                            title="Pausar"
-                          >
-                            <Pause className="h-4 w-4" />
-                          </Button>
-                        )}
-
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-10 w-10 p-0 rounded-xl"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreVertical className="h-5 w-5" />
-                            </Button>
-                          </DropdownMenuTrigger>
-
-                          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                            <DropdownMenuItem onClick={() => handleViewAccount(account.id)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              Ver detalhes
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditAccount(account)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Editar conta
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-warning">
-                              <Archive className="h-4 w-4 mr-2" />
-                              Arquivar
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Contas</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {stats.total} conta{stats.total !== 1 ? "s" : ""} · {stats.ativos} ativa{stats.ativos !== 1 ? "s" : ""}
+            </p>
           </div>
-
-          {/* EMPTY STATE */}
-          {filteredAccounts.length === 0 && !loading && (
-            <Card className="surface-elevated border-border/60">
-              <CardContent className="p-12 text-center">
-                <div className="mx-auto mb-4 p-3 bg-muted/30 rounded-full w-fit">
-                  <Search className="h-8 w-8 text-text-muted" />
-                </div>
-                <h3 className="font-semibold text-lg mb-2">Nenhuma conta encontrada</h3>
-                <p className="text-text-secondary mb-6">
-                  Ajuste os filtros ou verifique o termo digitado para localizar a conta desejada.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* FORMULÁRIO (inalterado) */}
-          <ModernAccountForm
-            open={showModernForm}
-            onOpenChange={setShowModernForm}
-            onSubmit={handleAccountSubmit}
-            initialData={
-              editingAccount
-                ? {
-                    cliente_id: editingAccount.cliente_id,
-                    nome_cliente: editingAccount.nome_cliente,
-                    telefone: editingAccount.telefone,
-                    email: editingAccount.email || "",
-                    status: editingAccount.status as "Ativo" | "Pausado" | "Arquivado",
-                    observacoes: editingAccount.observacoes || "",
-                    canais: editingAccount.canais || [],
-                    canal_relatorio: (editingAccount.canal_relatorio as "WhatsApp" | "Email" | "Ambos") || "WhatsApp",
-                    horario_relatorio: editingAccount.horario_relatorio || "09:00",
-                    usa_meta_ads: editingAccount.usa_meta_ads || false,
-                    meta_account_id: editingAccount.meta_account_id || "",
-                    saldo_meta: editingAccount.saldo_meta || 0,
-                    usa_google_ads: editingAccount.usa_google_ads || false,
-                    google_ads_id: editingAccount.google_ads_id || "",
-                    budget_mensal_meta: editingAccount.budget_mensal_meta || 0,
-                    budget_mensal_google: editingAccount.budget_mensal_google || 0,
-                  }
-                : undefined
-            }
-            isEdit={!!editingAccount}
-          />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline ml-1">Atualizar</span>
+            </Button>
+            <Button size="sm" onClick={handleCreateAccount}>
+              <Plus className="h-4 w-4" />
+              <span className="ml-1">Nova Conta</span>
+            </Button>
+          </div>
         </div>
-      </TooltipProvider>
+
+        {/* Filter pills */}
+        <div className="flex flex-wrap gap-1.5">
+          {FILTER_PILLS.map((p) => {
+            const active = activePill === p.key;
+            const count = pillCounts[p.key] ?? 0;
+            return (
+              <button
+                key={p.key}
+                onClick={() => setActivePill(p.key)}
+                className={[
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium border transition-colors",
+                  active
+                    ? "bg-primary text-primary-foreground border-primary/40"
+                    : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-secondary/50",
+                ].join(" ")}
+              >
+                {p.label}
+                <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${active ? "bg-primary-foreground/15" : "bg-muted/50"}`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Search + Client filter */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por conta, e-mail ou telefone…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 h-10 rounded-xl border-border"
+            />
+          </div>
+          <Select value={filterCliente} onValueChange={setFilterCliente}>
+            <SelectTrigger className="w-full sm:w-[220px] h-10 rounded-xl border-border">
+              <SelectValue placeholder="Todos os Clientes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Todos os Clientes">Todos os Clientes</SelectItem>
+              {clientes.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Results counter */}
+        <p className="text-xs text-muted-foreground">
+          Exibindo {filteredAccounts.length} de {accounts.length} conta{accounts.length !== 1 ? "s" : ""}
+        </p>
+
+        {/* Account cards */}
+        <div className="space-y-2">
+          {filteredAccounts.map((account) => {
+            const metaConfigured = !!(account.meta_account_id && account.meta_account_id.trim().length > 0);
+            const googleConfigured = !!(account.google_ads_id && account.google_ads_id.trim().length > 0);
+            const showMetaChip = account.usa_meta_ads || metaConfigured;
+            const showGoogleChip = account.usa_google_ads || googleConfigured;
+
+            const statusColor =
+              account.status === "Ativo" ? "bg-emerald-500"
+              : account.status === "Pausado" ? "bg-yellow-500"
+              : "bg-muted-foreground";
+
+            return (
+              <Card
+                key={account.id}
+                className="relative overflow-hidden transition-colors cursor-pointer border-border hover:border-primary/25"
+                onClick={() => handleViewAccount(account.id)}
+              >
+                <div className={`absolute left-0 top-0 h-full w-1 ${statusColor}`} />
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-start gap-3">
+                    {/* Avatar */}
+                    <Avatar className="h-10 w-10 shrink-0 ring-1 ring-border/50">
+                      <AvatarFallback className="bg-primary/10 text-primary font-semibold text-xs">
+                        {getInitials(account.nome_cliente)}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    {/* Content */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <h3 className="font-semibold text-sm truncate">{account.nome_cliente}</h3>
+                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${
+                          account.status === "Ativo" ? "border-emerald-500/40 text-emerald-500"
+                          : account.status === "Pausado" ? "border-yellow-500/40 text-yellow-500"
+                          : "border-muted-foreground/40 text-muted-foreground"
+                        }`}>
+                          {account.status}
+                        </Badge>
+                        {showMetaChip && (
+                          <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${metaConfigured ? "border-blue-500/30 text-blue-500" : "border-border text-muted-foreground"}`}>
+                            <Facebook className="h-3 w-3" /> Meta
+                          </span>
+                        )}
+                        {showGoogleChip && (
+                          <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${googleConfigured ? "border-amber-500/30 text-amber-500" : "border-border text-muted-foreground"}`}>
+                            <Chrome className="h-3 w-3" /> Google
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1"><Building2 className="h-3 w-3" />{account.cliente_nome}</span>
+                        <span className="flex items-center gap-1"><User className="h-3 w-3" />{account.gestor_name}</span>
+                      </div>
+
+                      {/* Real metrics only */}
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <Wallet className="h-3 w-3" />
+                          Budget: <span className="text-foreground font-medium">{formatMoney(account.total_budget)}</span>
+                        </span>
+                        {!!account.saldo_meta && account.saldo_meta > 0 && (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-blue-500">
+                            <Wallet className="h-3 w-3" />
+                            Saldo Meta: <span className="font-medium">{formatMoney(account.saldo_meta / 100)}</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-[10px] text-muted-foreground hidden sm:block mr-2">
+                        {formatDate(account.updated_at)}
+                      </span>
+
+                      {account.status !== "Ativo" ? (
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleToggleStatus(account, e); }} title="Ativar">
+                          <Play className="h-3.5 w-3.5 text-emerald-500" />
+                        </Button>
+                      ) : (
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleToggleStatus(account, e); }} title="Pausar">
+                          <Pause className="h-3.5 w-3.5 text-yellow-500" />
+                        </Button>
+                      )}
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenuItem onClick={() => handleViewAccount(account.id)}>
+                            <Eye className="h-4 w-4 mr-2" /> Ver detalhes
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditAccount(account)}>
+                            <Edit className="h-4 w-4 mr-2" /> Editar conta
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-destructive">
+                            <Archive className="h-4 w-4 mr-2" /> Arquivar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Empty state */}
+        {filteredAccounts.length === 0 && (
+          <Card className="border-border">
+            <CardContent className="p-10 text-center">
+              <Search className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+              <h3 className="font-semibold mb-1">Nenhuma conta encontrada</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Ajuste os filtros ou crie uma nova conta.
+              </p>
+              <Button size="sm" onClick={handleCreateAccount}>
+                <Plus className="h-4 w-4 mr-1" /> Nova Conta
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Form modal */}
+        <ModernAccountForm
+          open={showModernForm}
+          onOpenChange={setShowModernForm}
+          onSubmit={handleAccountSubmit}
+          initialData={
+            editingAccount
+              ? {
+                  cliente_id: editingAccount.cliente_id,
+                  nome_cliente: editingAccount.nome_cliente,
+                  telefone: editingAccount.telefone,
+                  email: editingAccount.email || "",
+                  status: editingAccount.status as "Ativo" | "Pausado" | "Arquivado",
+                  observacoes: editingAccount.observacoes || "",
+                  canais: editingAccount.canais || [],
+                  canal_relatorio: (editingAccount.canal_relatorio as "WhatsApp" | "Email" | "Ambos") || "WhatsApp",
+                  horario_relatorio: editingAccount.horario_relatorio || "09:00",
+                  usa_meta_ads: editingAccount.usa_meta_ads || false,
+                  meta_account_id: editingAccount.meta_account_id || "",
+                  saldo_meta: editingAccount.saldo_meta || 0,
+                  usa_google_ads: editingAccount.usa_google_ads || false,
+                  google_ads_id: editingAccount.google_ads_id || "",
+                  budget_mensal_meta: editingAccount.budget_mensal_meta || 0,
+                  budget_mensal_google: editingAccount.budget_mensal_google || 0,
+                }
+              : undefined
+          }
+          isEdit={!!editingAccount}
+        />
+      </div>
     </AppLayout>
   );
 }
