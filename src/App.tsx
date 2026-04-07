@@ -13,19 +13,12 @@ import Accounts from "./pages/ContasCliente";
 import Clientes from "./pages/Clientes";
 import ClienteDetail from "./pages/ClienteDetail";
 import ClienteEdit from "./pages/ClienteEdit";
-import Training from "./pages/Training";
-import TrainingDetail from "./pages/TrainingDetail";
-import AddTraining from "./pages/AddTraining";
 import Settings from "./pages/Settings";
 import RelatorioN8n from "./pages/RelatorioN8n";
 import Demandas from "./pages/Demandas";
 import NotFound from "./pages/NotFound";
 import PendingApproval from "./pages/PendingApproval";
 import BlockedAccount from "./pages/BlockedAccount";
-import VFeed from "./pages/VFeed";
-import VAcademy from "./pages/VAcademy";
-import CourseDetail from "./pages/CourseDetail";
-import CourseEditor from "./pages/CourseEditor";
 
 const queryClient = new QueryClient();
 
@@ -80,21 +73,6 @@ const App = () => (
                 <ClientDetail />
               </ProtectedRoute>
             } />
-            <Route path="/capacitacao" element={
-              <ProtectedRoute>
-                <Training />
-              </ProtectedRoute>
-            } />
-            <Route path="/capacitacao/:id" element={
-              <ProtectedRoute>
-                <TrainingDetail />
-              </ProtectedRoute>
-            } />
-            <Route path="/capacitacao/adicionar" element={
-              <ProtectedRoute>
-                <AddTraining />
-              </ProtectedRoute>
-            } />
             <Route path="/configuracoes" element={
               <ProtectedRoute>
                 <Settings />
@@ -103,31 +81,6 @@ const App = () => (
             <Route path="/demandas" element={
               <ProtectedRoute>
                 <Demandas />
-              </ProtectedRoute>
-            } />
-            <Route path="/vfeed" element={
-              <ProtectedRoute>
-                <VFeed />
-              </ProtectedRoute>
-            } />
-            <Route path="/vacademy" element={
-              <ProtectedRoute>
-                <VAcademy />
-              </ProtectedRoute>
-            } />
-            <Route path="/vacademy/novo" element={
-              <ProtectedRoute>
-                <CourseEditor />
-              </ProtectedRoute>
-            } />
-            <Route path="/vacademy/:courseId/editar" element={
-              <ProtectedRoute>
-                <CourseEditor />
-              </ProtectedRoute>
-            } />
-            <Route path="/vacademy/:courseId" element={
-              <ProtectedRoute>
-                <CourseDetail />
               </ProtectedRoute>
             } />
             <Route path="/relatorio-n8n" element={

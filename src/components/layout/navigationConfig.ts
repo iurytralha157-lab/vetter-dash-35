@@ -2,18 +2,9 @@ import {
   LayoutDashboard, 
   Users, 
   Building2,
-  LineChart, 
-  Blocks, 
-  GraduationCap, 
-  Briefcase, 
-  ShieldCheck, 
-  MessageSquare,
   Webhook,
   Kanban,
   Settings,
-  UserCheck,
-  Rss,
-  Activity
 } from "lucide-react";
 import { pt } from "@/i18n/pt";
 import { UserRole } from "@/hooks/useUserRole";
@@ -22,7 +13,7 @@ export interface NavigationItem {
   title: string;
   url: string;
   icon: any;
-  roles?: UserRole[]; // Se vazio/undefined, todos podem acessar
+  roles?: UserRole[];
 }
 
 export const navigationItems: NavigationItem[] = [
@@ -30,21 +21,18 @@ export const navigationItems: NavigationItem[] = [
   { title: "Clientes", url: "/clientes", icon: Users, roles: ['admin', 'gestor'] },
   { title: "Contas", url: "/contas", icon: Building2 },
   { title: "Demandas", url: "/demandas", icon: Kanban },
-  { title: "VFeed", url: "/vfeed", icon: Rss },
-  { title: "VAcademy", url: "/vacademy", icon: GraduationCap },
   { title: pt.nav.reportN8n, url: "/relatorio-n8n", icon: Webhook, roles: ['admin'] },
   { title: pt.settings.title, url: "/configuracoes", icon: Settings },
 ];
 
 export const filterNavigationByRole = (items: NavigationItem[], userRole: UserRole | null): NavigationItem[] => {
-  // Durante o carregamento ou sem role, mostra items sem restrição
   if (!userRole) {
     return items.filter(item => !item.roles || item.roles.length === 0);
   }
-  if (userRole === 'admin') return items; // Admin vê tudo
+  if (userRole === 'admin') return items;
   
   return items.filter(item => {
-    if (!item.roles || item.roles.length === 0) return true; // Item sem restrição
+    if (!item.roles || item.roles.length === 0) return true;
     return item.roles.includes(userRole);
   });
 };
