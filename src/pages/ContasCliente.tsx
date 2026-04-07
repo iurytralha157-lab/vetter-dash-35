@@ -485,14 +485,10 @@ export default function ContasCliente() {
           initialData={
             editingAccount
               ? {
-                  cliente_id: editingAccount.cliente_id,
                   nome_cliente: editingAccount.nome_cliente,
                   telefone: editingAccount.telefone,
                   email: editingAccount.email || "",
-                  status: editingAccount.status as "Ativo" | "Pausado" | "Arquivado",
-                  observacoes: editingAccount.observacoes || "",
                   canais: editingAccount.canais || [],
-                  canal_relatorio: (editingAccount.canal_relatorio as "WhatsApp" | "Email" | "Ambos") || "WhatsApp",
                   horario_relatorio: editingAccount.horario_relatorio || "09:00",
                   usa_meta_ads: editingAccount.usa_meta_ads || false,
                   meta_account_id: editingAccount.meta_account_id || "",
@@ -501,6 +497,8 @@ export default function ContasCliente() {
                   google_ads_id: editingAccount.google_ads_id || "",
                   budget_mensal_meta: editingAccount.budget_mensal_meta || 0,
                   budget_mensal_google: editingAccount.budget_mensal_google || 0,
+                  id_grupo: (editingAccount as any).id_grupo || "",
+                  link_drive: editingAccount.link_drive || "",
                 }
               : undefined
           }
