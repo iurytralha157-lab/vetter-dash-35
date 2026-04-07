@@ -427,9 +427,6 @@ export default function ClientDetailPage() {
                                     {formatNumber(campaign.insights?.clicks || 0)}
                                   </td>
                                   <td className="py-4 px-4 text-right">
-                                    {ctr.toFixed(2)}%
-                                  </td>
-                                  <td className="py-4 px-4 text-right">
                                     {currency(spend)}
                                   </td>
                                   <td className="py-4 px-4 text-right text-green-600 dark:text-green-400 font-bold">
@@ -465,33 +462,7 @@ export default function ClientDetailPage() {
             )}
           </TabsContent>
 
-          {/* TAB: CAMPANHAS (Original) */}
-          <TabsContent value="campanhas" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Campanhas Ativas</CardTitle>
-                <CardDescription className="mt-1">
-                  {orderedCampaigns.length} campanhas no período selecionado
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                {loading ? (
-                  <div className="p-6 space-y-3">
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                  </div>
-                ) : orderedCampaigns.length > 0 ? (
-                  <MetaCampaignTable campaigns={orderedCampaigns} loading={loading} />
-                ) : (
-                  <div className="p-12 text-center text-muted-foreground">
-                    <Target className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                    <p>Nenhuma campanha encontrada no período selecionado</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+
 
           {/* TAB: DETALHES (Original) */}
           <TabsContent value="detalhes" className="mt-6 space-y-6">
