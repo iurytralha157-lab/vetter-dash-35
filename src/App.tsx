@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import AuthPage from "./pages/Login";
-import ClientOnboarding from "./pages/ClientOnboarding";
+
 import Dashboard from "./pages/Dashboard";
 import ClientDetail from "./pages/ClientDetail";
 import Accounts from "./pages/ContasCliente";
@@ -33,7 +33,7 @@ const App = () => (
             {/* Public Routes */}
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/login" element={<Navigate to="/auth" replace />} />
-            <Route path="/onboarding" element={<ClientOnboarding />} />
+            
             <Route path="/aguardando-aprovacao" element={<PendingApproval />} />
             <Route path="/conta-bloqueada" element={<BlockedAccount />} />
             
