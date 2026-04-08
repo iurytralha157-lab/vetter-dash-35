@@ -205,7 +205,18 @@ export function ModernAccountForm({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (step < 3) {
+                // Don't submit on steps 1-2, just advance
+                if (canProceed()) nextStep();
+                return;
+              }
+              form.handleSubmit(handleSubmit)(e);
+            }}
+            className="space-y-6"
+          >
             {/* STEP 1: Dados Básicos */}
             {step === 1 && (
               <div className="space-y-6">
