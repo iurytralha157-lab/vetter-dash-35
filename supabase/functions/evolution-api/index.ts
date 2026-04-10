@@ -217,30 +217,7 @@ Deno.serve(async (req) => {
   }
 });
 
-async function ensureTable(admin: ReturnType<typeof createClient>) {
-  // Try a simple select - if fails, create table via RPC
-  const { error } = await admin.from("whatsapp_instances").select("id").limit(1);
-  if (error && error.message.includes("does not exist")) {
-    // Create table via raw SQL
-    const { error: createError } = await admin.rpc("exec_sql", {
-      sql: `
-        CREATE TABLE IF NOT EXISTS public.whatsapp_instances (
-          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-          instance_name text NOT NULL UNIQUE,
-          display_name text,
-          linked_by uuid,
-          created_at timestamptz DEFAULT now(),
-          updated_at timestamptz DEFAULT now()
-        );
-        ALTER TABLE public.whatsapp_instances ENABLE ROW LEVEL SECURITY;
-        CREATE POLICY "service_role_all" ON public.whatsapp_instances FOR ALL TO service_role USING (true) WITH CHECK (true);
-      `
-    });
-    if (createError) {
-      console.warn("[evolution-api] Could not auto-create table:", createError.message);
-    }
-  }
-}
+// Table must exist in Supabase - no auto-creation needed
 
 async function evoFetch(url: string, method: string, apiKey: string, body?: unknown) {
   const opts: RequestInit = {
