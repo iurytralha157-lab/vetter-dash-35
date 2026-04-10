@@ -109,13 +109,23 @@ export function AddInstanceDialog({ open, onOpenChange, onAdded }: AddInstanceDi
                   {instanceList.length === 0 ? "Nenhuma instância encontrada na Evolution API." : "Nenhuma instância corresponde à busca."}
                 </p>
               ) : (
-                filtered.map((inst: any) => {
-                  const name = inst?.instance?.instanceName || inst?.instanceName || "unknown";
-                  const status = inst?.instance?.connectionStatus || inst?.instance?.status || inst?.connectionStatus || "unknown";
+              filtered.map((inst: any, idx: number) => {
+                  // Try all possible paths for instance name
+                  const name = inst?.instance?.instanceName
+                    || inst?.instanceName
+                    || inst?.instance?.name
+                    || inst?.name
+                    || inst?.id
+                    || `instance-${idx}`;
+                  const status = inst?.instance?.connectionStatus
+                    || inst?.instance?.status
+                    || inst?.connectionStatus
+                    || inst?.status
+                    || "unknown";
                   const isOpen = status === "open" || status === "connected";
 
                   return (
-                    <Card key={name} className="p-3 flex items-center justify-between">
+                    <Card key={name + idx} className="p-3 flex items-center justify-between">
                       <div>
                         <p className="font-medium text-sm text-foreground">{name}</p>
                         <Badge variant={isOpen ? "default" : "secondary"} className="text-xs mt-1">
