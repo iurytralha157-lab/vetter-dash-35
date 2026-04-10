@@ -5,6 +5,7 @@ import {
   Webhook,
   Kanban,
   Settings,
+  MessageSquare,
 } from "lucide-react";
 import { pt } from "@/i18n/pt";
 import { UserRole } from "@/hooks/useUserRole";
