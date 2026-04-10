@@ -35,7 +35,7 @@ export function WhatsAppInstanceCard({ instance, isSelected, onSelect }: WhatsAp
         <div className="flex items-center gap-3">
           <div className={cn(
             "h-10 w-10 rounded-full flex items-center justify-center",
-            isConnected ? "bg-green-500/10 text-green-500" : "bg-muted text-muted-foreground"
+            isConnected ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
           )}>
             <Smartphone className="h-5 w-5" />
           </div>
@@ -43,11 +43,11 @@ export function WhatsAppInstanceCard({ instance, isSelected, onSelect }: WhatsAp
             <p className="font-medium text-foreground">{instanceName}</p>
             <div className="flex items-center gap-1.5 mt-1">
               {isConnected ? (
-                <Wifi className="h-3.5 w-3.5 text-green-500" />
+                <Wifi className="h-3.5 w-3.5 text-primary" />
               ) : (
                 <WifiOff className="h-3.5 w-3.5 text-muted-foreground" />
               )}
-              <span className={cn("text-xs", isConnected ? "text-green-500" : "text-muted-foreground")}>
+              <span className={cn("text-xs", isConnected ? "text-primary" : "text-muted-foreground")}>
                 {isConnected ? "Conectado" : connectionState}
               </span>
             </div>
