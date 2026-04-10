@@ -10,7 +10,7 @@ import { AddInstanceDialog } from "@/components/whatsapp/AddInstanceDialog";
 import { ConnectInstanceDialog } from "@/components/whatsapp/ConnectInstanceDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Plus, Unplug } from "lucide-react";
+import { MessageSquare, Plus, Unplug, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 export default function WhatsApp() {
@@ -20,6 +20,7 @@ export default function WhatsApp() {
   const [sendTarget, setSendTarget] = useState<{ type: "number" | "group"; id: string; name: string } | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [connectInstance, setConnectInstance] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const { data: linkedInstances, isLoading } = useQuery({
     queryKey: ["whatsapp-linked-instances"],
@@ -42,6 +43,35 @@ export default function WhatsApp() {
     }
   };
 
+  const handleSyncGroups = async () => {
+    setSyncing(true);
+    try {
+      for (const inst of instances) {
+        await evolutionApiService.syncGroups(inst.instance_name);
+      }
+      toast.success("Grupos sincronizados com sucesso!");
+    } catch (err: any) {
+      toast.error("Erro ao sincronizar: " + err.message);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleInstanceAdded = async () => {
+    queryClient.invalidateQueries({ queryKey: ["whatsapp-linked-instances"] });
+    // Auto-sync groups after adding instance
+    setTimeout(async () => {
+      try {
+        const result = await evolutionApiService.listLinkedInstances();
+        for (const inst of result) {
+          await evolutionApiService.syncGroups(inst.instance_name);
+        }
+      } catch (e) {
+        console.warn("Auto-sync failed:", e);
+      }
+    }, 1000);
+  };
+
   const instances = linkedInstances || [];
 
   return (
@@ -57,10 +87,16 @@ export default function WhatsApp() {
             <MessageSquare className="h-5 w-5 text-primary" />
             Instâncias Vinculadas ({instances.length})
           </h2>
-          <Button size="sm" onClick={() => setAddOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Conectar Instância
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={handleSyncGroups} disabled={syncing}>
+              <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? "animate-spin" : ""}`} />
+              Sincronizar Grupos
+            </Button>
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Conectar Instância
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -111,7 +147,7 @@ export default function WhatsApp() {
       <AddInstanceDialog
         open={addOpen}
         onOpenChange={setAddOpen}
-        onAdded={() => queryClient.invalidateQueries({ queryKey: ["whatsapp-linked-instances"] })}
+        onAdded={handleInstanceAdded}
       />
 
       {connectInstance && (

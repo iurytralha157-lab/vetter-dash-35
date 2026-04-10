@@ -201,6 +201,49 @@ Deno.serve(async (req) => {
         return jsonResponse(res);
       }
 
+      // ─── Sync groups to DB ───
+      case "sync-groups": {
+        const { instanceName } = params;
+        if (!instanceName) return jsonResponse({ error: "instanceName required" }, 400);
+        const groups = await evoFetch(
+          `${baseUrl}/group/fetchAllGroups/${instanceName}?getParticipants=false`,
+          "GET",
+          EVOLUTION_API_KEY
+        );
+        const groupList = Array.isArray(groups) ? groups : [];
+        const rows = groupList.map((g: any) => ({
+          instance_name: instanceName,
+          group_jid: g.id || g.jid || "",
+          group_name: g.subject || g.name || "Sem nome",
+          size: g.size || g.participants?.length || 0,
+          synced_at: new Date().toISOString(),
+        })).filter((r: any) => r.group_jid);
+
+        if (rows.length > 0) {
+          const { error } = await supabaseAdmin
+            .from("whatsapp_groups")
+            .upsert(rows, { onConflict: "instance_name,group_jid" });
+          if (error) {
+            console.error("[evolution-api] sync-groups upsert error:", error.message);
+            throw new Error(error.message);
+          }
+        }
+        return jsonResponse({ synced: rows.length });
+      }
+
+      // ─── List saved groups from DB ───
+      case "list-saved-groups": {
+        const { data, error } = await supabaseAdmin
+          .from("whatsapp_groups")
+          .select("*")
+          .order("group_name", { ascending: true });
+        if (error) {
+          console.warn("[evolution-api] list-saved-groups error:", error.message);
+          return jsonResponse([]);
+        }
+        return jsonResponse(data || []);
+      }
+
       // ─── List all from Evolution (for linking dialog) ───
       case "list-all-evolution": {
         const res = await evoFetch(`${baseUrl}/instance/fetchInstances`, "GET", EVOLUTION_API_KEY);
