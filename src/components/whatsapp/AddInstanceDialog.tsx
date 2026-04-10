@@ -36,7 +36,7 @@ export function AddInstanceDialog({ open, onOpenChange, onAdded }: AddInstanceDi
 
   const instanceList = Array.isArray(allInstances) ? allInstances : [];
   const filtered = instanceList.filter((inst: any) => {
-    const name = inst?.instance?.instanceName || inst?.instanceName || inst?.instance?.name || inst?.name || inst?.id || "";
+    const name = inst?.name || inst?.instance?.instanceName || inst?.instanceName || "";
     return name.toLowerCase().includes(search.toLowerCase());
   });
 
@@ -110,17 +110,13 @@ export function AddInstanceDialog({ open, onOpenChange, onAdded }: AddInstanceDi
                 </p>
               ) : (
               filtered.map((inst: any, idx: number) => {
-                  // Try all possible paths for instance name
-                  const name = inst?.instance?.instanceName
+                  const name = inst?.name
+                    || inst?.instance?.instanceName
                     || inst?.instanceName
-                    || inst?.instance?.name
-                    || inst?.name
-                    || inst?.id
                     || `instance-${idx}`;
-                  const status = inst?.instance?.connectionStatus
+                  const status = inst?.connectionStatus
+                    || inst?.instance?.connectionStatus
                     || inst?.instance?.status
-                    || inst?.connectionStatus
-                    || inst?.status
                     || "unknown";
                   const isOpen = status === "open" || status === "connected";
 
