@@ -9,19 +9,40 @@ interface WhatsAppInstanceCardProps {
   instance: any;
   isSelected: boolean;
   onSelect: (name: string) => void;
+  onConnect: (name: string) => void;
 }
 
-export function WhatsAppInstanceCard({ instance, isSelected, onSelect }: WhatsAppInstanceCardProps) {
-  const instanceName = instance.instance?.instanceName || instance.instanceName || "unknown";
+/** Extract instanceName from any Evolution API response shape */
+function getInstanceName(inst: any): string {
+  return inst?.instance?.instanceName
+    || inst?.instanceName
+    || inst?.instance?.name
+    || inst?.name
+    || "unknown";
+}
 
+function getConnectionState(inst: any): string {
+  return inst?.instance?.connectionStatus
+    || inst?.instance?.status
+    || inst?.connectionStatus
+    || inst?.status
+    || "unknown";
+}
+
+export function WhatsAppInstanceCard({ instance, isSelected, onSelect, onConnect }: WhatsAppInstanceCardProps) {
+  const instanceName = getInstanceName(instance);
+  const inlineState = getConnectionState(instance);
+
+  // Only fetch status if inline state is unknown
   const { data: status } = useQuery({
     queryKey: ["evolution-status", instanceName],
     queryFn: () => evolutionApiService.getInstanceStatus(instanceName),
     refetchInterval: 30000,
+    enabled: instanceName !== "unknown",
   });
 
-  const connectionState = status?.instance?.state || status?.state || "unknown";
-  const isConnected = connectionState === "open";
+  const connectionState = status?.instance?.state || status?.state || inlineState;
+  const isConnected = connectionState === "open" || connectionState === "connected";
 
   return (
     <Card
@@ -29,7 +50,15 @@ export function WhatsAppInstanceCard({ instance, isSelected, onSelect }: WhatsAp
         "p-4 cursor-pointer transition-all hover:shadow-md border-2",
         isSelected ? "border-primary bg-primary/5" : "border-transparent hover:border-primary/30"
       )}
-      onClick={() => onSelect(instanceName)}
+      onClick={() => {
+        if (instanceName !== "unknown") {
+          if (isConnected) {
+            onSelect(instanceName);
+          } else {
+            onConnect(instanceName);
+          }
+        }
+      }}
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
@@ -57,8 +86,11 @@ export function WhatsAppInstanceCard({ instance, isSelected, onSelect }: WhatsAp
           {isConnected ? "Online" : "Offline"}
         </Badge>
       </div>
-      {isSelected && (
+      {isSelected && isConnected && (
         <p className="text-xs text-primary mt-3">Grupos carregados abaixo ↓</p>
+      )}
+      {!isConnected && (
+        <p className="text-xs text-muted-foreground mt-3">Clique para conectar</p>
       )}
     </Card>
   );
