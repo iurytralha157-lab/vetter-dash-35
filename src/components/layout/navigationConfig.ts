@@ -5,6 +5,7 @@ import {
   Webhook,
   Kanban,
   Settings,
+  MessageSquare,
 } from "lucide-react";
 import { pt } from "@/i18n/pt";
 import { UserRole } from "@/hooks/useUserRole";
@@ -22,6 +23,7 @@ export const navigationItems: NavigationItem[] = [
   { title: "Contas", url: "/contas", icon: Building2 },
   { title: "Demandas", url: "/demandas", icon: Kanban },
   { title: pt.nav.reportN8n, url: "/relatorio-n8n", icon: Webhook, roles: ['admin'] },
+  { title: "WhatsApp", url: "/whatsapp", icon: MessageSquare, roles: ['admin'] },
   { title: pt.settings.title, url: "/configuracoes", icon: Settings },
 ];
 
