@@ -133,6 +133,11 @@ export function ModernAccountForm({
     queryFn: () => evolutionApiService.listSavedGroups(),
   });
 
+  const { data: linkedInstances = [] } = useQuery({
+    queryKey: ["whatsapp-linked-instances"],
+    queryFn: () => evolutionApiService.listLinkedInstances(),
+  });
+
   const defaults = useMemo(() => makeDefaults(initialData), [initialData]);
 
   const form = useForm<ContaFormData>({
@@ -184,6 +189,7 @@ export function ModernAccountForm({
   };
 
   const stepTitles = ["Dados Básicos", "Canais & Plataformas", "Configurações & Resumo"];
+  const selectedGroup = savedGroups.find((group) => group.group_jid === form.watch("id_grupo"));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -220,7 +226,6 @@ export function ModernAccountForm({
             onSubmit={(e) => {
               e.preventDefault();
               if (step < 3) {
-                // Don't submit on steps 1-2, just advance
                 if (canProceed()) nextStep();
                 return;
               }
@@ -228,7 +233,6 @@ export function ModernAccountForm({
             }}
             className="space-y-6"
           >
-            {/* STEP 1: Dados Básicos */}
             {step === 1 && (
               <div className="space-y-6">
                 <Card>
@@ -267,9 +271,10 @@ export function ModernAccountForm({
                                 <SelectTrigger className="flex-1">
                                   <SelectValue placeholder="Selecione um grupo">
                                     {field.value && (
-                                      <span className="truncate">
-                                        {savedGroups.find(g => g.group_jid === field.value)?.group_name || field.value}
-                                      </span>
+                                      <div className="flex min-w-0 flex-col items-start text-left">
+                                        <span className="truncate">{selectedGroup?.group_name || "Grupo selecionado"}</span>
+                                        <span className="text-xs text-muted-foreground truncate">{field.value}</span>
+                                      </div>
                                     )}
                                   </SelectValue>
                                 </SelectTrigger>
@@ -277,16 +282,15 @@ export function ModernAccountForm({
                               <SelectContent>
                                 {savedGroups.map((group) => (
                                   <SelectItem key={group.group_jid} value={group.group_jid}>
-                                    <div className="flex items-center gap-2">
-                                      <Users className="h-3 w-3 text-muted-foreground" />
-                                      <span>{group.group_name}</span>
-                                      <span className="text-xs text-muted-foreground">({group.size} membros)</span>
+                                    <div className="flex min-w-0 flex-col">
+                                      <span className="truncate">{group.group_name}</span>
+                                      <span className="text-xs text-muted-foreground truncate">{group.group_jid}</span>
                                     </div>
                                   </SelectItem>
                                 ))}
                                 {savedGroups.length === 0 && (
                                   <div className="px-3 py-2 text-sm text-muted-foreground">
-                                    Nenhum grupo sincronizado. Sincronize na página WhatsApp.
+                                    Nenhum grupo sincronizado ainda.
                                   </div>
                                 )}
                               </SelectContent>
@@ -295,18 +299,14 @@ export function ModernAccountForm({
                               type="button"
                               variant="outline"
                               size="icon"
-                              disabled={syncingGroups}
+                              disabled={syncingGroups || linkedInstances.length === 0}
                               onClick={async () => {
                                 setSyncingGroups(true);
                                 try {
-                                  const { data: instances } = await supabase
-                                    .from("whatsapp_instances" as any)
-                                    .select("instance_name");
-                                  const instanceList = (instances || []) as any[];
-                                  for (const inst of instanceList) {
+                                  for (const inst of linkedInstances) {
                                     await evolutionApiService.syncGroups(inst.instance_name);
                                   }
-                                  queryClient.invalidateQueries({ queryKey: ["whatsapp-saved-groups"] });
+                                  await queryClient.invalidateQueries({ queryKey: ["whatsapp-saved-groups"] });
                                   toast({ title: "Grupos sincronizados!" });
                                 } catch (err: any) {
                                   toast({ title: "Erro ao sincronizar", description: err.message, variant: "destructive" });
@@ -319,7 +319,7 @@ export function ModernAccountForm({
                             </Button>
                           </div>
                           <FormDescription>
-                            Selecione o grupo de WhatsApp vinculado a esta conta
+                            Escolha pelo nome do grupo e confirme pelo ID salvo na conta.
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
