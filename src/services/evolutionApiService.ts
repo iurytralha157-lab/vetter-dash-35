@@ -10,21 +10,43 @@ async function callEvolution(action: string, params: Record<string, unknown> = {
   return data;
 }
 
+export interface LinkedInstance {
+  id: string;
+  instance_name: string;
+  display_name: string | null;
+  linked_by: string | null;
+  created_at: string;
+}
+
 export const evolutionApiService = {
-  async listInstances() {
-    return callEvolution("list-instances");
+  /** List only instances linked to this system */
+  async listLinkedInstances(): Promise<LinkedInstance[]> {
+    return callEvolution("list-linked");
+  },
+
+  /** List ALL instances from Evolution API (for linking dialog) */
+  async listAllEvolutionInstances() {
+    return callEvolution("list-all-evolution");
+  },
+
+  /** Link an existing Evolution instance to this system */
+  async linkInstance(instanceName: string, displayName?: string) {
+    return callEvolution("link-instance", { instanceName, displayName });
+  },
+
+  /** Unlink an instance from this system */
+  async unlinkInstance(instanceName: string) {
+    return callEvolution("unlink-instance", { instanceName });
   },
 
   async getInstanceStatus(instanceName: string) {
     return callEvolution("instance-status", { instanceName });
   },
 
-  /** Create a new WhatsApp instance */
   async createInstance(instanceName: string, number?: string) {
     return callEvolution("create-instance", { instanceName, number, qrcode: true });
   },
 
-  /** Get QR code / connect an instance */
   async connectInstance(instanceName: string) {
     return callEvolution("connect-instance", { instanceName });
   },
