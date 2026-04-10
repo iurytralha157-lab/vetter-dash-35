@@ -43,6 +43,35 @@ export default function WhatsApp() {
     }
   };
 
+  const handleSyncGroups = async () => {
+    setSyncing(true);
+    try {
+      for (const inst of instances) {
+        await evolutionApiService.syncGroups(inst.instance_name);
+      }
+      toast.success("Grupos sincronizados com sucesso!");
+    } catch (err: any) {
+      toast.error("Erro ao sincronizar: " + err.message);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleInstanceAdded = async () => {
+    queryClient.invalidateQueries({ queryKey: ["whatsapp-linked-instances"] });
+    // Auto-sync groups after adding instance
+    setTimeout(async () => {
+      try {
+        const result = await evolutionApiService.listLinkedInstances();
+        for (const inst of result) {
+          await evolutionApiService.syncGroups(inst.instance_name);
+        }
+      } catch (e) {
+        console.warn("Auto-sync failed:", e);
+      }
+    }, 1000);
+  };
+
   const instances = linkedInstances || [];
 
   return (
