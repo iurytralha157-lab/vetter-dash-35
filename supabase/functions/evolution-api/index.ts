@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
 
       case "list-linked": {
         // Ensure table exists
-        await ensureTable(supabaseAdmin);
+
         const { data, error } = await supabaseAdmin
           .from("whatsapp_instances")
           .select("*")
@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
       }
 
       case "link-instance": {
-        await ensureTable(supabaseAdmin);
+
         const { instanceName, displayName } = params;
         if (!instanceName) return jsonResponse({ error: "instanceName required" }, 400);
 
@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
       }
 
       case "create-instance": {
-        await ensureTable(supabaseAdmin);
+
         const { instanceName, number, qrcode = true } = params;
         if (!instanceName) return jsonResponse({ error: "instanceName required" }, 400);
         const body: Record<string, unknown> = {
