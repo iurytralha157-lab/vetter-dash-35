@@ -258,9 +258,70 @@ export function ModernAccountForm({
                       name="id_grupo"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>ID do Grupo (WhatsApp) *</FormLabel>
-                          <FormControl><Input placeholder="Ex: GRP001" {...field} /></FormControl>
-                          <FormDescription>Identificador do grupo de WhatsApp</FormDescription>
+                          <FormLabel className="flex items-center gap-2">
+                            <Users className="w-4 h-4" />
+                            Grupo WhatsApp *
+                          </FormLabel>
+                          <div className="flex gap-2">
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger className="flex-1">
+                                  <SelectValue placeholder="Selecione um grupo">
+                                    {field.value && (
+                                      <span className="truncate">
+                                        {savedGroups.find(g => g.group_jid === field.value)?.group_name || field.value}
+                                      </span>
+                                    )}
+                                  </SelectValue>
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {savedGroups.map((group) => (
+                                  <SelectItem key={group.group_jid} value={group.group_jid}>
+                                    <div className="flex items-center gap-2">
+                                      <Users className="h-3 w-3 text-muted-foreground" />
+                                      <span>{group.group_name}</span>
+                                      <span className="text-xs text-muted-foreground">({group.size} membros)</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                                {savedGroups.length === 0 && (
+                                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                                    Nenhum grupo sincronizado. Sincronize na página WhatsApp.
+                                  </div>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              disabled={syncingGroups}
+                              onClick={async () => {
+                                setSyncingGroups(true);
+                                try {
+                                  const { data: instances } = await supabase
+                                    .from("whatsapp_instances" as any)
+                                    .select("instance_name");
+                                  const instanceList = (instances || []) as any[];
+                                  for (const inst of instanceList) {
+                                    await evolutionApiService.syncGroups(inst.instance_name);
+                                  }
+                                  queryClient.invalidateQueries({ queryKey: ["whatsapp-saved-groups"] });
+                                  toast({ title: "Grupos sincronizados!" });
+                                } catch (err: any) {
+                                  toast({ title: "Erro ao sincronizar", description: err.message, variant: "destructive" });
+                                } finally {
+                                  setSyncingGroups(false);
+                                }
+                              }}
+                            >
+                              <RefreshCw className={`h-4 w-4 ${syncingGroups ? "animate-spin" : ""}`} />
+                            </Button>
+                          </div>
+                          <FormDescription>
+                            Selecione o grupo de WhatsApp vinculado a esta conta
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
