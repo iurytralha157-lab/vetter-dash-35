@@ -75,32 +75,33 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Normalize the group JID (remove @g.us suffix for matching)
-    const groupJidClean = remoteJid.replace("@g.us", "");
+    // Normalize the group JID - Evolution sends "123@g.us", DB stores "123-group"
+    const groupNumber = remoteJid.replace("@g.us", "");
+    const possibleFormats = [
+      groupNumber,                    // 120363401551537577
+      `${groupNumber}-group`,         // 120363401551537577-group
+      remoteJid,                      // 120363401551537577@g.us
+    ];
 
-    // Find account linked to this group
-    const { data: account, error: accErr } = await supabase
-      .from("accounts")
-      .select("id, nome_cliente, meta_account_id")
-      .eq("id_grupo", groupJidClean)
-      .single();
-
-    if (accErr || !account) {
-      // Also try with full JID format
-      const { data: account2 } = await supabase
+    // Find account linked to this group (try all formats)
+    let account: any = null;
+    for (const fmt of possibleFormats) {
+      const { data } = await supabase
         .from("accounts")
         .select("id, nome_cliente, meta_account_id")
-        .eq("id_grupo", remoteJid)
+        .eq("id_grupo", fmt)
         .single();
-
-      if (!account2) {
-        console.log("[whatsapp-webhook] No account linked to group:", groupJidClean);
-        return new Response(JSON.stringify({ ignored: true, reason: "no linked account" }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      if (data) {
+        account = data;
+        break;
       }
-      // Use account2
-      return await processCommand(text, account2, remoteJid, instanceName, evolutionUrl, evolutionKey, supabase);
+    }
+
+    if (!account) {
+      console.log("[whatsapp-webhook] No account linked to group:", groupNumber, "tried:", possibleFormats);
+      return new Response(JSON.stringify({ ignored: true, reason: "no linked account" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     return await processCommand(text, account, remoteJid, instanceName, evolutionUrl, evolutionKey, supabase);
