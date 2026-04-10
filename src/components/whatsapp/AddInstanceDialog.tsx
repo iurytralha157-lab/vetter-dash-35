@@ -36,7 +36,7 @@ export function AddInstanceDialog({ open, onOpenChange, onAdded }: AddInstanceDi
 
   const instanceList = Array.isArray(allInstances) ? allInstances : [];
   const filtered = instanceList.filter((inst: any) => {
-    const name = inst?.instance?.instanceName || inst?.instanceName || "";
+    const name = inst?.instance?.instanceName || inst?.instanceName || inst?.instance?.name || inst?.name || inst?.id || "";
     return name.toLowerCase().includes(search.toLowerCase());
   });
 
