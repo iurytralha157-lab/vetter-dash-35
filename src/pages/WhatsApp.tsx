@@ -87,10 +87,16 @@ export default function WhatsApp() {
             <MessageSquare className="h-5 w-5 text-primary" />
             Instâncias Vinculadas ({instances.length})
           </h2>
-          <Button size="sm" onClick={() => setAddOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Conectar Instância
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={handleSyncGroups} disabled={syncing}>
+              <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? "animate-spin" : ""}`} />
+              Sincronizar Grupos
+            </Button>
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Conectar Instância
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -141,7 +147,7 @@ export default function WhatsApp() {
       <AddInstanceDialog
         open={addOpen}
         onOpenChange={setAddOpen}
-        onAdded={() => queryClient.invalidateQueries({ queryKey: ["whatsapp-linked-instances"] })}
+        onAdded={handleInstanceAdded}
       />
 
       {connectInstance && (
