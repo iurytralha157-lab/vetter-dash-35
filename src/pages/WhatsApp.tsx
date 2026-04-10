@@ -10,7 +10,7 @@ import { AddInstanceDialog } from "@/components/whatsapp/AddInstanceDialog";
 import { ConnectInstanceDialog } from "@/components/whatsapp/ConnectInstanceDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Plus, Unplug } from "lucide-react";
+import { MessageSquare, Plus, Unplug, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 export default function WhatsApp() {
@@ -20,6 +20,7 @@ export default function WhatsApp() {
   const [sendTarget, setSendTarget] = useState<{ type: "number" | "group"; id: string; name: string } | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [connectInstance, setConnectInstance] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const { data: linkedInstances, isLoading } = useQuery({
     queryKey: ["whatsapp-linked-instances"],
