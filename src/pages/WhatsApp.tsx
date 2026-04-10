@@ -6,23 +6,24 @@ import { evolutionApiService } from "@/services/evolutionApiService";
 import { WhatsAppInstanceCard } from "@/components/whatsapp/WhatsAppInstanceCard";
 import { WhatsAppGroupsList } from "@/components/whatsapp/WhatsAppGroupsList";
 import { WhatsAppSendDialog } from "@/components/whatsapp/WhatsAppSendDialog";
-import { CreateInstanceDialog } from "@/components/whatsapp/CreateInstanceDialog";
+import { AddInstanceDialog } from "@/components/whatsapp/AddInstanceDialog";
 import { ConnectInstanceDialog } from "@/components/whatsapp/ConnectInstanceDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Plus } from "lucide-react";
+import { MessageSquare, Plus, Unplug } from "lucide-react";
+import { toast } from "sonner";
 
 export default function WhatsApp() {
   const queryClient = useQueryClient();
   const [selectedInstance, setSelectedInstance] = useState<string | null>(null);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [sendTarget, setSendTarget] = useState<{ type: "number" | "group"; id: string; name: string } | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [connectInstance, setConnectInstance] = useState<string | null>(null);
 
-  const { data: instances, isLoading: loadingInstances } = useQuery({
-    queryKey: ["evolution-instances"],
-    queryFn: () => evolutionApiService.listInstances(),
+  const { data: linkedInstances, isLoading } = useQuery({
+    queryKey: ["whatsapp-linked-instances"],
+    queryFn: () => evolutionApiService.listLinkedInstances(),
   });
 
   const handleSendMessage = (type: "number" | "group", id: string, name: string) => {
@@ -30,54 +31,69 @@ export default function WhatsApp() {
     setSendDialogOpen(true);
   };
 
-  const instanceList = Array.isArray(instances) ? instances : instances ? [instances] : [];
+  const handleUnlink = async (instanceName: string) => {
+    try {
+      await evolutionApiService.unlinkInstance(instanceName);
+      toast.success(`Instância "${instanceName}" desvinculada`);
+      if (selectedInstance === instanceName) setSelectedInstance(null);
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-linked-instances"] });
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const instances = linkedInstances || [];
 
   return (
     <AppLayout>
       <PageHeader
         title="WhatsApp"
-        subtitle="Gerencie instâncias, grupos e envie mensagens via Evolution API"
+        subtitle="Gerencie instâncias vinculadas, grupos e envie mensagens"
       />
 
-      {/* Instances */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-primary" />
-            Instâncias ({instanceList.length})
+            Instâncias Vinculadas ({instances.length})
           </h2>
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
+          <Button size="sm" onClick={() => setAddOpen(true)}>
             <Plus className="h-4 w-4 mr-1" />
-            Nova Instância
+            Conectar Instância
           </Button>
         </div>
 
-        {loadingInstances ? (
+        {isLoading ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2].map(i => (
-              <Skeleton key={i} className="h-32 rounded-xl" />
-            ))}
+            {[1, 2].map(i => <Skeleton key={i} className="h-32 rounded-xl" />)}
           </div>
-        ) : instanceList.length === 0 ? (
-          <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
-            Nenhuma instância encontrada. Clique em "Nova Instância" para criar uma.
+        ) : instances.length === 0 ? (
+          <div className="rounded-xl border border-border bg-card p-8 text-center">
+            <Unplug className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+            <p className="text-muted-foreground mb-4">
+              Nenhuma instância vinculada ao sistema.
+            </p>
+            <Button onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Conectar Instância
+            </Button>
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {instanceList.map((inst: any, idx: number) => (
+            {instances.map((inst) => (
               <WhatsAppInstanceCard
-                key={inst?.instance?.instanceName || inst?.instanceName || idx}
+                key={inst.id}
                 instance={inst}
-                isSelected={selectedInstance === (inst?.instance?.instanceName || inst?.instanceName)}
+                isSelected={selectedInstance === inst.instance_name}
                 onSelect={(name) => setSelectedInstance(prev => prev === name ? null : name)}
                 onConnect={(name) => setConnectInstance(name)}
+                onUnlink={handleUnlink}
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* Groups */}
       {selectedInstance && (
         <WhatsAppGroupsList
           instanceName={selectedInstance}
@@ -85,7 +101,6 @@ export default function WhatsApp() {
         />
       )}
 
-      {/* Dialogs */}
       <WhatsAppSendDialog
         open={sendDialogOpen}
         onOpenChange={setSendDialogOpen}
@@ -93,10 +108,10 @@ export default function WhatsApp() {
         target={sendTarget}
       />
 
-      <CreateInstanceDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        onCreated={() => queryClient.invalidateQueries({ queryKey: ["evolution-instances"] })}
+      <AddInstanceDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onAdded={() => queryClient.invalidateQueries({ queryKey: ["whatsapp-linked-instances"] })}
       />
 
       {connectInstance && (

@@ -25,9 +25,12 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: authHeader } },
   });
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
@@ -47,20 +50,56 @@ Deno.serve(async (req) => {
     const { action, ...params } = await req.json();
 
     switch (action) {
-      case "list-instances": {
-        const res = await evoFetch(`${baseUrl}/instance/fetchInstances`, "GET", EVOLUTION_API_KEY);
-        console.log("[evolution-api] list-instances response:", JSON.stringify(res).slice(0, 500));
-        return jsonResponse(res);
+      // ─── Linked instances management ───
+
+      case "list-linked": {
+        // Ensure table exists
+
+        const { data, error } = await supabaseAdmin
+          .from("whatsapp_instances")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (error) throw new Error(error.message);
+        return jsonResponse(data || []);
       }
 
-      case "instance-status": {
+      case "link-instance": {
+
+        const { instanceName, displayName } = params;
+        if (!instanceName) return jsonResponse({ error: "instanceName required" }, 400);
+
+        // Verify it exists in Evolution
+        try {
+          await evoFetch(`${baseUrl}/instance/connectionState/${instanceName}`, "GET", EVOLUTION_API_KEY);
+        } catch {
+          return jsonResponse({ error: `Instância "${instanceName}" não encontrada na Evolution API` }, 404);
+        }
+
+        const { data, error } = await supabaseAdmin
+          .from("whatsapp_instances")
+          .upsert(
+            { instance_name: instanceName, display_name: displayName || instanceName, linked_by: user.id },
+            { onConflict: "instance_name" }
+          )
+          .select()
+          .single();
+        if (error) throw new Error(error.message);
+        return jsonResponse(data);
+      }
+
+      case "unlink-instance": {
         const { instanceName } = params;
         if (!instanceName) return jsonResponse({ error: "instanceName required" }, 400);
-        const res = await evoFetch(`${baseUrl}/instance/connectionState/${instanceName}`, "GET", EVOLUTION_API_KEY);
-        return jsonResponse(res);
+        const { error } = await supabaseAdmin
+          .from("whatsapp_instances")
+          .delete()
+          .eq("instance_name", instanceName);
+        if (error) throw new Error(error.message);
+        return jsonResponse({ success: true });
       }
 
       case "create-instance": {
+
         const { instanceName, number, qrcode = true } = params;
         if (!instanceName) return jsonResponse({ error: "instanceName required" }, 400);
         const body: Record<string, unknown> = {
@@ -70,6 +109,24 @@ Deno.serve(async (req) => {
         };
         if (number) body.number = number;
         const res = await evoFetch(`${baseUrl}/instance/create`, "POST", EVOLUTION_API_KEY, body);
+
+        // Auto-link new instance
+        await supabaseAdmin
+          .from("whatsapp_instances")
+          .upsert(
+            { instance_name: instanceName, display_name: instanceName, linked_by: user.id },
+            { onConflict: "instance_name" }
+          );
+
+        return jsonResponse(res);
+      }
+
+      // ─── Evolution API proxy (only for linked instances) ───
+
+      case "instance-status": {
+        const { instanceName } = params;
+        if (!instanceName) return jsonResponse({ error: "instanceName required" }, 400);
+        const res = await evoFetch(`${baseUrl}/instance/connectionState/${instanceName}`, "GET", EVOLUTION_API_KEY);
         return jsonResponse(res);
       }
 
@@ -142,6 +199,12 @@ Deno.serve(async (req) => {
         return jsonResponse(res);
       }
 
+      // ─── List all from Evolution (for linking dialog) ───
+      case "list-all-evolution": {
+        const res = await evoFetch(`${baseUrl}/instance/fetchInstances`, "GET", EVOLUTION_API_KEY);
+        return jsonResponse(res);
+      }
+
       default:
         return jsonResponse({ error: `Unknown action: ${action}` }, 400);
     }
@@ -153,6 +216,8 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+// Table must exist in Supabase - no auto-creation needed
 
 async function evoFetch(url: string, method: string, apiKey: string, body?: unknown) {
   const opts: RequestInit = {
