@@ -53,13 +53,15 @@ Deno.serve(async (req) => {
       // ─── Linked instances management ───
 
       case "list-linked": {
-        // Ensure table exists
-
         const { data, error } = await supabaseAdmin
           .from("whatsapp_instances")
           .select("*")
           .order("created_at", { ascending: false });
-        if (error) throw new Error(error.message);
+        if (error) {
+          // Table may not exist yet - return empty array
+          console.warn("[evolution-api] list-linked error:", error.message);
+          return jsonResponse([]);
+        }
         return jsonResponse(data || []);
       }
 
@@ -202,6 +204,12 @@ Deno.serve(async (req) => {
       // ─── List all from Evolution (for linking dialog) ───
       case "list-all-evolution": {
         const res = await evoFetch(`${baseUrl}/instance/fetchInstances`, "GET", EVOLUTION_API_KEY);
+        console.log("[evolution-api] list-all-evolution response keys:", JSON.stringify(
+          Array.isArray(res) ? res.map((r: any) => Object.keys(r)) : Object.keys(res)
+        ));
+        if (Array.isArray(res) && res.length > 0) {
+          console.log("[evolution-api] first instance sample:", JSON.stringify(res[0]).slice(0, 500));
+        }
         return jsonResponse(res);
       }
 
