@@ -11,52 +11,50 @@ async function callEvolution(action: string, params: Record<string, unknown> = {
 }
 
 export const evolutionApiService = {
-  /** List all connected WhatsApp instances */
   async listInstances() {
     return callEvolution("list-instances");
   },
 
-  /** Get connection status of an instance */
   async getInstanceStatus(instanceName: string) {
     return callEvolution("instance-status", { instanceName });
   },
 
-  /** List all groups for an instance */
+  /** Create a new WhatsApp instance */
+  async createInstance(instanceName: string, number?: string) {
+    return callEvolution("create-instance", { instanceName, number, qrcode: true });
+  },
+
+  /** Get QR code / connect an instance */
+  async connectInstance(instanceName: string) {
+    return callEvolution("connect-instance", { instanceName });
+  },
+
   async listGroups(instanceName: string) {
     return callEvolution("list-groups", { instanceName });
   },
 
-  /** Get participants of a group */
   async getGroupParticipants(instanceName: string, groupJid: string) {
     return callEvolution("group-participants", { instanceName, groupJid });
   },
 
-  /** Send a text message to a number */
   async sendText(instanceName: string, number: string, text: string) {
     return callEvolution("send-text", { instanceName, number, text });
   },
 
-  /** Send a text message to a group */
   async sendGroupMessage(instanceName: string, groupJid: string, text: string) {
     return callEvolution("send-group", { instanceName, groupJid, text });
   },
 
-  /** Send media (image, document, etc.) */
   async sendMedia(
     instanceName: string,
     number: string,
     mediatype: "image" | "document" | "video" | "audio",
-    media: string, // URL or base64
+    media: string,
     caption?: string,
     fileName?: string
   ) {
     return callEvolution("send-media", {
-      instanceName,
-      number,
-      mediatype,
-      media,
-      caption,
-      fileName,
+      instanceName, number, mediatype, media, caption, fileName,
     });
   },
 };
