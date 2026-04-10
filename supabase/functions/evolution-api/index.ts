@@ -18,7 +18,6 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Authenticate user
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
     return jsonResponse({ error: "Missing authorization" }, 401);
@@ -35,7 +34,6 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Unauthorized" }, 401);
   }
 
-  // Get Evolution API config
   const EVOLUTION_API_URL = Deno.env.get("EVOLUTION_API_URL");
   const EVOLUTION_API_KEY = Deno.env.get("EVOLUTION_API_KEY");
 
@@ -43,14 +41,18 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Evolution API not configured" }, 500);
   }
 
-  // Remove trailing slash
   const baseUrl = EVOLUTION_API_URL.replace(/\/+$/, "");
 
   try {
     const { action, ...params } = await req.json();
 
     switch (action) {
-      // ─── Instance info ───
+      case "list-instances": {
+        const res = await evoFetch(`${baseUrl}/instance/fetchInstances`, "GET", EVOLUTION_API_KEY);
+        console.log("[evolution-api] list-instances response:", JSON.stringify(res).slice(0, 500));
+        return jsonResponse(res);
+      }
+
       case "instance-status": {
         const { instanceName } = params;
         if (!instanceName) return jsonResponse({ error: "instanceName required" }, 400);
@@ -58,13 +60,26 @@ Deno.serve(async (req) => {
         return jsonResponse(res);
       }
 
-      // ─── List instances ───
-      case "list-instances": {
-        const res = await evoFetch(`${baseUrl}/instance/fetchInstances`, "GET", EVOLUTION_API_KEY);
+      case "create-instance": {
+        const { instanceName, number, qrcode = true } = params;
+        if (!instanceName) return jsonResponse({ error: "instanceName required" }, 400);
+        const body: Record<string, unknown> = {
+          instanceName,
+          qrcode,
+          integration: "WHATSAPP-BAILEYS",
+        };
+        if (number) body.number = number;
+        const res = await evoFetch(`${baseUrl}/instance/create`, "POST", EVOLUTION_API_KEY, body);
         return jsonResponse(res);
       }
 
-      // ─── List groups ───
+      case "connect-instance": {
+        const { instanceName } = params;
+        if (!instanceName) return jsonResponse({ error: "instanceName required" }, 400);
+        const res = await evoFetch(`${baseUrl}/instance/connect/${instanceName}`, "GET", EVOLUTION_API_KEY);
+        return jsonResponse(res);
+      }
+
       case "list-groups": {
         const { instanceName } = params;
         if (!instanceName) return jsonResponse({ error: "instanceName required" }, 400);
@@ -76,7 +91,6 @@ Deno.serve(async (req) => {
         return jsonResponse(res);
       }
 
-      // ─── Group participants ───
       case "group-participants": {
         const { instanceName, groupJid } = params;
         if (!instanceName || !groupJid)
@@ -89,7 +103,6 @@ Deno.serve(async (req) => {
         return jsonResponse(res);
       }
 
-      // ─── Send text message ───
       case "send-text": {
         const { instanceName, number, text } = params;
         if (!instanceName || !number || !text)
@@ -103,7 +116,6 @@ Deno.serve(async (req) => {
         return jsonResponse(res);
       }
 
-      // ─── Send message to group ───
       case "send-group": {
         const { instanceName, groupJid, text } = params;
         if (!instanceName || !groupJid || !text)
@@ -117,7 +129,6 @@ Deno.serve(async (req) => {
         return jsonResponse(res);
       }
 
-      // ─── Send media ───
       case "send-media": {
         const { instanceName, number, mediatype, media, caption, fileName } = params;
         if (!instanceName || !number || !mediatype || !media)
