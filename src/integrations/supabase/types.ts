@@ -2781,6 +2781,36 @@ export type Database = {
           },
         ]
       }
+      whatsapp_groups: {
+        Row: {
+          created_at: string | null
+          group_jid: string
+          group_name: string
+          id: string
+          instance_name: string
+          size: number | null
+          synced_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          group_jid: string
+          group_name: string
+          id?: string
+          instance_name: string
+          size?: number | null
+          synced_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          group_jid?: string
+          group_name?: string
+          id?: string
+          instance_name?: string
+          size?: number | null
+          synced_at?: string | null
+        }
+        Relationships: []
+      }
       whatsapp_instances: {
         Row: {
           created_at: string | null
