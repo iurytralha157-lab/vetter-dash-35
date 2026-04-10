@@ -67,6 +67,16 @@ export const evolutionApiService = {
     return callEvolution("send-group", { instanceName, groupJid, text });
   },
 
+  /** Sync groups from Evolution API to DB */
+  async syncGroups(instanceName: string) {
+    return callEvolution("sync-groups", { instanceName });
+  },
+
+  /** List saved groups from DB */
+  async listSavedGroups(): Promise<{ id: string; instance_name: string; group_jid: string; group_name: string; size: number }[]> {
+    return callEvolution("list-saved-groups");
+  },
+
   async sendMedia(
     instanceName: string,
     number: string,
