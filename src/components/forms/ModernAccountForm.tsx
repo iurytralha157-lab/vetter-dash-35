@@ -124,8 +124,15 @@ export function ModernAccountForm({
 }: ModernAccountFormProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
+  const [syncingGroups, setSyncingGroups] = useState(false);
+
+  const { data: savedGroups = [] } = useQuery({
+    queryKey: ["whatsapp-saved-groups"],
+    queryFn: () => evolutionApiService.listSavedGroups(),
+  });
 
   const defaults = useMemo(() => makeDefaults(initialData), [initialData]);
 
