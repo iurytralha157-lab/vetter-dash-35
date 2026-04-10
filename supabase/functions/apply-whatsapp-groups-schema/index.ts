@@ -1,4 +1,3 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import postgres from "https://esm.sh/postgres@3.4.5?target=deno";
 
 const corsHeaders = {
@@ -18,26 +17,9 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) {
-    return jsonResponse({ error: "Missing authorization" }, 401);
-  }
-
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const dbUrl = Deno.env.get("SUPABASE_DB_URL");
-
   if (!dbUrl) {
     return jsonResponse({ error: "SUPABASE_DB_URL not configured" }, 500);
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authHeader } },
-  });
-
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return jsonResponse({ error: "Unauthorized" }, 401);
   }
 
   const sql = postgres(dbUrl, { prepare: false, max: 1 });

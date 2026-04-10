@@ -44,6 +44,11 @@ export function AddInstanceDialog({ open, onOpenChange, onAdded }: AddInstanceDi
     setLinking(instanceName);
     try {
       await evolutionApiService.linkInstance(instanceName);
+      try {
+        await evolutionApiService.syncGroups(instanceName);
+      } catch (syncErr) {
+        console.warn("Falha ao sincronizar grupos após vincular:", syncErr);
+      }
       toast.success(`Instância "${instanceName}" vinculada com sucesso!`);
       onAdded();
       onOpenChange(false);
@@ -59,6 +64,11 @@ export function AddInstanceDialog({ open, onOpenChange, onAdded }: AddInstanceDi
     setCreating(true);
     try {
       await evolutionApiService.createInstance(newName.trim(), newNumber.trim() || undefined);
+      try {
+        await evolutionApiService.syncGroups(newName.trim());
+      } catch (syncErr) {
+        console.warn("Falha ao sincronizar grupos após criar:", syncErr);
+      }
       toast.success(`Instância "${newName}" criada e vinculada!`);
       setNewName("");
       setNewNumber("");

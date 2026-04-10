@@ -49,6 +49,7 @@ export default function WhatsApp() {
       for (const inst of instances) {
         await evolutionApiService.syncGroups(inst.instance_name);
       }
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-saved-groups"] });
       toast.success("Grupos sincronizados com sucesso!");
     } catch (err: any) {
       toast.error("Erro ao sincronizar: " + err.message);
@@ -58,18 +59,8 @@ export default function WhatsApp() {
   };
 
   const handleInstanceAdded = async () => {
-    queryClient.invalidateQueries({ queryKey: ["whatsapp-linked-instances"] });
-    // Auto-sync groups after adding instance
-    setTimeout(async () => {
-      try {
-        const result = await evolutionApiService.listLinkedInstances();
-        for (const inst of result) {
-          await evolutionApiService.syncGroups(inst.instance_name);
-        }
-      } catch (e) {
-        console.warn("Auto-sync failed:", e);
-      }
-    }, 1000);
+    await queryClient.invalidateQueries({ queryKey: ["whatsapp-linked-instances"] });
+    await queryClient.invalidateQueries({ queryKey: ["whatsapp-saved-groups"] });
   };
 
   const instances = linkedInstances || [];
