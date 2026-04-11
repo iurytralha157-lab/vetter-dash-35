@@ -141,7 +141,6 @@ function GlobalDashboardView({ period }: { period: string }) {
         avg_ctr: 0,
         avg_cpm: 0,
         avg_cpc: 0,
-        avg_cpl: 0,
       };
 
       for (const v of valid) {
@@ -162,10 +161,6 @@ function GlobalDashboardView({ period }: { period: string }) {
       totals.avg_cpc = totals.total_clicks > 0
         ? totals.total_spend / totals.total_clicks
         : 0;
-      totals.avg_cpl = totals.total_conversions > 0
-        ? totals.total_spend / totals.total_conversions
-        : 0;
-
       setAggregatedMetrics(totals);
 
       // 4. Merge all campaigns
