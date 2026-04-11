@@ -292,9 +292,9 @@ export const dashboardService = {
     };
 
     const [sends, reports, leads] = await Promise.all([
-      sendsQuery,
-      reportsQuery,
-      leadsQuery,
+      buildSendsQuery(),
+      buildReportsQuery(),
+      buildLeadsQuery(),
     ]);
 
     if (sends.error) throw sends.error;
