@@ -7,6 +7,7 @@ import { KPICardLarge } from "@/components/dashboard/KPICardLarge";
 import { SmartProjectionCard } from "@/components/dashboard/SmartProjectionCard";
 import { ProfitCard } from "@/components/dashboard/ProfitCard";
 import { PeriodSelector, Period } from "@/components/dashboard/PeriodSelector";
+import { AccountSelector } from "@/components/dashboard/AccountSelector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -30,6 +31,7 @@ import {
 } from "@/services/dashboardService";
 
 export default function Dashboard() {
+  const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [period, setPeriod] = useState<Period>("30d");
   const [kpiData, setKpiData] = useState<KPIData | null>(null);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
@@ -82,6 +84,7 @@ export default function Dashboard() {
           title="Dashboard"
           breadcrumb="Visão Geral"
           subtitle="Desempenho de campanhas"
+          filters={<AccountSelector value={selectedAccount} onValueChange={setSelectedAccount} />}
           actions={<PeriodSelector value={period} onValueChange={setPeriod} />}
         />
 
