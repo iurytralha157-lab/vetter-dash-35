@@ -30,10 +30,11 @@ const formatNumber = (value: number) => {
 
 // Map dashboard period to Meta period
 const mapPeriod = (p: string): MetaPeriod => {
+  if (p === "today") return "today";
+  if (p === "yesterday") return "yesterday" as MetaPeriod;
   if (p === "7d") return "last_7d";
   if (p === "15d") return "last_15d";
   if (p === "30d") return "this_month";
-  if (p === "today") return "today";
   return "last_7d";
 };
 
