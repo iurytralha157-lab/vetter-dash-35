@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
     for (const fmt of possibleFormats) {
       const { data } = await supabase
         .from("accounts")
-        .select("id, nome_cliente, meta_account_id")
+        .select("id, nome_cliente, meta_account_id, cliente_id")
         .eq("id_grupo", fmt)
         .single();
       if (data) {
