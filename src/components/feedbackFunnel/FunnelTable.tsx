@@ -50,6 +50,7 @@ export function FunnelTable({ rows, onViewDetail }: Props) {
         <TableHeader>
           <TableRow>
             <TableHead className="w-[130px]">Data</TableHead>
+            <TableHead>Conta</TableHead>
             <TableHead>Origem</TableHead>
             <TableHead>Lead</TableHead>
             <TableHead className="max-w-[200px]">Mensagem</TableHead>
@@ -69,6 +70,9 @@ export function FunnelTable({ rows, onViewDetail }: Props) {
             <TableRow key={row.id} className={row.duplicado ? "opacity-50" : ""}>
               <TableCell className="text-xs whitespace-nowrap">
                 {row.created_at ? format(new Date(row.created_at), "dd/MM/yy HH:mm") : "-"}
+              </TableCell>
+              <TableCell className="text-sm font-medium whitespace-nowrap">
+                {row._account_name || "-"}
               </TableCell>
               <TableCell className="text-sm">{row.nome_origem || "-"}</TableCell>
               <TableCell className="text-sm font-medium">{row.lead_nome || "-"}</TableCell>

@@ -6,6 +6,7 @@ import { MetaMetricsGrid } from "@/components/meta/MetaMetricsGrid";
 import { MetaStatusBadge } from "@/components/meta/MetaStatusBadge";
 import { MetaCampaignDetailDialog } from "@/components/meta/MetaCampaignDetailDialog";
 import { metaAdsService } from "@/services/metaAdsService";
+import { fetchFunnelByAccount } from "@/services/feedbackFunnelService";
 import { supabase } from "@/integrations/supabase/client";
 import type { MetaAdsResponse, MetaCampaign, MetaAccountMetrics } from "@/types/meta";
 import type { MetaPeriod } from "@/components/meta/MetaPeriodFilter";
@@ -50,8 +51,9 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<MetaCampaign | null>(null);
   const [funnelData, setFunnelData] = useState<{
-    leads_gerados: number; conversa_iniciada: number; lead_qualificado: number;
-    em_atendimento: number; perdido: number; visita: number; venda: number;
+    lead_novo: number; contato_iniciado: number; sem_resposta: number;
+    atendimento: number; visita_agendada: number; visita_realizada: number;
+    proposta: number; venda: number; perdido: number; total: number;
   } | null>(null);
 
   const metaPeriod = mapPeriod(period);
@@ -96,31 +98,14 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
     if (metaAccountId) fetchMeta();
   }, [metaAccountId, metaPeriod]);
 
-  // Fetch funnel data from feedback_funnel
+  // Fetch funnel data from feedback_funnel (etapa_funil counts)
   useEffect(() => {
     const loadFunnel = async () => {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const { data } = await supabase
-        .from("feedback_funnel" as any)
-        .select("leads_gerados, conversa_iniciada, lead_qualificado, em_atendimento, perdido, visita, venda")
-        .eq("account_id", accountId)
-        .gte("data_referencia", thirtyDaysAgo.toISOString().slice(0, 10));
-      if (data && (data as any[]).length > 0) {
-        const totals = (data as any[]).reduce(
-          (acc, r) => ({
-            leads_gerados: acc.leads_gerados + (r.leads_gerados || 0),
-            conversa_iniciada: acc.conversa_iniciada + (r.conversa_iniciada || 0),
-            lead_qualificado: acc.lead_qualificado + (r.lead_qualificado || 0),
-            em_atendimento: acc.em_atendimento + (r.em_atendimento || 0),
-            perdido: acc.perdido + (r.perdido || 0),
-            visita: acc.visita + (r.visita || 0),
-            venda: acc.venda + (r.venda || 0),
-          }),
-          { leads_gerados: 0, conversa_iniciada: 0, lead_qualificado: 0, em_atendimento: 0, perdido: 0, visita: 0, venda: 0 }
-        );
-        setFunnelData(totals);
-      } else {
+      try {
+        const data = await fetchFunnelByAccount(accountId);
+        setFunnelData(data);
+      } catch (err) {
+        console.error("Error loading funnel data:", err);
         setFunnelData(null);
       }
     };
@@ -148,16 +133,17 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
 
   const funnelSteps = useMemo(() => {
     const totalLeadsMeta = metrics?.total_conversions || 0;
-    const f = funnelData || { leads_gerados: 0, conversa_iniciada: 0, lead_qualificado: 0, em_atendimento: 0, perdido: 0, visita: 0, venda: 0 };
+    const f = funnelData || { lead_novo: 0, contato_iniciado: 0, sem_resposta: 0, atendimento: 0, visita_agendada: 0, visita_realizada: 0, proposta: 0, venda: 0, perdido: 0, total: 0 };
     return [
-      { label: "Total de Leads", value: totalLeadsMeta, color: "#3b82f6" },
-      { label: "Leads Recebidos", value: f.conversa_iniciada, color: "#06b6d4" },
-      { label: "Descartados", value: f.perdido, color: "#ef4444" },
-      { label: "Em Atendimento", value: f.em_atendimento, color: "#f59e0b" },
-      { label: "Qualificados", value: f.lead_qualificado, color: "#10b981" },
-      { label: "Visita", value: f.visita, color: "#8b5cf6" },
-      { label: "Proposta", value: 0, color: "#ec4899" },
+      { label: "Total de Leads", value: totalLeadsMeta || f.total, color: "#3b82f6" },
+      { label: "Lead Novo", value: f.lead_novo, color: "#60a5fa" },
+      { label: "Contato Iniciado", value: f.contato_iniciado, color: "#06b6d4" },
+      { label: "Sem Resposta", value: f.sem_resposta, color: "#94a3b8" },
+      { label: "Em Atendimento", value: f.atendimento, color: "#f59e0b" },
+      { label: "Visita", value: f.visita_agendada + f.visita_realizada, color: "#8b5cf6" },
+      { label: "Proposta", value: f.proposta, color: "#ec4899" },
       { label: "Venda", value: f.venda, color: "#22c55e" },
+      { label: "Perdido", value: f.perdido, color: "#ef4444" },
     ];
   }, [metrics, funnelData]);
 

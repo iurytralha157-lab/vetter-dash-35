@@ -32,9 +32,10 @@ const TEMPERATURAS = [
 interface Props {
   filters: FeedbackFunnelFilters;
   onChange: (filters: FeedbackFunnelFilters) => void;
+  accountsMap: Record<string, string>;
 }
 
-export function FunnelFilters({ filters, onChange }: Props) {
+export function FunnelFilters({ filters, onChange, accountsMap }: Props) {
   const update = (key: keyof FeedbackFunnelFilters, value: string | undefined) => {
     onChange({ ...filters, [key]: value || undefined });
   };
@@ -43,8 +44,22 @@ export function FunnelFilters({ filters, onChange }: Props) {
 
   const hasFilters = Object.values(filters).some(Boolean);
 
+  const accountEntries = Object.entries(accountsMap).sort((a, b) => a[1].localeCompare(b[1]));
+
   return (
     <div className="flex flex-wrap gap-3 items-end">
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">Conta</label>
+        <Select value={filters.account_id || ""} onValueChange={(v) => update("account_id", v)}>
+          <SelectTrigger className="w-[200px]"><SelectValue placeholder="Todas as contas" /></SelectTrigger>
+          <SelectContent>
+            {accountEntries.map(([id, name]) => (
+              <SelectItem key={id} value={id}>{name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="space-y-1">
         <label className="text-xs text-muted-foreground">Etapa Funil</label>
         <Select value={filters.etapa_funil || ""} onValueChange={(v) => update("etapa_funil", v)}>
