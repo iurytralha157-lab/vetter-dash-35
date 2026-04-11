@@ -58,7 +58,6 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (existing) {
-      // Mark as duplicate, don't reprocess
       await supabase.from("feedback_funnel").insert({
         mensagem_original: mensagem_original.trim(),
         mensagem_hash,
@@ -80,31 +79,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Call AI to interpret the message
-    let aiResult: any = null;
-    let aiModel = "google/gemini-3-flash-preview";
-    let promptVersion = "v1";
-    let processamentoStatus = "pendente";
-    let processamentoErro: string | null = null;
-
-    if (lovableApiKey) {
-      try {
-        aiResult = await callAI(mensagem_original, lovableApiKey, aiModel);
-        processamentoStatus = "processado";
-      } catch (err) {
-        console.error("[process-followup] AI error:", err);
-        processamentoStatus = "erro";
-        processamentoErro = err instanceof Error ? err.message : "AI processing failed";
-      }
-    } else {
-      processamentoStatus = "erro";
-      processamentoErro = "LOVABLE_API_KEY not configured";
-    }
-
-    // Validate and sanitize AI results
-    const sanitized = sanitizeAIResult(aiResult);
-
-    const { error: insertError } = await supabase.from("feedback_funnel").insert({
+    // Shared metadata for all records
+    const sharedFields = {
       mensagem_original: mensagem_original.trim(),
       mensagem_hash,
       duplicado: false,
@@ -117,26 +93,83 @@ Deno.serve(async (req) => {
       usuario_origem: usuario_origem || null,
       hashtag: "followup",
       origem: "whatsapp_grupo",
-      processamento_status: processamentoStatus,
-      processamento_erro: processamentoErro,
-      ai_modelo: aiModel,
-      ai_prompt_versao: promptVersion,
-      ai_json: aiResult,
-      ...sanitized,
-    });
+    };
 
-    if (insertError) {
-      console.error("[process-followup] Insert error:", insertError);
-      return new Response(JSON.stringify({ error: "Failed to save" }), {
-        status: 500,
+    // Call AI to interpret the message - try multi-lead first
+    let aiResults: any[] = [];
+    let aiModel = "google/gemini-3-flash-preview";
+    let promptVersion = "v2";
+    let processamentoStatus = "pendente";
+    let processamentoErro: string | null = null;
+
+    if (lovableApiKey) {
+      try {
+        aiResults = await callAIMultiLead(mensagem_original, lovableApiKey, aiModel);
+        processamentoStatus = "processado";
+      } catch (err) {
+        console.error("[process-followup] AI error:", err);
+        processamentoStatus = "erro";
+        processamentoErro = err instanceof Error ? err.message : "AI processing failed";
+      }
+    } else {
+      processamentoStatus = "erro";
+      processamentoErro = "LOVABLE_API_KEY not configured";
+    }
+
+    // If AI failed or returned empty, insert a single raw record
+    if (aiResults.length === 0) {
+      const { error: insertError } = await supabase.from("feedback_funnel").insert({
+        ...sharedFields,
+        processamento_status: processamentoStatus,
+        processamento_erro: processamentoErro,
+        ai_modelo: aiModel,
+        ai_prompt_versao: promptVersion,
+      });
+
+      if (insertError) {
+        console.error("[process-followup] Insert error:", insertError);
+        return new Response(JSON.stringify({ error: "Failed to save" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        processamento_status: processamentoStatus,
+        leads_count: 0,
+        dados: [],
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Insert one record per lead
+    const insertedLeads: any[] = [];
+    for (const leadResult of aiResults) {
+      const sanitized = sanitizeAIResult(leadResult);
+      const { error: insertError } = await supabase.from("feedback_funnel").insert({
+        ...sharedFields,
+        processamento_status: processamentoStatus,
+        processamento_erro: processamentoErro,
+        ai_modelo: aiModel,
+        ai_prompt_versao: promptVersion,
+        ai_json: leadResult,
+        ...sanitized,
+      });
+
+      if (insertError) {
+        console.error("[process-followup] Insert error for lead:", insertError);
+      } else {
+        insertedLeads.push(sanitized);
+      }
     }
 
     return new Response(JSON.stringify({
       success: true,
       processamento_status: processamentoStatus,
-      dados: sanitized,
+      leads_count: insertedLeads.length,
+      dados: insertedLeads,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -149,20 +182,22 @@ Deno.serve(async (req) => {
   }
 });
 
-async function callAI(mensagem: string, apiKey: string, model: string) {
+async function callAIMultiLead(mensagem: string, apiKey: string, model: string): Promise<any[]> {
   const systemPrompt = `Você é um assistente especializado em interpretar mensagens de follow-up de vendas imobiliárias enviadas via WhatsApp.
 
-Analise a mensagem e extraia informações estruturadas. Retorne APENAS um JSON com os campos abaixo. Se não conseguir identificar um campo, retorne null.
+IMPORTANTE: Uma mensagem pode conter informações sobre MÚLTIPLOS leads. Você DEVE identificar CADA lead mencionado separadamente.
 
-Campos:
-- mensagem_normalizada: texto limpo e organizado da mensagem
-- lead_nome: nome do lead mencionado
+Analise a mensagem e extraia informações estruturadas para CADA lead identificado. Retorne um ARRAY JSON com um objeto por lead.
+
+Campos de cada objeto:
+- mensagem_normalizada: resumo específico deste lead
+- lead_nome: nome do lead (se não mencionado, use "Lead 1", "Lead 2", etc.)
 - lead_telefone: telefone do lead se mencionado
 - etapa_funil: uma de [lead_novo, contato_iniciado, sem_resposta, atendimento, visita_agendada, visita_realizada, proposta, venda, perdido]
 - status_lead: um de [aberto, em_andamento, ganho, perdido]
 - temperatura_lead: um de [frio, morno, quente]
-- resumo: resumo curto da situação do lead
-- proxima_acao: próxima ação sugerida
+- resumo: resumo curto da situação DESTE lead específico
+- proxima_acao: próxima ação sugerida para ESTE lead
 - data_proxima_acao: data sugerida para próxima ação (formato YYYY-MM-DD se possível)
 - responsavel_sugerido: nome do responsável se mencionado
 - campanha_nome: nome da campanha se mencionado
@@ -170,7 +205,10 @@ Campos:
 - confianca: nível de confiança da interpretação (0.0 a 1.0)
 - score_intencao: score de intenção de compra (0 a 100)
 
-Responda SOMENTE com o JSON, sem markdown, sem explicações.`;
+Se a mensagem fala de apenas 1 lead, retorne um array com 1 objeto.
+Se fala de 3 leads, retorne um array com 3 objetos.
+
+Responda SOMENTE com o JSON array, sem markdown, sem explicações.`;
 
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -188,32 +226,42 @@ Responda SOMENTE com o JSON, sem markdown, sem explicações.`;
         {
           type: "function",
           function: {
-            name: "extract_followup_data",
-            description: "Extract structured follow-up data from a WhatsApp message",
+            name: "extract_multiple_leads",
+            description: "Extract structured follow-up data for each lead mentioned in a WhatsApp message. Returns an array of leads.",
             parameters: {
               type: "object",
               properties: {
-                mensagem_normalizada: { type: "string" },
-                lead_nome: { type: "string" },
-                lead_telefone: { type: "string" },
-                etapa_funil: { type: "string", enum: VALID_ETAPA_FUNIL },
-                status_lead: { type: "string", enum: VALID_STATUS_LEAD },
-                temperatura_lead: { type: "string", enum: VALID_TEMPERATURA },
-                resumo: { type: "string" },
-                proxima_acao: { type: "string" },
-                data_proxima_acao: { type: "string" },
-                responsavel_sugerido: { type: "string" },
-                campanha_nome: { type: "string" },
-                campaign_id: { type: "string" },
-                confianca: { type: "number" },
-                score_intencao: { type: "integer" },
+                leads: {
+                  type: "array",
+                  description: "Array of leads extracted from the message. One object per lead.",
+                  items: {
+                    type: "object",
+                    properties: {
+                      mensagem_normalizada: { type: "string" },
+                      lead_nome: { type: "string" },
+                      lead_telefone: { type: "string" },
+                      etapa_funil: { type: "string", enum: VALID_ETAPA_FUNIL },
+                      status_lead: { type: "string", enum: VALID_STATUS_LEAD },
+                      temperatura_lead: { type: "string", enum: VALID_TEMPERATURA },
+                      resumo: { type: "string" },
+                      proxima_acao: { type: "string" },
+                      data_proxima_acao: { type: "string" },
+                      responsavel_sugerido: { type: "string" },
+                      campanha_nome: { type: "string" },
+                      campaign_id: { type: "string" },
+                      confianca: { type: "number" },
+                      score_intencao: { type: "integer" },
+                    },
+                    required: ["mensagem_normalizada", "etapa_funil", "status_lead", "resumo", "lead_nome"],
+                  },
+                },
               },
-              required: ["mensagem_normalizada", "etapa_funil", "status_lead", "resumo"],
+              required: ["leads"],
             },
           },
         },
       ],
-      tool_choice: { type: "function", function: { name: "extract_followup_data" } },
+      tool_choice: { type: "function", function: { name: "extract_multiple_leads" } },
     }),
   });
 
@@ -226,14 +274,26 @@ Responda SOMENTE com o JSON, sem markdown, sem explicações.`;
   const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
 
   if (toolCall?.function?.arguments) {
-    return JSON.parse(toolCall.function.arguments);
+    const parsed = JSON.parse(toolCall.function.arguments);
+    // The tool returns { leads: [...] }
+    if (parsed.leads && Array.isArray(parsed.leads)) {
+      return parsed.leads;
+    }
+    // Fallback: if it returned a single object, wrap it
+    if (parsed.etapa_funil) {
+      return [parsed];
+    }
+    return [];
   }
 
   // Fallback: try to parse content as JSON
   const content = result.choices?.[0]?.message?.content;
   if (content) {
     try {
-      return JSON.parse(content);
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) return parsed;
+      if (parsed.leads && Array.isArray(parsed.leads)) return parsed.leads;
+      if (parsed.etapa_funil) return [parsed];
     } catch {
       throw new Error("AI did not return valid JSON");
     }
