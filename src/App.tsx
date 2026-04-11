@@ -17,6 +17,7 @@ import Settings from "./pages/Settings";
 import RelatorioN8n from "./pages/RelatorioN8n";
 import Demandas from "./pages/Demandas";
 import WhatsApp from "./pages/WhatsApp";
+import FeedbackFunnel from "./pages/FeedbackFunnel";
 import NotFound from "./pages/NotFound";
 import PendingApproval from "./pages/PendingApproval";
 import BlockedAccount from "./pages/BlockedAccount";
@@ -92,6 +93,11 @@ const App = () => (
             <Route path="/whatsapp" element={
               <ProtectedRoute>
                 <WhatsApp />
+              </ProtectedRoute>
+            } />
+            <Route path="/feedback-funnel" element={
+              <ProtectedRoute>
+                <FeedbackFunnel />
               </ProtectedRoute>
             } />
             
