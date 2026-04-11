@@ -243,55 +243,65 @@ async function handleFeedback(
   senderName: string,
   supabase: any
 ): Promise<string> {
-  // Remove the #feedback prefix
+  // Remove the #feedback prefix - keep the body (tipo_funil + campaigns)
   const feedbackBody = text.replace(/^#feedback\s*/i, "").trim();
 
   if (!feedbackBody || feedbackBody.length < 5) {
-    return `⚠️ *Feedback vazio!*\n\nEnvie no formato:\n*#feedback*\nLEADS DE 09/04\nRecebi 21 leads, 9 Qualificaram...\n\nDigite *#ajuda* para mais informações.`;
+    return `⚠️ *Feedback vazio!*\n\nEnvie no formato:\n*#feedback*\nterceiros\n\nreferente à campanha REF47\nrecebidos 2\natendimento SDR 2\n\nDigite *#ajuda* para mais informações.`;
   }
 
-  const parsed = parseFeedbackText(feedbackBody);
+  // Call the process-feedback edge function
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  // Default date to today if not found
-  const dataRef = parsed.data_referencia || new Date().toISOString().split("T")[0];
+    const response = await fetch(`${supabaseUrl}/functions/v1/process-feedback`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({
+        mensagem_original: text, // full message including #feedback
+        account_id: account.id,
+        id_grupo: groupJid,
+        numero_grupo: groupJid,
+        telefone_origem: null,
+        nome_origem: senderName,
+        usuario_origem: senderName,
+      }),
+    });
 
-  const { error } = await supabase.from("feedback_funnel").insert({
-    account_id: account.id,
-    data_referencia: dataRef,
-    leads_gerados: parsed.leads_gerados,
-    conversa_iniciada: parsed.conversa_iniciada,
-    lead_qualificado: parsed.lead_qualificado,
-    em_atendimento: parsed.em_atendimento,
-    perdido: parsed.perdido,
-    visita: parsed.visita,
-    venda: parsed.venda,
-    mensagem_original: feedbackBody,
-    enviado_por: senderName,
-    grupo_jid: groupJid,
-  });
+    const result = await response.json();
 
-  if (error) {
-    console.error("[whatsapp-webhook] Feedback insert error:", error);
-    return `⚠️ Erro ao salvar feedback. Tente novamente.`;
+    if (!response.ok || !result.success) {
+      console.error("[whatsapp-webhook] process-feedback error:", result);
+      return `⚠️ Erro ao processar feedback: ${result.error || "erro desconhecido"}`;
+    }
+
+    if (result.duplicado) {
+      return `⚠️ Essa mensagem já foi processada anteriormente.`;
+    }
+
+    let msg = `✅ *Feedback registrado com sucesso!*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `👤 Enviado por: *${senderName}*\n`;
+    msg += `🏢 Conta: *${account.nome_cliente}*\n`;
+    msg += `📋 Tipo: *${result.tipo_funil === "terceiros" ? "Terceiros" : "Lançamento"}*\n\n`;
+    msg += `📊 *${result.campanhas_count} campanha(s) registrada(s):*\n`;
+
+    if (result.campanhas && Array.isArray(result.campanhas)) {
+      for (const c of result.campanhas) {
+        msg += `   • ${c.nome} — ${c.recebidos} recebidos\n`;
+      }
+    }
+
+    msg += `\n💡 Use *#funil* para ver o funil consolidado.`;
+    return msg;
+  } catch (err) {
+    console.error("[whatsapp-webhook] Feedback processing error:", err);
+    return `⚠️ Erro ao processar feedback. Tente novamente.`;
   }
-
-  let msg = `✅ *Feedback registrado com sucesso!*\n`;
-  msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-  msg += `📅 Data: *${formatDateBR(dataRef)}*\n`;
-  msg += `👤 Enviado por: *${senderName}*\n`;
-  msg += `🏢 Conta: *${account.nome_cliente}*\n\n`;
-  msg += `📊 *Dados capturados:*\n`;
-  if (parsed.leads_gerados > 0) msg += `   👥 Leads gerados: *${parsed.leads_gerados}*\n`;
-  if (parsed.conversa_iniciada > 0) msg += `   💬 Conversa iniciada: *${parsed.conversa_iniciada}*\n`;
-  if (parsed.lead_qualificado > 0) msg += `   ✅ Qualificados: *${parsed.lead_qualificado}*\n`;
-  if (parsed.em_atendimento > 0) msg += `   🔄 Em atendimento: *${parsed.em_atendimento}*\n`;
-  if (parsed.perdido > 0) msg += `   ❌ Perdidos: *${parsed.perdido}*\n`;
-  if (parsed.visita > 0) msg += `   🏠 Visitas: *${parsed.visita}*\n`;
-  if (parsed.venda > 0) msg += `   🎉 Vendas: *${parsed.venda}*\n`;
-
-  msg += `\n💡 Use *#funil* para ver o funil consolidado.`;
-
-  return msg;
 }
 
 async function handleFunil(account: any, supabase: any): Promise<string> {
@@ -574,10 +584,12 @@ function getHelpText(clientName: string): string {
     `👥 *#leads* — Resumo de leads por campanha\n` +
     `👥 *#leads{N}* — Leads detalhados da campanha N\n\n` +
     `📊 *#resumo* — Resumo geral da conta\n\n` +
-    `📝 *#feedback* — Registrar feedback do funil\n` +
+    `📝 *#feedback* — Registrar feedback por campanha\n` +
     `   Ex: #feedback\n` +
-    `   LEADS DE 09/04\n` +
-    `   Recebi 21 leads, 9 Qualificaram...\n\n` +
+    `   terceiros\n` +
+    `   referente à campanha REF47\n` +
+    `   recebidos 2\n` +
+    `   atendimento SDR 2\n\n` +
     `📊 *#funil* — Ver funil consolidado (30 dias)\n\n` +
     `🔄 *#followup* — Registrar follow-up de lead\n` +
     `   Ex: #followup João ligou, quer visitar apt 3Q\n\n` +
