@@ -7,6 +7,7 @@ import { KPICardLarge } from "@/components/dashboard/KPICardLarge";
 import { SmartProjectionCard } from "@/components/dashboard/SmartProjectionCard";
 import { ProfitCard } from "@/components/dashboard/ProfitCard";
 import { PeriodSelector, Period } from "@/components/dashboard/PeriodSelector";
+import { AccountSelector } from "@/components/dashboard/AccountSelector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
