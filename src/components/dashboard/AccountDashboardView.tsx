@@ -245,14 +245,14 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
             <div className="col-span-12 lg:col-span-4 grid grid-cols-1 gap-4">
               <SalesFunnelCard
                 title="Funil de Lançamento"
-                subtitle="Campanhas com 'Lançamento' no nome"
+                subtitle="Dados do tipo #feedback lançamento"
                 totalLeads={lancamentoFunnel.totalLeads}
                 leadsRecebidos={lancamentoFunnel.leadsRecebidos}
                 steps={lancamentoFunnel.steps}
               />
               <SalesFunnelCard
                 title="Funil de Terceiros"
-                subtitle="Campanhas com 'Terceiros' no nome"
+                subtitle="Dados do tipo #feedback terceiros"
                 totalLeads={terceirosFunnel.totalLeads}
                 leadsRecebidos={terceirosFunnel.leadsRecebidos}
                 steps={terceirosFunnel.steps}
