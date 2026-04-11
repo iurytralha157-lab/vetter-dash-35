@@ -10,10 +10,10 @@ import { supabase } from "@/integrations/supabase/client";
 import type { MetaAdsResponse, MetaCampaign, MetaAccountMetrics } from "@/types/meta";
 import type { MetaPeriod } from "@/components/meta/MetaPeriodFilter";
 import {
-  Activity, Target, Eye, AlertCircle, PieChart as PieChartIcon, RefreshCw,
+  Activity, Target, Eye, AlertCircle, Filter, RefreshCw,
 } from "lucide-react";
 import {
-  LineChart, Line, PieChart as RePieChart, Pie, Cell,
+  LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 
@@ -49,6 +49,10 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
   const [accountName, setAccountName] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<MetaCampaign | null>(null);
+  const [funnelData, setFunnelData] = useState<{
+    leads_gerados: number; conversa_iniciada: number; lead_qualificado: number;
+    em_atendimento: number; perdido: number; visita: number; venda: number;
+  } | null>(null);
 
   const metaPeriod = mapPeriod(period);
 
@@ -92,6 +96,37 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
     if (metaAccountId) fetchMeta();
   }, [metaAccountId, metaPeriod]);
 
+  // Fetch funnel data from feedback_funnel
+  useEffect(() => {
+    const loadFunnel = async () => {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const { data } = await supabase
+        .from("feedback_funnel" as any)
+        .select("leads_gerados, conversa_iniciada, lead_qualificado, em_atendimento, perdido, visita, venda")
+        .eq("account_id", accountId)
+        .gte("data_referencia", thirtyDaysAgo.toISOString().slice(0, 10));
+      if (data && (data as any[]).length > 0) {
+        const totals = (data as any[]).reduce(
+          (acc, r) => ({
+            leads_gerados: acc.leads_gerados + (r.leads_gerados || 0),
+            conversa_iniciada: acc.conversa_iniciada + (r.conversa_iniciada || 0),
+            lead_qualificado: acc.lead_qualificado + (r.lead_qualificado || 0),
+            em_atendimento: acc.em_atendimento + (r.em_atendimento || 0),
+            perdido: acc.perdido + (r.perdido || 0),
+            visita: acc.visita + (r.visita || 0),
+            venda: acc.venda + (r.venda || 0),
+          }),
+          { leads_gerados: 0, conversa_iniciada: 0, lead_qualificado: 0, em_atendimento: 0, perdido: 0, visita: 0, venda: 0 }
+        );
+        setFunnelData(totals);
+      } else {
+        setFunnelData(null);
+      }
+    };
+    loadFunnel();
+  }, [accountId]);
+
   const orderedCampaigns = useMemo(() => {
     return [...campaigns].sort((a, b) => {
       const aActive = a.status === "ACTIVE" ? 0 : 1;
@@ -111,25 +146,20 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
     }));
   }, [campaigns]);
 
-  const topCampaigns = useMemo(() => {
-    return [...campaigns]
-      .sort((a, b) => (b.insights?.conversions || 0) - (a.insights?.conversions || 0))
-      .slice(0, 5);
-  }, [campaigns]);
-
-  const budgetDistribution = useMemo(() => {
-    const total = campaigns.reduce((sum, c) => sum + (c.insights?.spend || 0), 0);
-    const colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
-    return topCampaigns.map((camp, idx) => {
-      const spend = camp.insights?.spend || 0;
-      return {
-        name: camp.name.length > 25 ? camp.name.substring(0, 25) + "..." : camp.name,
-        value: total > 0 ? Math.round((spend / total) * 100) : 0,
-        spend,
-        color: colors[idx] || "#6b7280",
-      };
-    });
-  }, [topCampaigns, campaigns]);
+  const funnelSteps = useMemo(() => {
+    const totalLeadsMeta = metrics?.total_conversions || 0;
+    const f = funnelData || { leads_gerados: 0, conversa_iniciada: 0, lead_qualificado: 0, em_atendimento: 0, perdido: 0, visita: 0, venda: 0 };
+    return [
+      { label: "Total de Leads", value: totalLeadsMeta, color: "#3b82f6" },
+      { label: "Leads Recebidos", value: f.conversa_iniciada, color: "#06b6d4" },
+      { label: "Descartados", value: f.perdido, color: "#ef4444" },
+      { label: "Em Atendimento", value: f.em_atendimento, color: "#f59e0b" },
+      { label: "Qualificados", value: f.lead_qualificado, color: "#10b981" },
+      { label: "Visita", value: f.visita, color: "#8b5cf6" },
+      { label: "Proposta", value: 0, color: "#ec4899" },
+      { label: "Venda", value: f.venda, color: "#22c55e" },
+    ];
+  }, [metrics, funnelData]);
 
   return (
     <div className="space-y-6">
@@ -208,49 +238,42 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
               </CardContent>
             </Card>
 
-            {/* Top 5 Campaigns Pie */}
+            {/* Sales Funnel */}
             <Card className="col-span-12 lg:col-span-4">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  <PieChartIcon className="w-5 h-5 text-primary" />
-                  Top 5 Campanhas
+                  <Filter className="w-5 h-5 text-primary" />
+                  Funil de Vendas
                 </CardTitle>
+                <CardDescription>Últimos 30 dias via #feedback</CardDescription>
               </CardHeader>
               <CardContent>
-                {budgetDistribution.length > 0 ? (
-                  <>
-                    <div className="h-64 flex items-center justify-center">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <RePieChart>
-                          <Pie data={budgetDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value">
-                            {budgetDistribution.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                        </RePieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="space-y-3 mt-6">
-                      {budgetDistribution.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                            <span className="text-sm truncate">{item.name}</span>
+                <div className="space-y-2">
+                  {funnelSteps.map((step, idx) => {
+                    const maxVal = Math.max(...funnelSteps.map(s => s.value), 1);
+                    const widthPct = Math.max((step.value / maxVal) * 100, 12);
+                    return (
+                      <div key={idx} className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-muted-foreground">{step.label}</span>
+                            <span className="text-sm font-bold">{step.value}</span>
                           </div>
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            <span className="text-sm font-semibold">{item.value}%</span>
-                            <span className="text-xs text-muted-foreground">{currency(item.spend)}</span>
+                          <div className="w-full bg-muted rounded-full h-6 overflow-hidden">
+                            <div
+                              className="h-full rounded-full flex items-center justify-center text-[10px] font-semibold text-white transition-all duration-500"
+                              style={{ width: `${widthPct}%`, backgroundColor: step.color }}
+                            >
+                              {step.value > 0 && funnelSteps[0].value > 0
+                                ? `${Math.round((step.value / funnelSteps[0].value) * 100)}%`
+                                : ""}
+                            </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <div className="h-80 flex items-center justify-center text-muted-foreground">
-                    Sem dados para exibir
-                  </div>
-                )}
+                      </div>
+                    );
+                  })}
+                </div>
               </CardContent>
             </Card>
           </div>
