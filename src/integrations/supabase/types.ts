@@ -1666,14 +1666,14 @@ export type Database = {
           numero_grupo: string | null
           processamento_erro: string | null
           processamento_status: string | null
-          quantidade_aguardando_retorno: number
-          quantidade_atendimento: number
-          quantidade_descartado: number
-          quantidade_passou_corretor: number
-          quantidade_proposta: number
-          quantidade_recebida: number
-          quantidade_venda: number
-          quantidade_visita: number
+          quantidade_aguardando_retorno: number | null
+          quantidade_atendimento: number | null
+          quantidade_descartado: number | null
+          quantidade_passou_corretor: number | null
+          quantidade_proposta: number | null
+          quantidade_recebida: number | null
+          quantidade_venda: number | null
+          quantidade_visita: number | null
           telefone_origem: string | null
           tipo_funil: string
           updated_at: string
@@ -1695,14 +1695,14 @@ export type Database = {
           numero_grupo?: string | null
           processamento_erro?: string | null
           processamento_status?: string | null
-          quantidade_aguardando_retorno?: number
-          quantidade_atendimento?: number
-          quantidade_descartado?: number
-          quantidade_passou_corretor?: number
-          quantidade_proposta?: number
-          quantidade_recebida?: number
-          quantidade_venda?: number
-          quantidade_visita?: number
+          quantidade_aguardando_retorno?: number | null
+          quantidade_atendimento?: number | null
+          quantidade_descartado?: number | null
+          quantidade_passou_corretor?: number | null
+          quantidade_proposta?: number | null
+          quantidade_recebida?: number | null
+          quantidade_venda?: number | null
+          quantidade_visita?: number | null
           telefone_origem?: string | null
           tipo_funil: string
           updated_at?: string
@@ -1724,14 +1724,14 @@ export type Database = {
           numero_grupo?: string | null
           processamento_erro?: string | null
           processamento_status?: string | null
-          quantidade_aguardando_retorno?: number
-          quantidade_atendimento?: number
-          quantidade_descartado?: number
-          quantidade_passou_corretor?: number
-          quantidade_proposta?: number
-          quantidade_recebida?: number
-          quantidade_venda?: number
-          quantidade_visita?: number
+          quantidade_aguardando_retorno?: number | null
+          quantidade_atendimento?: number | null
+          quantidade_descartado?: number | null
+          quantidade_passou_corretor?: number | null
+          quantidade_proposta?: number | null
+          quantidade_recebida?: number | null
+          quantidade_venda?: number | null
+          quantidade_visita?: number | null
           telefone_origem?: string | null
           tipo_funil?: string
           updated_at?: string
