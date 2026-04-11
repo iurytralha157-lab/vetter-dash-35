@@ -6,12 +6,13 @@ import { MetaMetricsGrid } from "@/components/meta/MetaMetricsGrid";
 import { MetaStatusBadge } from "@/components/meta/MetaStatusBadge";
 import { MetaCampaignDetailDialog } from "@/components/meta/MetaCampaignDetailDialog";
 import { metaAdsService } from "@/services/metaAdsService";
-import { fetchFunnelByAccount } from "@/services/feedbackFunnelService";
+import { fetchFunnelByAccountSplit } from "@/services/feedbackFunnelService";
+import { SalesFunnelCard } from "@/components/dashboard/SalesFunnelCard";
 import { supabase } from "@/integrations/supabase/client";
 import type { MetaAdsResponse, MetaCampaign, MetaAccountMetrics } from "@/types/meta";
 import type { MetaPeriod } from "@/components/meta/MetaPeriodFilter";
 import {
-  Activity, Target, Eye, AlertCircle, Filter, RefreshCw,
+  Activity, Target, Eye, AlertCircle, RefreshCw,
 } from "lucide-react";
 import {
   LineChart, Line,
@@ -50,10 +51,10 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
   const [accountName, setAccountName] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<MetaCampaign | null>(null);
-  const [funnelData, setFunnelData] = useState<{
-    lead_novo: number; contato_iniciado: number; sem_resposta: number;
-    atendimento: number; visita_agendada: number; visita_realizada: number;
-    proposta: number; venda: number; perdido: number; total: number;
+  const [funnelSplit, setFunnelSplit] = useState<{
+    lancamento: { lead_novo: number; contato_iniciado: number; sem_resposta: number; atendimento: number; visita_agendada: number; visita_realizada: number; proposta: number; venda: number; perdido: number; total: number };
+    terceiros: { lead_novo: number; contato_iniciado: number; sem_resposta: number; atendimento: number; visita_agendada: number; visita_realizada: number; proposta: number; venda: number; perdido: number; total: number };
+    all: { lead_novo: number; contato_iniciado: number; sem_resposta: number; atendimento: number; visita_agendada: number; visita_realizada: number; proposta: number; venda: number; perdido: number; total: number };
   } | null>(null);
 
   const metaPeriod = mapPeriod(period);
@@ -102,11 +103,11 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
   useEffect(() => {
     const loadFunnel = async () => {
       try {
-        const data = await fetchFunnelByAccount(accountId);
-        setFunnelData(data);
+        const data = await fetchFunnelByAccountSplit(accountId);
+        setFunnelSplit(data);
       } catch (err) {
         console.error("Error loading funnel data:", err);
-        setFunnelData(null);
+        setFunnelSplit(null);
       }
     };
     loadFunnel();
@@ -131,13 +132,12 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
     }));
   }, [campaigns]);
 
-  const funnelSteps = useMemo(() => {
+  const lancamentoFunnel = useMemo(() => {
     const totalLeadsMeta = metrics?.total_conversions || 0;
-    const f = funnelData || { lead_novo: 0, contato_iniciado: 0, sem_resposta: 0, atendimento: 0, visita_agendada: 0, visita_realizada: 0, proposta: 0, venda: 0, perdido: 0, total: 0 };
-    const leadsRecebidos = f.total; // total from feedback_funnel
+    const f = funnelSplit?.lancamento || { lead_novo: 0, contato_iniciado: 0, sem_resposta: 0, atendimento: 0, visita_agendada: 0, visita_realizada: 0, proposta: 0, venda: 0, perdido: 0, total: 0 };
     return {
-      totalLeads: totalLeadsMeta || leadsRecebidos,
-      leadsRecebidos,
+      totalLeads: totalLeadsMeta || f.total,
+      leadsRecebidos: f.total,
       steps: [
         { label: "Descartados", value: f.sem_resposta + f.perdido, color: "#94a3b8" },
         { label: "Em Atendimento", value: f.atendimento + f.contato_iniciado + f.lead_novo, color: "#f59e0b" },
@@ -146,7 +146,24 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
         { label: "Venda", value: f.venda, color: "#22c55e" },
       ],
     };
-  }, [metrics, funnelData]);
+  }, [metrics, funnelSplit]);
+
+  const terceirosFunnel = useMemo(() => {
+    const totalLeadsMeta = metrics?.total_conversions || 0;
+    const f = funnelSplit?.terceiros || { lead_novo: 0, contato_iniciado: 0, sem_resposta: 0, atendimento: 0, visita_agendada: 0, visita_realizada: 0, proposta: 0, venda: 0, perdido: 0, total: 0 };
+    return {
+      totalLeads: totalLeadsMeta || f.total,
+      leadsRecebidos: f.total,
+      steps: [
+        { label: "Descartados", value: f.sem_resposta + f.perdido, color: "#94a3b8" },
+        { label: "Atendimento SDR", value: f.atendimento + f.contato_iniciado + f.lead_novo, color: "#f59e0b" },
+        { label: "Passou para Corretor", value: 0, color: "#0ea5e9" },
+        { label: "Visita", value: f.visita_agendada + f.visita_realizada, color: "#8b5cf6" },
+        { label: "Proposta", value: f.proposta, color: "#ec4899" },
+        { label: "Venda", value: f.venda, color: "#22c55e" },
+      ],
+    };
+  }, [metrics, funnelSplit]);
 
   return (
     <div className="space-y-6">
@@ -225,81 +242,23 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
               </CardContent>
             </Card>
 
-            {/* Sales Funnel */}
-            <Card className="col-span-12 lg:col-span-4">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Filter className="w-5 h-5 text-primary" />
-                  Funil de Vendas
-                </CardTitle>
-                <CardDescription>Últimos 30 dias via #feedback</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {/* Total de Leads */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-semibold">Total de Leads</span>
-                      <span className="text-lg font-bold">{funnelSteps.totalLeads}</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-6 overflow-hidden">
-                      <div
-                        className="h-full rounded-full flex items-center justify-center text-[10px] font-semibold text-white"
-                        style={{ width: "100%", backgroundColor: "#3b82f6" }}
-                      >
-                        100%
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Leads Recebidos */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-semibold">Leads Recebidos</span>
-                      <span className="text-lg font-bold">{funnelSteps.leadsRecebidos}</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-6 overflow-hidden">
-                      <div
-                        className="h-full rounded-full flex items-center justify-center text-[10px] font-semibold text-white"
-                        style={{
-                          width: funnelSteps.totalLeads > 0 ? `${Math.max((funnelSteps.leadsRecebidos / funnelSteps.totalLeads) * 100, 12)}%` : "12%",
-                          backgroundColor: "#06b6d4",
-                        }}
-                      >
-                        {funnelSteps.totalLeads > 0
-                          ? `${Math.round((funnelSteps.leadsRecebidos / funnelSteps.totalLeads) * 100)}%`
-                          : ""}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Funnel steps — % always based on leadsRecebidos */}
-                  {funnelSteps.steps.map((step, idx) => {
-                    const pct = funnelSteps.leadsRecebidos > 0
-                      ? Math.round((step.value / funnelSteps.leadsRecebidos) * 100)
-                      : 0;
-                    const barWidth = funnelSteps.leadsRecebidos > 0
-                      ? Math.max((step.value / funnelSteps.leadsRecebidos) * 100, step.value > 0 ? 12 : 6)
-                      : 6;
-                    return (
-                      <div key={idx}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-muted-foreground">
-                            {step.value} {step.label} {step.value > 0 && funnelSteps.leadsRecebidos > 0 ? `(${pct}%)` : ""}
-                          </span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-6 overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{ width: `${barWidth}%`, backgroundColor: step.color }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Sales Funnels - Side by Side */}
+            <div className="col-span-12 lg:col-span-4 grid grid-cols-1 gap-4">
+              <SalesFunnelCard
+                title="Funil de Lançamento"
+                subtitle="Campanhas com 'Lançamento' no nome"
+                totalLeads={lancamentoFunnel.totalLeads}
+                leadsRecebidos={lancamentoFunnel.leadsRecebidos}
+                steps={lancamentoFunnel.steps}
+              />
+              <SalesFunnelCard
+                title="Funil de Terceiros"
+                subtitle="Campanhas com 'Terceiros' no nome"
+                totalLeads={terceirosFunnel.totalLeads}
+                leadsRecebidos={terceirosFunnel.leadsRecebidos}
+                steps={terceirosFunnel.steps}
+              />
+            </div>
           </div>
 
           {/* Campaign Performance Table */}

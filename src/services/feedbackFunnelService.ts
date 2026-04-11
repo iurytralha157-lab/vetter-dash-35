@@ -81,6 +81,53 @@ export async function fetchFunnelByAccount(accountId: string) {
   };
 }
 
+// Funnel counts split by tipo (lançamento vs terceiros) based on campanha_nome
+export async function fetchFunnelByAccountSplit(accountId: string) {
+  const { data, error } = await supabase
+    .from("feedback_funnel" as any)
+    .select("etapa_funil, campanha_nome")
+    .eq("account_id", accountId)
+    .eq("duplicado", false);
+
+  if (error) throw error;
+  const rows = (data || []) as any[];
+
+  const classify = (campanha: string | null): "lancamento" | "terceiros" | "outro" => {
+    if (!campanha) return "outro";
+    const lower = campanha.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (lower.includes("lancamento") || lower.includes("lançamento")) return "lancamento";
+    if (lower.includes("terceiro") || lower.includes("terceiros")) return "terceiros";
+    return "outro";
+  };
+
+  const buildCounts = (filtered: any[]) => {
+    const count = (etapa: string) => filtered.filter((r) => r.etapa_funil === etapa).length;
+    return {
+      lead_novo: count("lead_novo"),
+      contato_iniciado: count("contato_iniciado"),
+      sem_resposta: count("sem_resposta"),
+      atendimento: count("atendimento"),
+      visita_agendada: count("visita_agendada"),
+      visita_realizada: count("visita_realizada"),
+      proposta: count("proposta"),
+      venda: count("venda"),
+      perdido: count("perdido"),
+      total: filtered.length,
+    };
+  };
+
+  const lancRows = rows.filter((r: any) => classify(r.campanha_nome) === "lancamento");
+  const tercRows = rows.filter((r: any) => classify(r.campanha_nome) === "terceiros");
+  const outroRows = rows.filter((r: any) => classify(r.campanha_nome) === "outro");
+
+  return {
+    lancamento: buildCounts(lancRows),
+    terceiros: buildCounts(tercRows),
+    outro: buildCounts(outroRows),
+    all: buildCounts(rows),
+  };
+}
+
 // Fetch accounts map for name resolution
 export async function fetchAccountsMap(): Promise<Record<string, string>> {
   const { data } = await supabase
