@@ -242,81 +242,23 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
               </CardContent>
             </Card>
 
-            {/* Sales Funnel */}
-            <Card className="col-span-12 lg:col-span-4">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Filter className="w-5 h-5 text-primary" />
-                  Funil de Vendas
-                </CardTitle>
-                <CardDescription>Últimos 30 dias via #feedback</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {/* Total de Leads */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-semibold">Total de Leads</span>
-                      <span className="text-lg font-bold">{funnelSteps.totalLeads}</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-6 overflow-hidden">
-                      <div
-                        className="h-full rounded-full flex items-center justify-center text-[10px] font-semibold text-white"
-                        style={{ width: "100%", backgroundColor: "#3b82f6" }}
-                      >
-                        100%
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Leads Recebidos */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-semibold">Leads Recebidos</span>
-                      <span className="text-lg font-bold">{funnelSteps.leadsRecebidos}</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-6 overflow-hidden">
-                      <div
-                        className="h-full rounded-full flex items-center justify-center text-[10px] font-semibold text-white"
-                        style={{
-                          width: funnelSteps.totalLeads > 0 ? `${Math.max((funnelSteps.leadsRecebidos / funnelSteps.totalLeads) * 100, 12)}%` : "12%",
-                          backgroundColor: "#06b6d4",
-                        }}
-                      >
-                        {funnelSteps.totalLeads > 0
-                          ? `${Math.round((funnelSteps.leadsRecebidos / funnelSteps.totalLeads) * 100)}%`
-                          : ""}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Funnel steps — % always based on leadsRecebidos */}
-                  {funnelSteps.steps.map((step, idx) => {
-                    const pct = funnelSteps.leadsRecebidos > 0
-                      ? Math.round((step.value / funnelSteps.leadsRecebidos) * 100)
-                      : 0;
-                    const barWidth = funnelSteps.leadsRecebidos > 0
-                      ? Math.max((step.value / funnelSteps.leadsRecebidos) * 100, step.value > 0 ? 12 : 6)
-                      : 6;
-                    return (
-                      <div key={idx}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-muted-foreground">
-                            {step.value} {step.label} {step.value > 0 && funnelSteps.leadsRecebidos > 0 ? `(${pct}%)` : ""}
-                          </span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-6 overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{ width: `${barWidth}%`, backgroundColor: step.color }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Sales Funnels - Side by Side */}
+            <div className="col-span-12 lg:col-span-4 grid grid-cols-1 gap-4">
+              <SalesFunnelCard
+                title="Funil de Lançamento"
+                subtitle="Campanhas com 'Lançamento' no nome"
+                totalLeads={lancamentoFunnel.totalLeads}
+                leadsRecebidos={lancamentoFunnel.leadsRecebidos}
+                steps={lancamentoFunnel.steps}
+              />
+              <SalesFunnelCard
+                title="Funil de Terceiros"
+                subtitle="Campanhas com 'Terceiros' no nome"
+                totalLeads={terceirosFunnel.totalLeads}
+                leadsRecebidos={terceirosFunnel.leadsRecebidos}
+                steps={terceirosFunnel.steps}
+              />
+            </div>
           </div>
 
           {/* Campaign Performance Table */}
