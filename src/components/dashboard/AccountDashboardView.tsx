@@ -132,13 +132,12 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
     }));
   }, [campaigns]);
 
-  const funnelSteps = useMemo(() => {
+  const lancamentoFunnel = useMemo(() => {
     const totalLeadsMeta = metrics?.total_conversions || 0;
-    const f = funnelData || { lead_novo: 0, contato_iniciado: 0, sem_resposta: 0, atendimento: 0, visita_agendada: 0, visita_realizada: 0, proposta: 0, venda: 0, perdido: 0, total: 0 };
-    const leadsRecebidos = f.total; // total from feedback_funnel
+    const f = funnelSplit?.lancamento || { lead_novo: 0, contato_iniciado: 0, sem_resposta: 0, atendimento: 0, visita_agendada: 0, visita_realizada: 0, proposta: 0, venda: 0, perdido: 0, total: 0 };
     return {
-      totalLeads: totalLeadsMeta || leadsRecebidos,
-      leadsRecebidos,
+      totalLeads: totalLeadsMeta || f.total,
+      leadsRecebidos: f.total,
       steps: [
         { label: "Descartados", value: f.sem_resposta + f.perdido, color: "#94a3b8" },
         { label: "Em Atendimento", value: f.atendimento + f.contato_iniciado + f.lead_novo, color: "#f59e0b" },
@@ -147,7 +146,24 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
         { label: "Venda", value: f.venda, color: "#22c55e" },
       ],
     };
-  }, [metrics, funnelData]);
+  }, [metrics, funnelSplit]);
+
+  const terceirosFunnel = useMemo(() => {
+    const totalLeadsMeta = metrics?.total_conversions || 0;
+    const f = funnelSplit?.terceiros || { lead_novo: 0, contato_iniciado: 0, sem_resposta: 0, atendimento: 0, visita_agendada: 0, visita_realizada: 0, proposta: 0, venda: 0, perdido: 0, total: 0 };
+    return {
+      totalLeads: totalLeadsMeta || f.total,
+      leadsRecebidos: f.total,
+      steps: [
+        { label: "Descartados", value: f.sem_resposta + f.perdido, color: "#94a3b8" },
+        { label: "Atendimento SDR", value: f.atendimento + f.contato_iniciado + f.lead_novo, color: "#f59e0b" },
+        { label: "Passou para Corretor", value: 0, color: "#0ea5e9" },
+        { label: "Visita", value: f.visita_agendada + f.visita_realizada, color: "#8b5cf6" },
+        { label: "Proposta", value: f.proposta, color: "#ec4899" },
+        { label: "Venda", value: f.venda, color: "#22c55e" },
+      ],
+    };
+  }, [metrics, funnelSplit]);
 
   return (
     <div className="space-y-6">
