@@ -20,7 +20,6 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     console.log("[whatsapp-webhook] Received:", JSON.stringify(payload).slice(0, 500));
 
-    // Evolution API sends different event types
     const event = payload.event;
     if (event !== "messages.upsert") {
       return new Response(JSON.stringify({ ignored: true, event }), {
@@ -35,7 +34,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Extract message info
     const message = data.message;
     const key = data.key;
     const instanceName = payload.instance;
@@ -46,7 +44,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Only process group messages
     const remoteJid = key.remoteJid || "";
     const isGroup = remoteJid.endsWith("@g.us");
     if (!isGroup) {
@@ -55,14 +52,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Don't respond to our own messages
     if (key.fromMe) {
       return new Response(JSON.stringify({ ignored: true, reason: "own message" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Extract text content
     const text = (
       message.conversation ||
       message.extendedTextMessage?.text ||
@@ -75,15 +70,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Normalize the group JID - Evolution sends "123@g.us", DB stores "123-group"
     const groupNumber = remoteJid.replace("@g.us", "");
-    const possibleFormats = [
-      groupNumber,                    // 120363401551537577
-      `${groupNumber}-group`,         // 120363401551537577-group
-      remoteJid,                      // 120363401551537577@g.us
-    ];
+    const possibleFormats = [groupNumber, `${groupNumber}-group`, remoteJid];
 
-    // Find account linked to this group (try all formats)
     let account: any = null;
     for (const fmt of possibleFormats) {
       const { data } = await supabase
@@ -98,13 +87,15 @@ Deno.serve(async (req) => {
     }
 
     if (!account) {
-      console.log("[whatsapp-webhook] No account linked to group:", groupNumber, "tried:", possibleFormats);
+      console.log("[whatsapp-webhook] No account linked to group:", groupNumber);
       return new Response(JSON.stringify({ ignored: true, reason: "no linked account" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return await processCommand(text, account, remoteJid, instanceName, evolutionUrl, evolutionKey, supabase);
+    const senderName = data.pushName || key.participant || "Desconhecido";
+
+    return await processCommand(text, account, remoteJid, instanceName, evolutionUrl, evolutionKey, supabase, senderName);
   } catch (err) {
     console.error("[whatsapp-webhook] Error:", err);
     return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Internal error" }), {
@@ -121,13 +112,18 @@ async function processCommand(
   instanceName: string,
   evolutionUrl: string,
   evolutionKey: string,
-  supabase: any
+  supabase: any,
+  senderName: string
 ) {
   const cmd = text.toLowerCase().trim();
   let responseText = "";
 
   try {
-    if (cmd === "#campanhas") {
+    if (cmd.startsWith("#feedback")) {
+      responseText = await handleFeedback(text, account, groupJid, senderName, supabase);
+    } else if (cmd === "#funil") {
+      responseText = await handleFunil(account, supabase);
+    } else if (cmd === "#campanhas") {
       responseText = await handleCampanhas(account, supabase);
     } else if (cmd.startsWith("#campanha")) {
       const num = parseInt(cmd.replace("#campanha", "").trim());
@@ -149,7 +145,6 @@ async function processCommand(
     responseText = `⚠️ Erro ao processar comando. Tente novamente.`;
   }
 
-  // Send response via Evolution API
   await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, groupJid, responseText);
 
   return new Response(JSON.stringify({ success: true, command: cmd }), {
@@ -157,7 +152,220 @@ async function processCommand(
   });
 }
 
-// ─── Command Handlers ───
+// ─── Feedback Parser ───
+
+function parseFeedbackText(text: string): {
+  data_referencia: string | null;
+  leads_gerados: number;
+  conversa_iniciada: number;
+  lead_qualificado: number;
+  em_atendimento: number;
+  perdido: number;
+  visita: number;
+  venda: number;
+} {
+  const result = {
+    data_referencia: null as string | null,
+    leads_gerados: 0,
+    conversa_iniciada: 0,
+    lead_qualificado: 0,
+    em_atendimento: 0,
+    perdido: 0,
+    visita: 0,
+    venda: 0,
+  };
+
+  // Extract date - formats: dd/mm, dd/mm/yyyy, dd/mm/yy
+  const dateMatch = text.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+  if (dateMatch) {
+    const day = parseInt(dateMatch[1]);
+    const month = parseInt(dateMatch[2]);
+    const yearStr = dateMatch[3];
+    let year = new Date().getFullYear();
+    if (yearStr) {
+      year = yearStr.length === 2 ? 2000 + parseInt(yearStr) : parseInt(yearStr);
+    }
+    result.data_referencia = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+
+  const lower = text.toLowerCase();
+
+  // Pattern: look for numbers near keywords
+  // Split into lines for better parsing
+  const lines = lower.split(/[\n,;.]+/);
+
+  for (const line of lines) {
+    const numbersInLine = line.match(/\d+/g);
+    if (!numbersInLine) continue;
+
+    for (const numStr of numbersInLine) {
+      const num = parseInt(numStr);
+      if (num > 9999) continue; // skip dates/IDs
+
+      // Check context around the number
+      if (matchKeyword(line, ["lead", "leads", "recebi", "recebemos", "gerado", "gerados", "geramos"])) {
+        if (result.leads_gerados === 0) result.leads_gerados = num;
+      }
+      if (matchKeyword(line, ["conversa iniciada", "conversas iniciadas", "contato", "contatamos", "entramos em contato", "contato novamente"])) {
+        if (result.conversa_iniciada === 0) result.conversa_iniciada = num;
+      }
+      if (matchKeyword(line, ["qualificou", "qualificaram", "qualificado", "qualificados", "qualifica"])) {
+        if (result.lead_qualificado === 0) result.lead_qualificado = num;
+      }
+      if (matchKeyword(line, ["atendimento", "atendendo", "aguardando", "retorno", "em andamento"])) {
+        if (result.em_atendimento === 0) result.em_atendimento = num;
+      }
+      if (matchKeyword(line, ["perdido", "perdidos", "não deu", "nao deu", "desistiu", "desistiram", "sem andamento", "não andamento", "nao andamento"])) {
+        if (result.perdido === 0) result.perdido = num;
+      }
+      if (matchKeyword(line, ["visita", "visitas", "visitou", "visitaram", "agendada", "agendadas"])) {
+        if (result.visita === 0) result.visita = num;
+      }
+      if (matchKeyword(line, ["venda", "vendas", "vendeu", "venderam", "fechou", "fecharam", "comprar", "comprou"])) {
+        if (result.venda === 0) result.venda = num;
+      }
+    }
+  }
+
+  return result;
+}
+
+function matchKeyword(text: string, keywords: string[]): boolean {
+  return keywords.some((kw) => text.includes(kw));
+}
+
+async function handleFeedback(
+  text: string,
+  account: any,
+  groupJid: string,
+  senderName: string,
+  supabase: any
+): Promise<string> {
+  // Remove the #feedback prefix
+  const feedbackBody = text.replace(/^#feedback\s*/i, "").trim();
+
+  if (!feedbackBody || feedbackBody.length < 5) {
+    return `⚠️ *Feedback vazio!*\n\nEnvie no formato:\n*#feedback*\nLEADS DE 09/04\nRecebi 21 leads, 9 Qualificaram...\n\nDigite *#ajuda* para mais informações.`;
+  }
+
+  const parsed = parseFeedbackText(feedbackBody);
+
+  // Default date to today if not found
+  const dataRef = parsed.data_referencia || new Date().toISOString().split("T")[0];
+
+  const { error } = await supabase.from("feedback_funnel").insert({
+    account_id: account.id,
+    data_referencia: dataRef,
+    leads_gerados: parsed.leads_gerados,
+    conversa_iniciada: parsed.conversa_iniciada,
+    lead_qualificado: parsed.lead_qualificado,
+    em_atendimento: parsed.em_atendimento,
+    perdido: parsed.perdido,
+    visita: parsed.visita,
+    venda: parsed.venda,
+    mensagem_original: feedbackBody,
+    enviado_por: senderName,
+    grupo_jid: groupJid,
+  });
+
+  if (error) {
+    console.error("[whatsapp-webhook] Feedback insert error:", error);
+    return `⚠️ Erro ao salvar feedback. Tente novamente.`;
+  }
+
+  let msg = `✅ *Feedback registrado com sucesso!*\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+  msg += `📅 Data: *${formatDateBR(dataRef)}*\n`;
+  msg += `👤 Enviado por: *${senderName}*\n`;
+  msg += `🏢 Conta: *${account.nome_cliente}*\n\n`;
+  msg += `📊 *Dados capturados:*\n`;
+  if (parsed.leads_gerados > 0) msg += `   👥 Leads gerados: *${parsed.leads_gerados}*\n`;
+  if (parsed.conversa_iniciada > 0) msg += `   💬 Conversa iniciada: *${parsed.conversa_iniciada}*\n`;
+  if (parsed.lead_qualificado > 0) msg += `   ✅ Qualificados: *${parsed.lead_qualificado}*\n`;
+  if (parsed.em_atendimento > 0) msg += `   🔄 Em atendimento: *${parsed.em_atendimento}*\n`;
+  if (parsed.perdido > 0) msg += `   ❌ Perdidos: *${parsed.perdido}*\n`;
+  if (parsed.visita > 0) msg += `   🏠 Visitas: *${parsed.visita}*\n`;
+  if (parsed.venda > 0) msg += `   🎉 Vendas: *${parsed.venda}*\n`;
+
+  msg += `\n💡 Use *#funil* para ver o funil consolidado.`;
+
+  return msg;
+}
+
+async function handleFunil(account: any, supabase: any): Promise<string> {
+  // Get last 30 days of feedback
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const { data: feedbacks } = await supabase
+    .from("feedback_funnel")
+    .select("*")
+    .eq("account_id", account.id)
+    .gte("data_referencia", thirtyDaysAgo.toISOString().split("T")[0])
+    .order("data_referencia", { ascending: false });
+
+  if (!feedbacks || feedbacks.length === 0) {
+    return `📊 *Funil - ${account.nome_cliente}*\n\nNenhum feedback registrado nos últimos 30 dias.\n\nEnvie *#feedback* seguido do relatório para registrar.`;
+  }
+
+  // Aggregate
+  const totals = feedbacks.reduce(
+    (acc: any, f: any) => ({
+      leads_gerados: acc.leads_gerados + (f.leads_gerados || 0),
+      conversa_iniciada: acc.conversa_iniciada + (f.conversa_iniciada || 0),
+      lead_qualificado: acc.lead_qualificado + (f.lead_qualificado || 0),
+      em_atendimento: acc.em_atendimento + (f.em_atendimento || 0),
+      perdido: acc.perdido + (f.perdido || 0),
+      visita: acc.visita + (f.visita || 0),
+      venda: acc.venda + (f.venda || 0),
+    }),
+    { leads_gerados: 0, conversa_iniciada: 0, lead_qualificado: 0, em_atendimento: 0, perdido: 0, visita: 0, venda: 0 }
+  );
+
+  // Also get Meta leads for comparison
+  let metaLeads = 0;
+  if (account.meta_account_id) {
+    const { data: campaigns } = await supabase
+      .from("meta_campaigns")
+      .select("leads")
+      .eq("account_id", account.meta_account_id);
+    if (campaigns) {
+      metaLeads = campaigns.reduce((s: number, c: any) => s + (c.leads || 0), 0);
+    }
+  }
+
+  const convRate = totals.leads_gerados > 0 ? ((totals.venda / totals.leads_gerados) * 100).toFixed(1) : "0";
+  const qualRate = totals.leads_gerados > 0 ? ((totals.lead_qualificado / totals.leads_gerados) * 100).toFixed(1) : "0";
+
+  let msg = `📊 *Funil de Vendas - ${account.nome_cliente}*\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+  msg += `📅 Últimos 30 dias (${feedbacks.length} feedbacks)\n\n`;
+
+  msg += `🔽 *FUNIL*\n`;
+  msg += `┌─────────────────────────\n`;
+  if (metaLeads > 0) {
+    msg += `│ 📢 Leads Meta Ads: *${metaLeads}*\n`;
+  }
+  msg += `│ 👥 Leads Gerados: *${totals.leads_gerados}*\n`;
+  msg += `│ 💬 Conversa Iniciada: *${totals.conversa_iniciada}*\n`;
+  msg += `│ ✅ Qualificados: *${totals.lead_qualificado}* (${qualRate}%)\n`;
+  msg += `│ 🔄 Em Atendimento: *${totals.em_atendimento}*\n`;
+  msg += `│ ❌ Perdidos: *${totals.perdido}*\n`;
+  msg += `│ 🏠 Visitas: *${totals.visita}*\n`;
+  msg += `│ 🎉 Vendas: *${totals.venda}* (${convRate}%)\n`;
+  msg += `└─────────────────────────\n`;
+
+  // Last 5 feedbacks
+  msg += `\n📋 *Últimos registros:*\n`;
+  feedbacks.slice(0, 5).forEach((f: any) => {
+    const date = formatDateBR(f.data_referencia);
+    msg += `   ${date} - ${f.enviado_por}: 👥${f.leads_gerados} ✅${f.lead_qualificado} 🎉${f.venda}\n`;
+  });
+
+  return msg;
+}
+
+// ─── Existing Command Handlers ───
 
 async function handleCampanhas(account: any, supabase: any): Promise<string> {
   const { data: campaigns } = await supabase
@@ -171,13 +379,12 @@ async function handleCampanhas(account: any, supabase: any): Promise<string> {
   }
 
   const activeCampaigns = campaigns.filter((c: any) => c.status === "ACTIVE");
-  const allCampaigns = campaigns;
 
   let msg = `📊 *Campanhas - ${account.nome_cliente}*\n`;
   msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-  msg += `✅ Ativas: ${activeCampaigns.length} | 📋 Total: ${allCampaigns.length}\n\n`;
+  msg += `✅ Ativas: ${activeCampaigns.length} | 📋 Total: ${campaigns.length}\n\n`;
 
-  allCampaigns.forEach((c: any, i: number) => {
+  campaigns.forEach((c: any, i: number) => {
     const statusIcon = c.status === "ACTIVE" ? "🟢" : "🔴";
     const spend = formatCurrency(c.spend || 0);
     const leads = c.leads || 0;
@@ -225,7 +432,6 @@ async function handleCampanhaDetail(account: any, num: number, supabase: any): P
   msg += `   Total: ${c.leads || 0}\n`;
   msg += `   CPL: ${c.cpl ? formatCurrency(c.cpl) : "N/A"}\n`;
 
-  // Get recent daily data
   const { data: insights } = await supabase
     .from("campaign_insights")
     .select("date, spend, leads, clicks, impressions")
@@ -266,7 +472,7 @@ async function handleLeads(account: any, supabase: any): Promise<string> {
   msg += `📉 CPL médio: *${formatCurrency(avgCpl)}*\n\n`;
 
   msg += `📋 *Por campanha:*\n`;
-  campaigns.filter((c: any) => (c.leads || 0) > 0).forEach((c: any, i: number) => {
+  campaigns.filter((c: any) => (c.leads || 0) > 0).forEach((c: any) => {
     const statusIcon = c.status === "ACTIVE" ? "🟢" : "🔴";
     msg += `${statusIcon} ${c.campaign_name}\n`;
     msg += `   👥 ${c.leads} leads | CPL: ${c.cpl ? formatCurrency(c.cpl) : "N/A"}\n`;
@@ -292,7 +498,6 @@ async function handleLeadsCampaign(account: any, ref: string, supabase: any): Pr
   if (!isNaN(num) && num >= 1 && num <= campaigns.length) {
     campaign = campaigns[num - 1];
   } else {
-    // Search by name
     campaign = campaigns.find((c: any) =>
       c.campaign_name.toLowerCase().includes(ref.toLowerCase())
     );
@@ -302,7 +507,6 @@ async function handleLeadsCampaign(account: any, ref: string, supabase: any): Pr
     return `⚠️ Campanha "${ref}" não encontrada. Use *#campanhas* para ver a lista.`;
   }
 
-  // Get daily leads
   const { data: insights } = await supabase
     .from("campaign_insights")
     .select("date, leads, spend")
@@ -366,9 +570,13 @@ function getHelpText(clientName: string): string {
     `📋 *#campanha{N}* — Detalhes da campanha N\n` +
     `   Ex: #campanha1, #campanha2\n\n` +
     `👥 *#leads* — Resumo de leads por campanha\n` +
-    `👥 *#leads{N}* — Leads detalhados da campanha N\n` +
-    `   Ex: #leads1, #leads2\n\n` +
-    `📊 *#resumo* — Resumo geral da conta\n` +
+    `👥 *#leads{N}* — Leads detalhados da campanha N\n\n` +
+    `📊 *#resumo* — Resumo geral da conta\n\n` +
+    `📝 *#feedback* — Registrar feedback do funil\n` +
+    `   Ex: #feedback\n` +
+    `   LEADS DE 09/04\n` +
+    `   Recebi 21 leads, 9 Qualificaram...\n\n` +
+    `📊 *#funil* — Ver funil consolidado (30 dias)\n\n` +
     `❓ *#ajuda* — Mostra esta mensagem\n`;
 }
 
@@ -382,10 +590,15 @@ function formatNumber(value: number): string {
   return value.toLocaleString("pt-BR");
 }
 
+function formatDateBR(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 async function sendEvolutionMessage(baseUrl: string, apiKey: string, instanceName: string, groupJid: string, text: string) {
   const url = `${baseUrl}/message/sendText/${instanceName}`;
   console.log("[whatsapp-webhook] Sending to:", groupJid, "via", instanceName);
-  
+
   const res = await fetch(url, {
     method: "POST",
     headers: {
