@@ -584,10 +584,12 @@ function getHelpText(clientName: string): string {
     `👥 *#leads* — Resumo de leads por campanha\n` +
     `👥 *#leads{N}* — Leads detalhados da campanha N\n\n` +
     `📊 *#resumo* — Resumo geral da conta\n\n` +
-    `📝 *#feedback* — Registrar feedback do funil\n` +
+    `📝 *#feedback* — Registrar feedback por campanha\n` +
     `   Ex: #feedback\n` +
-    `   LEADS DE 09/04\n` +
-    `   Recebi 21 leads, 9 Qualificaram...\n\n` +
+    `   terceiros\n` +
+    `   referente à campanha REF47\n` +
+    `   recebidos 2\n` +
+    `   atendimento SDR 2\n\n` +
     `📊 *#funil* — Ver funil consolidado (30 dias)\n\n` +
     `🔄 *#followup* — Registrar follow-up de lead\n` +
     `   Ex: #followup João ligou, quer visitar apt 3Q\n\n` +
