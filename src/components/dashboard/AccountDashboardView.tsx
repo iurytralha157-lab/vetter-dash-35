@@ -134,17 +134,18 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
   const funnelSteps = useMemo(() => {
     const totalLeadsMeta = metrics?.total_conversions || 0;
     const f = funnelData || { lead_novo: 0, contato_iniciado: 0, sem_resposta: 0, atendimento: 0, visita_agendada: 0, visita_realizada: 0, proposta: 0, venda: 0, perdido: 0, total: 0 };
-    return [
-      { label: "Total de Leads", value: totalLeadsMeta || f.total, color: "#3b82f6" },
-      { label: "Lead Novo", value: f.lead_novo, color: "#60a5fa" },
-      { label: "Contato Iniciado", value: f.contato_iniciado, color: "#06b6d4" },
-      { label: "Sem Resposta", value: f.sem_resposta, color: "#94a3b8" },
-      { label: "Em Atendimento", value: f.atendimento, color: "#f59e0b" },
-      { label: "Visita", value: f.visita_agendada + f.visita_realizada, color: "#8b5cf6" },
-      { label: "Proposta", value: f.proposta, color: "#ec4899" },
-      { label: "Venda", value: f.venda, color: "#22c55e" },
-      { label: "Perdido", value: f.perdido, color: "#ef4444" },
-    ];
+    const leadsRecebidos = f.total; // total from feedback_funnel
+    return {
+      totalLeads: totalLeadsMeta || leadsRecebidos,
+      leadsRecebidos,
+      steps: [
+        { label: "Descartados", value: f.sem_resposta + f.perdido, color: "#94a3b8" },
+        { label: "Em Atendimento", value: f.atendimento + f.contato_iniciado + f.lead_novo, color: "#f59e0b" },
+        { label: "Visita", value: f.visita_agendada + f.visita_realizada, color: "#8b5cf6" },
+        { label: "Proposta", value: f.proposta, color: "#ec4899" },
+        { label: "Venda", value: f.venda, color: "#22c55e" },
+      ],
+    };
   }, [metrics, funnelData]);
 
   return (
@@ -234,27 +235,64 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
                 <CardDescription>Últimos 30 dias via #feedback</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {funnelSteps.map((step, idx) => {
-                    const maxVal = Math.max(...funnelSteps.map(s => s.value), 1);
-                    const widthPct = Math.max((step.value / maxVal) * 100, 12);
+                <div className="space-y-3">
+                  {/* Total de Leads */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-semibold">Total de Leads</span>
+                      <span className="text-lg font-bold">{funnelSteps.totalLeads}</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-6 overflow-hidden">
+                      <div
+                        className="h-full rounded-full flex items-center justify-center text-[10px] font-semibold text-white"
+                        style={{ width: "100%", backgroundColor: "#3b82f6" }}
+                      >
+                        100%
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Leads Recebidos */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-semibold">Leads Recebidos</span>
+                      <span className="text-lg font-bold">{funnelSteps.leadsRecebidos}</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-6 overflow-hidden">
+                      <div
+                        className="h-full rounded-full flex items-center justify-center text-[10px] font-semibold text-white"
+                        style={{
+                          width: funnelSteps.totalLeads > 0 ? `${Math.max((funnelSteps.leadsRecebidos / funnelSteps.totalLeads) * 100, 12)}%` : "12%",
+                          backgroundColor: "#06b6d4",
+                        }}
+                      >
+                        {funnelSteps.totalLeads > 0
+                          ? `${Math.round((funnelSteps.leadsRecebidos / funnelSteps.totalLeads) * 100)}%`
+                          : ""}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Funnel steps — % always based on leadsRecebidos */}
+                  {funnelSteps.steps.map((step, idx) => {
+                    const pct = funnelSteps.leadsRecebidos > 0
+                      ? Math.round((step.value / funnelSteps.leadsRecebidos) * 100)
+                      : 0;
+                    const barWidth = funnelSteps.leadsRecebidos > 0
+                      ? Math.max((step.value / funnelSteps.leadsRecebidos) * 100, step.value > 0 ? 12 : 6)
+                      : 6;
                     return (
-                      <div key={idx} className="flex items-center gap-3">
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs text-muted-foreground">{step.label}</span>
-                            <span className="text-sm font-bold">{step.value}</span>
-                          </div>
-                          <div className="w-full bg-muted rounded-full h-6 overflow-hidden">
-                            <div
-                              className="h-full rounded-full flex items-center justify-center text-[10px] font-semibold text-white transition-all duration-500"
-                              style={{ width: `${widthPct}%`, backgroundColor: step.color }}
-                            >
-                              {step.value > 0 && funnelSteps[0].value > 0
-                                ? `${Math.round((step.value / funnelSteps[0].value) * 100)}%`
-                                : ""}
-                            </div>
-                          </div>
+                      <div key={idx}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-muted-foreground">
+                            {step.value} {step.label} {step.value > 0 && funnelSteps.leadsRecebidos > 0 ? `(${pct}%)` : ""}
+                          </span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-6 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${barWidth}%`, backgroundColor: step.color }}
+                          />
                         </div>
                       </div>
                     );
