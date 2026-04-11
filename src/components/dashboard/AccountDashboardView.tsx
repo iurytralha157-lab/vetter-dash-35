@@ -131,11 +131,29 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
     }));
   }, [campaigns]);
 
+  // Classify Meta campaigns by funnel type based on campaign name
+  const metaLeadsByFunnel = useMemo(() => {
+    let lancLeads = 0;
+    let tercLeads = 0;
+    for (const camp of campaigns) {
+      const name = (camp.name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const leads = camp.insights?.conversions || 0;
+      if (name.includes("lancamento") || name.includes("lançamento")) {
+        lancLeads += leads;
+      } else if (name.includes("terceiro") || name.includes("terceiros")) {
+        tercLeads += leads;
+      }
+      // Campaigns that don't match either keyword are not counted in funnels
+    }
+    return { lancamento: lancLeads, terceiros: tercLeads };
+  }, [campaigns]);
+
   const lancamentoFunnel = useMemo(() => {
     const f = funnelData?.lancamento;
+    const totalFromMeta = metaLeadsByFunnel.lancamento;
     const recebidos = f?.recebidos ?? null;
     return {
-      totalLeads: recebidos,
+      totalLeads: totalFromMeta > 0 ? totalFromMeta : recebidos,
       leadsRecebidos: recebidos,
       steps: [
         { label: "Descartados", value: f?.descartados ?? null, color: "#94a3b8" },
@@ -145,13 +163,14 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
         { label: "Venda", value: f?.venda ?? null, color: "#22c55e" },
       ],
     };
-  }, [funnelData]);
+  }, [funnelData, metaLeadsByFunnel]);
 
   const terceirosFunnel = useMemo(() => {
     const f = funnelData?.terceiros;
+    const totalFromMeta = metaLeadsByFunnel.terceiros;
     const recebidos = f?.recebidos ?? null;
     return {
-      totalLeads: recebidos,
+      totalLeads: totalFromMeta > 0 ? totalFromMeta : recebidos,
       leadsRecebidos: recebidos,
       steps: [
         { label: "Descartados", value: f?.descartados ?? null, color: "#94a3b8" },
@@ -162,7 +181,7 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
         { label: "Venda", value: f?.venda ?? null, color: "#22c55e" },
       ],
     };
-  }, [funnelData]);
+  }, [funnelData, metaLeadsByFunnel]);
 
   return (
     <div className="space-y-6">
