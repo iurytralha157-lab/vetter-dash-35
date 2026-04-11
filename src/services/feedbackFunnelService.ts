@@ -11,6 +11,7 @@ export interface FeedbackFunnelFilters {
   date_to?: string;
 }
 
+// Fetch rows with account name via separate lookup
 export async function fetchFeedbackFunnel(filters: FeedbackFunnelFilters = {}) {
   let query = supabase
     .from("feedback_funnel" as any)
@@ -31,12 +32,15 @@ export async function fetchFeedbackFunnel(filters: FeedbackFunnelFilters = {}) {
   return (data || []) as any[];
 }
 
-export async function fetchFeedbackFunnelStats() {
-  const { data, error } = await supabase
+export async function fetchFeedbackFunnelStats(accountId?: string) {
+  let query = supabase
     .from("feedback_funnel" as any)
     .select("etapa_funil, temperatura_lead, duplicado")
     .eq("duplicado", false);
 
+  if (accountId) query = query.eq("account_id", accountId);
+
+  const { data, error } = await query;
   if (error) throw error;
   const rows = (data || []) as any[];
 
@@ -48,4 +52,43 @@ export async function fetchFeedbackFunnelStats() {
     vendas: rows.filter((r) => r.etapa_funil === "venda").length,
     perdidos: rows.filter((r) => r.etapa_funil === "perdido").length,
   };
+}
+
+// Funnel counts by etapa for a specific account
+export async function fetchFunnelByAccount(accountId: string) {
+  const { data, error } = await supabase
+    .from("feedback_funnel" as any)
+    .select("etapa_funil")
+    .eq("account_id", accountId)
+    .eq("duplicado", false);
+
+  if (error) throw error;
+  const rows = (data || []) as any[];
+
+  const count = (etapa: string) => rows.filter((r) => r.etapa_funil === etapa).length;
+
+  return {
+    lead_novo: count("lead_novo"),
+    contato_iniciado: count("contato_iniciado"),
+    sem_resposta: count("sem_resposta"),
+    atendimento: count("atendimento"),
+    visita_agendada: count("visita_agendada"),
+    visita_realizada: count("visita_realizada"),
+    proposta: count("proposta"),
+    venda: count("venda"),
+    perdido: count("perdido"),
+    total: rows.length,
+  };
+}
+
+// Fetch accounts map for name resolution
+export async function fetchAccountsMap(): Promise<Record<string, string>> {
+  const { data } = await supabase
+    .from("accounts")
+    .select("id, nome_cliente")
+    .order("nome_cliente");
+  
+  const map: Record<string, string> = {};
+  (data || []).forEach((a: any) => { map[a.id] = a.nome_cliente; });
+  return map;
 }
