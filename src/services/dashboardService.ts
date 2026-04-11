@@ -71,15 +71,22 @@ const getDateRange = (period: string) => {
  * (same data source as individual account pages)
  */
 const fetchAllAccountsData = async (
-  period: string
+  period: string,
+  accountId?: string | null
 ): Promise<AccountMetaResult[]> => {
-  // Get all active accounts with Meta Ads
-  const { data: accounts, error } = await supabase
+  // Get accounts with Meta Ads
+  let query = supabase
     .from("accounts")
     .select("id, nome_cliente, meta_account_id, status")
     .eq("usa_meta_ads", true)
     .eq("status", "Ativo")
     .not("meta_account_id", "is", null);
+
+  if (accountId) {
+    query = query.eq("id", accountId);
+  }
+
+  const { data: accounts, error } = await query;
 
   if (error) {
     console.error("Error fetching accounts:", error);
@@ -90,7 +97,6 @@ const fetchAllAccountsData = async (
 
   const metaPeriod = periodToMetaParam(period);
 
-  // Fetch data from all accounts in parallel using the same edge function
   const results = await Promise.all(
     accounts.map(async (account) => {
       try {
