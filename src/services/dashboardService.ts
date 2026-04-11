@@ -136,21 +136,29 @@ const fetchAllAccountsData = async (
 };
 
 export const dashboardService = {
-  async getKPIData(period: string): Promise<KPIData> {
+  async getKPIData(period: string, accountId?: string | null): Promise<KPIData> {
     // Counts from DB (fast)
+    let metaQuery = supabase
+      .from("accounts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "Ativo")
+      .eq("usa_meta_ads", true)
+      .not("meta_account_id", "is", null);
+    let googleQuery = supabase
+      .from("accounts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "Ativo")
+      .eq("usa_google_ads", true);
+
+    if (accountId) {
+      metaQuery = metaQuery.eq("id", accountId);
+      googleQuery = googleQuery.eq("id", accountId);
+    }
+
     const [metaCount, googleCount, metaResults] = await Promise.all([
-      supabase
-        .from("accounts")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "Ativo")
-        .eq("usa_meta_ads", true)
-        .not("meta_account_id", "is", null),
-      supabase
-        .from("accounts")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "Ativo")
-        .eq("usa_google_ads", true),
-      fetchAllAccountsData(period),
+      metaQuery,
+      googleQuery,
+      fetchAllAccountsData(period, accountId),
     ]);
 
     if (metaCount.error) throw metaCount.error;
@@ -185,14 +193,19 @@ export const dashboardService = {
     };
   },
 
-  async getChartData(period: string): Promise<ChartDataPoint[]> {
-    // Try campaign_history first (if populated)
+  async getChartData(period: string, accountId?: string | null): Promise<ChartDataPoint[]> {
     const { startISO, endISO } = getDateRange(period);
-    const { data: historyRows, error } = await supabase
+    let query = supabase
       .from("campaign_history")
       .select("date, spend, leads")
       .gte("date", startISO)
       .lte("date", endISO);
+
+    if (accountId) {
+      query = query.eq("account_id", accountId);
+    }
+
+    const { data: historyRows, error } = await query;
 
     if (error) throw error;
 
@@ -221,14 +234,20 @@ export const dashboardService = {
     return result;
   },
 
-  async getTopCreatives(): Promise<CreativePerformance[]> {
-    const { data, error } = await supabase
+  async getTopCreatives(accountId?: string | null): Promise<CreativePerformance[]> {
+    let query = supabase
       .from("campaign_creatives")
       .select(
         "id, creative_name, ad_name, campaign_name, avg_ctr, avg_hook_rate, total_leads"
       )
       .order("total_leads", { ascending: false })
       .limit(3);
+
+    if (accountId) {
+      query = query.eq("client_id", accountId);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
@@ -240,26 +259,38 @@ export const dashboardService = {
     }));
   },
 
-  async getAutomationStats(period: string): Promise<AutomationStats> {
+  async getAutomationStats(period: string, accountId?: string | null): Promise<AutomationStats> {
     const { startISO, endISO } = getDateRange(period);
 
+    let sendsQuery = supabase
+      .from("relatorio_disparos")
+      .select("id", { count: "exact", head: true })
+      .gte("data_disparo", startISO)
+      .lte("data_disparo", endISO);
+
+    let reportsQuery = supabase
+      .from("relatorio_disparos")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "sucesso")
+      .gte("data_disparo", startISO)
+      .lte("data_disparo", endISO);
+
+    let leadsQuery = supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", `${startISO}T00:00:00.000Z`)
+      .lte("created_at", `${endISO}T23:59:59.999Z`);
+
+    if (accountId) {
+      sendsQuery = sendsQuery.eq("account_id", accountId);
+      reportsQuery = reportsQuery.eq("account_id", accountId);
+      leadsQuery = leadsQuery.eq("client_id", accountId);
+    }
+
     const [sends, reports, leads] = await Promise.all([
-      supabase
-        .from("relatorio_disparos")
-        .select("id", { count: "exact", head: true })
-        .gte("data_disparo", startISO)
-        .lte("data_disparo", endISO),
-      supabase
-        .from("relatorio_disparos")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "sucesso")
-        .gte("data_disparo", startISO)
-        .lte("data_disparo", endISO),
-      supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .gte("created_at", `${startISO}T00:00:00.000Z`)
-        .lte("created_at", `${endISO}T23:59:59.999Z`),
+      sendsQuery,
+      reportsQuery,
+      leadsQuery,
     ]);
 
     if (sends.error) throw sends.error;
