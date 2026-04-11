@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { MetaAdsResponse, MetaCampaign, MetaAccountMetrics } from "@/types/meta";
 import type { MetaPeriod } from "@/components/meta/MetaPeriodFilter";
 import {
-  Activity, Target, Eye, AlertCircle, Filter, RefreshCw,
+  Activity, Target, Eye, AlertCircle, RefreshCw,
 } from "lucide-react";
 import {
   LineChart, Line,
