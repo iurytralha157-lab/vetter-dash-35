@@ -1649,6 +1649,146 @@ export type Database = {
           },
         ]
       }
+      feedback_funnel: {
+        Row: {
+          account_id: string | null
+          ai_json: Json | null
+          ai_modelo: string | null
+          ai_prompt_versao: string | null
+          campaign_id: string | null
+          campanha_nome: string | null
+          cliente_id: string | null
+          confianca: number | null
+          created_at: string
+          data_proxima_acao: string | null
+          duplicado: boolean | null
+          etapa_funil: string | null
+          hashtag: string | null
+          id: number
+          id_grupo: string | null
+          lead_nome: string | null
+          lead_telefone: string | null
+          mensagem_hash: string | null
+          mensagem_normalizada: string | null
+          mensagem_original: string
+          nome_origem: string | null
+          numero_grupo: string | null
+          origem: string | null
+          processamento_erro: string | null
+          processamento_status: string | null
+          proxima_acao: string | null
+          responsavel_sugerido: string | null
+          resumo: string | null
+          score_intencao: number | null
+          status_lead: string | null
+          telefone_origem: string | null
+          temperatura_lead: string | null
+          updated_at: string
+          usuario_origem: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          ai_json?: Json | null
+          ai_modelo?: string | null
+          ai_prompt_versao?: string | null
+          campaign_id?: string | null
+          campanha_nome?: string | null
+          cliente_id?: string | null
+          confianca?: number | null
+          created_at?: string
+          data_proxima_acao?: string | null
+          duplicado?: boolean | null
+          etapa_funil?: string | null
+          hashtag?: string | null
+          id?: number
+          id_grupo?: string | null
+          lead_nome?: string | null
+          lead_telefone?: string | null
+          mensagem_hash?: string | null
+          mensagem_normalizada?: string | null
+          mensagem_original: string
+          nome_origem?: string | null
+          numero_grupo?: string | null
+          origem?: string | null
+          processamento_erro?: string | null
+          processamento_status?: string | null
+          proxima_acao?: string | null
+          responsavel_sugerido?: string | null
+          resumo?: string | null
+          score_intencao?: number | null
+          status_lead?: string | null
+          telefone_origem?: string | null
+          temperatura_lead?: string | null
+          updated_at?: string
+          usuario_origem?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          ai_json?: Json | null
+          ai_modelo?: string | null
+          ai_prompt_versao?: string | null
+          campaign_id?: string | null
+          campanha_nome?: string | null
+          cliente_id?: string | null
+          confianca?: number | null
+          created_at?: string
+          data_proxima_acao?: string | null
+          duplicado?: boolean | null
+          etapa_funil?: string | null
+          hashtag?: string | null
+          id?: number
+          id_grupo?: string | null
+          lead_nome?: string | null
+          lead_telefone?: string | null
+          mensagem_hash?: string | null
+          mensagem_normalizada?: string | null
+          mensagem_original?: string
+          nome_origem?: string | null
+          numero_grupo?: string | null
+          origem?: string | null
+          processamento_erro?: string | null
+          processamento_status?: string | null
+          proxima_acao?: string | null
+          responsavel_sugerido?: string | null
+          resumo?: string | null
+          score_intencao?: number | null
+          status_lead?: string | null
+          telefone_origem?: string | null
+          temperatura_lead?: string | null
+          updated_at?: string
+          usuario_origem?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_funnel_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_funnel_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "leads_stats"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "feedback_funnel_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "relatorio_n8n_consolidated"
+            referencedColumns: ["conta_id"]
+          },
+          {
+            foreignKeyName: "feedback_funnel_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           campanha: string | null
