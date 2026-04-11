@@ -103,11 +103,11 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
   useEffect(() => {
     const loadFunnel = async () => {
       try {
-        const data = await fetchFunnelByAccount(accountId);
-        setFunnelData(data);
+        const data = await fetchFunnelByAccountSplit(accountId);
+        setFunnelSplit(data);
       } catch (err) {
         console.error("Error loading funnel data:", err);
-        setFunnelData(null);
+        setFunnelSplit(null);
       }
     };
     loadFunnel();
