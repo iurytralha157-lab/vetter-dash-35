@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { MetaMetricsGrid } from "@/components/meta/MetaMetricsGrid";
 import { MetaStatusBadge } from "@/components/meta/MetaStatusBadge";
 import { MetaCampaignDetailDialog } from "@/components/meta/MetaCampaignDetailDialog";
 import { metaAdsService } from "@/services/metaAdsService";
@@ -12,10 +11,10 @@ import { supabase } from "@/integrations/supabase/client";
 import type { MetaAdsResponse, MetaCampaign, MetaAccountMetrics } from "@/types/meta";
 import type { MetaPeriod } from "@/components/meta/MetaPeriodFilter";
 import {
-  Activity, Target, Eye, AlertCircle, RefreshCw,
+  AlertCircle, RefreshCw, Eye, DollarSign, Target, TrendingUp,
 } from "lucide-react";
 import {
-  LineChart, Line,
+  BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 
@@ -28,7 +27,6 @@ const formatNumber = (value: number) => {
   return Math.round(value).toString();
 };
 
-// Map dashboard period to Meta period
 const mapPeriod = (p: string): MetaPeriod => {
   if (p === "today") return "today";
   if (p === "yesterday") return "yesterday";
@@ -99,7 +97,6 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
     if (metaAccountId) fetchMeta();
   }, [metaAccountId, metaPeriod]);
 
-  // Fetch funnel data from feedback_campanha (campaign-level)
   useEffect(() => {
     const loadFunnel = async () => {
       try {
@@ -113,45 +110,67 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
     loadFunnel();
   }, [accountId]);
 
-  const orderedCampaigns = useMemo(() => {
-    return [...campaigns].sort((a, b) => {
-      const aActive = a.status === "ACTIVE" ? 0 : 1;
-      const bActive = b.status === "ACTIVE" ? 0 : 1;
-      if (aActive !== bActive) return aActive - bActive;
-      return (b.insights?.conversions || 0) - (a.insights?.conversions || 0);
-    });
-  }, [campaigns]);
-
-  const performanceData = useMemo(() => {
-    if (!campaigns.length) return [];
-    return campaigns.slice(0, 7).map((camp, idx) => ({
-      date: `Dia ${idx + 1}`,
-      impressions: camp.insights?.impressions || 0,
-      clicks: camp.insights?.clicks || 0,
-      conversions: camp.insights?.conversions || 0,
-    }));
-  }, [campaigns]);
-
-  // Classify Meta campaigns by funnel type based on campaign name
-  const metaLeadsByFunnel = useMemo(() => {
-    let lancLeads = 0;
-    let tercLeads = 0;
+  // Classify campaigns by funnel type
+  const classifiedCampaigns = useMemo(() => {
+    const lanc: MetaCampaign[] = [];
+    const terc: MetaCampaign[] = [];
+    const other: MetaCampaign[] = [];
     for (const camp of campaigns) {
       const name = (camp.name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-      const leads = camp.insights?.conversions || 0;
       if (name.includes("lancamento") || name.includes("lançamento")) {
-        lancLeads += leads;
+        lanc.push(camp);
       } else if (name.includes("terceiro") || name.includes("terceiros")) {
-        tercLeads += leads;
+        terc.push(camp);
+      } else {
+        other.push(camp);
       }
-      // Campaigns that don't match either keyword are not counted in funnels
     }
-    return { lancamento: lancLeads, terceiros: tercLeads };
+    return { lanc, terc, other };
   }, [campaigns]);
 
+  // Aggregate metrics by funnel type
+  const splitMetrics = useMemo(() => {
+    const sum = (list: MetaCampaign[]) => {
+      let spend = 0, leads = 0;
+      for (const c of list) {
+        spend += c.insights?.spend || 0;
+        leads += c.insights?.conversions || 0;
+      }
+      return { spend, leads, cpl: leads > 0 ? spend / leads : 0 };
+    };
+    return {
+      lancamento: sum(classifiedCampaigns.lanc),
+      terceiros: sum(classifiedCampaigns.terc),
+    };
+  }, [classifiedCampaigns]);
+
+  // Only active campaigns with spend > 0
+  const activeCampaigns = useMemo(() => {
+    return campaigns
+      .filter(c => c.status === "ACTIVE" && (c.insights?.spend || 0) > 0)
+      .sort((a, b) => (b.insights?.conversions || 0) - (a.insights?.conversions || 0));
+  }, [campaigns]);
+
+  // Comparison chart data
+  const comparisonData = useMemo(() => {
+    return [
+      {
+        name: "Lançamento",
+        "Valor Gasto": splitMetrics.lancamento.spend,
+        "Leads": splitMetrics.lancamento.leads,
+      },
+      {
+        name: "Terceiros",
+        "Valor Gasto": splitMetrics.terceiros.spend,
+        "Leads": splitMetrics.terceiros.leads,
+      },
+    ];
+  }, [splitMetrics]);
+
+  // Funnel data
   const lancamentoFunnel = useMemo(() => {
     const f = funnelData?.lancamento;
-    const totalFromMeta = metaLeadsByFunnel.lancamento;
+    const totalFromMeta = splitMetrics.lancamento.leads;
     const recebidos = f?.recebidos ?? null;
     return {
       totalLeads: totalFromMeta > 0 ? totalFromMeta : recebidos,
@@ -164,11 +183,11 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
         { label: "Venda", value: f?.venda ?? null, color: "#22c55e" },
       ],
     };
-  }, [funnelData, metaLeadsByFunnel]);
+  }, [funnelData, splitMetrics]);
 
   const terceirosFunnel = useMemo(() => {
     const f = funnelData?.terceiros;
-    const totalFromMeta = metaLeadsByFunnel.terceiros;
+    const totalFromMeta = splitMetrics.terceiros.leads;
     const recebidos = f?.recebidos ?? null;
     return {
       totalLeads: totalFromMeta > 0 ? totalFromMeta : recebidos,
@@ -182,7 +201,11 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
         { label: "Venda", value: f?.venda ?? null, color: "#22c55e" },
       ],
     };
-  }, [funnelData, metaLeadsByFunnel]);
+  }, [funnelData, splitMetrics]);
+
+  const totalLeads = (metrics?.total_conversions || 0);
+  const totalSpend = (metrics?.total_spend || 0);
+  const totalCPL = totalLeads > 0 ? totalSpend / totalLeads : 0;
 
   return (
     <div className="space-y-6">
@@ -200,18 +223,15 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
         </Button>
       </div>
 
-      {/* KPIs */}
-      <Card>
-        <CardContent className="p-6">
-          <MetaMetricsGrid metrics={metrics} loading={loading} />
-        </CardContent>
-      </Card>
-
-      {/* Charts */}
+      {/* ===== KPIs ===== */}
       {loading ? (
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-8"><Skeleton className="h-80" /></div>
-          <div className="col-span-4"><Skeleton className="h-80" /></div>
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-24" />)}
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-20" />)}
+          </div>
         </div>
       ) : !metrics ? (
         <Card>
@@ -222,57 +242,105 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-12 gap-6">
-            {/* Performance Chart */}
-            <Card className="col-span-12 lg:col-span-8">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Activity className="w-5 h-5 text-primary" />
-                  Desempenho no Período
+          {/* Row 1: Total */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <KPICard
+              title="Investimento Total"
+              value={currency(totalSpend)}
+              icon={<DollarSign className="h-5 w-5 text-orange-500" />}
+              bgIcon="bg-orange-500/10"
+            />
+            <KPICard
+              title="Leads Total"
+              value={totalLeads.toString()}
+              icon={<Target className="h-5 w-5 text-blue-500" />}
+              bgIcon="bg-blue-500/10"
+            />
+            <KPICard
+              title="CPL Total"
+              value={currency(totalCPL)}
+              icon={<TrendingUp className="h-5 w-5 text-purple-500" />}
+              bgIcon="bg-purple-500/10"
+            />
+          </div>
+
+          {/* Row 2: Split Lançamento | Terceiros */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Lançamento */}
+            <Card className="border-l-4 border-l-emerald-500">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                  Lançamento
                 </CardTitle>
               </CardHeader>
+              <CardContent className="grid grid-cols-3 gap-3">
+                <MiniKPI label="Gasto" value={currency(splitMetrics.lancamento.spend)} />
+                <MiniKPI label="Leads" value={splitMetrics.lancamento.leads.toString()} />
+                <MiniKPI label="CPL" value={currency(splitMetrics.lancamento.cpl)} />
+              </CardContent>
+            </Card>
+            {/* Terceiros */}
+            <Card className="border-l-4 border-l-sky-500">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold text-sky-600 dark:text-sky-400">
+                  Terceiros
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-3 gap-3">
+                <MiniKPI label="Gasto" value={currency(splitMetrics.terceiros.spend)} />
+                <MiniKPI label="Leads" value={splitMetrics.terceiros.leads.toString()} />
+                <MiniKPI label="CPL" value={currency(splitMetrics.terceiros.cpl)} />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ===== Comparison Chart + Funnels ===== */}
+          <div className="grid grid-cols-12 gap-6">
+            {/* Comparison Chart */}
+            <Card className="col-span-12 lg:col-span-6">
+              <CardHeader>
+                <CardTitle className="text-lg">Comparativo Lançamento vs Terceiros</CardTitle>
+              </CardHeader>
               <CardContent>
-                {performanceData.length > 0 ? (
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={performanceData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
-                        <YAxis stroke="hsl(var(--muted-foreground))" />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: "hsl(var(--card))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: "8px",
-                          }}
-                        />
-                        <Legend />
-                        <Line type="monotone" dataKey="impressions" stroke="hsl(var(--primary))" strokeWidth={3} name="Impressões" dot={{ fill: "hsl(var(--primary))", r: 4 }} />
-                        <Line type="monotone" dataKey="clicks" stroke="#10b981" strokeWidth={3} name="Cliques" dot={{ fill: "#10b981", r: 4 }} />
-                        <Line type="monotone" dataKey="conversions" stroke="#f59e0b" strokeWidth={3} name="Conversões" dot={{ fill: "#f59e0b", r: 4 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="h-80 flex items-center justify-center text-muted-foreground">
-                    Sem dados para exibir
-                  </div>
-                )}
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={comparisonData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" />
+                      <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" />
+                      <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                        formatter={(value: number, name: string) => {
+                          if (name === "Valor Gasto") return [currency(value), name];
+                          return [value, name];
+                        }}
+                      />
+                      <Legend />
+                      <Bar yAxisId="left" dataKey="Valor Gasto" fill="#10b981" radius={[6, 6, 0, 0]} />
+                      <Bar yAxisId="right" dataKey="Leads" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Sales Funnels - Side by Side */}
-            <div className="col-span-12 lg:col-span-4 grid grid-cols-1 gap-4">
+            {/* Funnels */}
+            <div className="col-span-12 lg:col-span-6 grid grid-cols-1 md:grid-cols-2 gap-4">
               <SalesFunnelCard
-                title="Funil de Lançamento"
-                subtitle="Dados do tipo #feedback lançamento"
+                title="Funil Lançamento"
+                subtitle="Meta + #feedback lançamento"
                 totalLeads={lancamentoFunnel.totalLeads}
                 leadsRecebidos={lancamentoFunnel.leadsRecebidos}
                 steps={lancamentoFunnel.steps}
               />
               <SalesFunnelCard
-                title="Funil de Terceiros"
-                subtitle="Dados do tipo #feedback terceiros"
+                title="Funil Terceiros"
+                subtitle="Meta + #feedback terceiros"
                 totalLeads={terceirosFunnel.totalLeads}
                 leadsRecebidos={terceirosFunnel.leadsRecebidos}
                 steps={terceirosFunnel.steps}
@@ -280,16 +348,16 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
             </div>
           </div>
 
-          {/* Campaign Performance Table */}
+          {/* ===== Campaign Table - Active with spend only ===== */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Performance Detalhada por Campanha</CardTitle>
+              <CardTitle className="text-lg">Performance por Campanha</CardTitle>
               <CardDescription>
-                {campaigns.length} campanhas no total • Ordenado por conversões
+                {activeCampaigns.length} campanhas ativas com investimento no período
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {campaigns.length > 0 ? (
+              {activeCampaigns.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
@@ -305,11 +373,10 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
                       </tr>
                     </thead>
                     <tbody>
-                      {orderedCampaigns.map((campaign) => {
+                      {activeCampaigns.map((campaign) => {
                         const spend = campaign.insights?.spend || 0;
                         const conversions = campaign.insights?.conversions || 0;
                         const cpl = conversions > 0 ? spend / conversions : 0;
-
                         return (
                           <tr
                             key={campaign.id}
@@ -356,7 +423,7 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
               ) : (
                 <div className="py-12 text-center text-muted-foreground">
                   <Target className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                  <p>Nenhuma campanha encontrada no período selecionado</p>
+                  <p>Nenhuma campanha ativa com investimento no período</p>
                 </div>
               )}
             </CardContent>
@@ -364,12 +431,36 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
         </>
       )}
 
-      {/* Campaign Detail Dialog */}
       <MetaCampaignDetailDialog
         campaign={selectedCampaign}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
       />
+    </div>
+  );
+}
+
+// --- Sub-components ---
+
+function KPICard({ title, value, icon, bgIcon }: { title: string; value: string; icon: React.ReactNode; bgIcon: string }) {
+  return (
+    <Card className="surface-elevated">
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <div className={`p-2 rounded-lg ${bgIcon}`}>{icon}</div>
+        </div>
+        <p className="text-3xl font-bold text-foreground">{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MiniKPI({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="text-center">
+      <p className="text-xs text-muted-foreground mb-1">{label}</p>
+      <p className="text-lg font-bold text-foreground">{value}</p>
     </div>
   );
 }
