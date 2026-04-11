@@ -8,28 +8,34 @@ export interface FeedbackCampanhaRow {
   tipo_funil: "lancamento" | "terceiros";
   campanha_nome: string;
   campanha_codigo_curto: string | null;
-  quantidade_recebida: number;
-  quantidade_descartado: number;
-  quantidade_aguardando_retorno: number;
-  quantidade_atendimento: number;
-  quantidade_passou_corretor: number;
-  quantidade_visita: number;
-  quantidade_proposta: number;
-  quantidade_venda: number;
+  quantidade_recebida: number | null;
+  quantidade_descartado: number | null;
+  quantidade_aguardando_retorno: number | null;
+  quantidade_atendimento: number | null;
+  quantidade_passou_corretor: number | null;
+  quantidade_visita: number | null;
+  quantidade_proposta: number | null;
+  quantidade_venda: number | null;
 }
 
 export interface FunnelTotals {
-  recebidos: number;
-  descartados: number;
-  aguardando_retorno: number;
-  atendimento: number;
-  passou_corretor: number;
-  visita: number;
-  proposta: number;
-  venda: number;
+  recebidos: number | null;
+  descartados: number | null;
+  aguardando_retorno: number | null;
+  atendimento: number | null;
+  passou_corretor: number | null;
+  visita: number | null;
+  proposta: number | null;
+  venda: number | null;
 }
 
-// Fetch campaign-level funnel data for a specific account, split by tipo_funil
+// Sum only non-null values; if ALL values are null, return null
+function sumNullable(values: (number | null)[]): number | null {
+  const nonNull = values.filter((v): v is number => v !== null && v !== undefined);
+  if (nonNull.length === 0) return null;
+  return nonNull.reduce((a, b) => a + b, 0);
+}
+
 export async function fetchCampanhaFunnel(accountId: string): Promise<{
   lancamento: FunnelTotals;
   terceiros: FunnelTotals;
@@ -46,14 +52,14 @@ export async function fetchCampanhaFunnel(accountId: string): Promise<{
   const rows = (data || []) as any[];
 
   const sumTotals = (filtered: any[]): FunnelTotals => ({
-    recebidos: filtered.reduce((s, r) => s + (r.quantidade_recebida || 0), 0),
-    descartados: filtered.reduce((s, r) => s + (r.quantidade_descartado || 0), 0),
-    aguardando_retorno: filtered.reduce((s, r) => s + (r.quantidade_aguardando_retorno || 0), 0),
-    atendimento: filtered.reduce((s, r) => s + (r.quantidade_atendimento || 0), 0),
-    passou_corretor: filtered.reduce((s, r) => s + (r.quantidade_passou_corretor || 0), 0),
-    visita: filtered.reduce((s, r) => s + (r.quantidade_visita || 0), 0),
-    proposta: filtered.reduce((s, r) => s + (r.quantidade_proposta || 0), 0),
-    venda: filtered.reduce((s, r) => s + (r.quantidade_venda || 0), 0),
+    recebidos: sumNullable(filtered.map(r => r.quantidade_recebida)),
+    descartados: sumNullable(filtered.map(r => r.quantidade_descartado)),
+    aguardando_retorno: sumNullable(filtered.map(r => r.quantidade_aguardando_retorno)),
+    atendimento: sumNullable(filtered.map(r => r.quantidade_atendimento)),
+    passou_corretor: sumNullable(filtered.map(r => r.quantidade_passou_corretor)),
+    visita: sumNullable(filtered.map(r => r.quantidade_visita)),
+    proposta: sumNullable(filtered.map(r => r.quantidade_proposta)),
+    venda: sumNullable(filtered.map(r => r.quantidade_venda)),
   });
 
   const lancRows = rows.filter((r: any) => r.tipo_funil === "lancamento");

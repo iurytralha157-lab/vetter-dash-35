@@ -133,16 +133,16 @@ Deno.serve(async (req) => {
         ...sharedFields,
         tipo_funil: tipoFunil,
         campanha_nome: camp.campanha_nome || "desconhecida",
-        campanha_codigo_curto: camp.campanha_codigo_curto || null,
+        campanha_codigo_curto: camp.campanha_codigo_curto ?? null,
         data_referencia: camp.data_referencia || new Date().toISOString().split("T")[0],
-        quantidade_recebida: camp.quantidade_recebida || 0,
-        quantidade_descartado: camp.quantidade_descartado || 0,
-        quantidade_aguardando_retorno: camp.quantidade_aguardando_retorno || 0,
-        quantidade_atendimento: camp.quantidade_atendimento || 0,
-        quantidade_passou_corretor: camp.quantidade_passou_corretor || 0,
-        quantidade_visita: camp.quantidade_visita || 0,
-        quantidade_proposta: camp.quantidade_proposta || 0,
-        quantidade_venda: camp.quantidade_venda || 0,
+        quantidade_recebida: camp.quantidade_recebida ?? null,
+        quantidade_descartado: camp.quantidade_descartado ?? null,
+        quantidade_aguardando_retorno: camp.quantidade_aguardando_retorno ?? null,
+        quantidade_atendimento: camp.quantidade_atendimento ?? null,
+        quantidade_passou_corretor: camp.quantidade_passou_corretor ?? null,
+        quantidade_visita: camp.quantidade_visita ?? null,
+        quantidade_proposta: camp.quantidade_proposta ?? null,
+        quantidade_venda: camp.quantidade_venda ?? null,
         processamento_status: processamentoStatus,
         processamento_erro: processamentoErro,
         ai_modelo: aiModel,
@@ -177,16 +177,16 @@ Deno.serve(async (req) => {
 
 interface CampaignData {
   campanha_nome: string;
-  campanha_codigo_curto?: string;
-  data_referencia?: string;
-  quantidade_recebida: number;
-  quantidade_descartado: number;
-  quantidade_aguardando_retorno: number;
-  quantidade_atendimento: number;
-  quantidade_passou_corretor: number;
-  quantidade_visita: number;
-  quantidade_proposta: number;
-  quantidade_venda: number;
+  campanha_codigo_curto?: string | null;
+  data_referencia?: string | null;
+  quantidade_recebida: number | null;
+  quantidade_descartado: number | null;
+  quantidade_aguardando_retorno: number | null;
+  quantidade_atendimento: number | null;
+  quantidade_passou_corretor: number | null;
+  quantidade_visita: number | null;
+  quantidade_proposta: number | null;
+  quantidade_venda: number | null;
 }
 
 async function callAI(mensagem: string, apiKey: string, model: string): Promise<{ tipo_funil: string; campanhas: CampaignData[] }> {
@@ -208,9 +208,16 @@ venda <N>
 
 Pode haver MÚLTIPLAS campanhas na mesma mensagem.
 
+REGRA CRÍTICA:
+- Extraia SOMENTE os campos explicitamente mencionados na mensagem.
+- Se um campo NÃO foi mencionado, retorne null para esse campo. NÃO retorne 0.
+- NÃO invente, assuma ou estime valores.
+- NÃO preencha campos ausentes com 0 ou qualquer outro valor.
+- Somente retorne um número quando ele estiver explícito na mensagem.
+
 Extraia:
 1. tipo_funil: "lancamento" ou "terceiros" (da linha logo após #feedback)
-2. Para cada campanha mencionada, extraia as quantidades
+2. Para cada campanha mencionada, extraia APENAS as quantidades explicitamente informadas
 
 Retorne usando a tool extract_feedback_campaigns.`;
 
@@ -246,17 +253,17 @@ Retorne usando a tool extract_feedback_campaigns.`;
                     type: "object",
                     properties: {
                       campanha_nome: { type: "string", description: "Nome completo da campanha" },
-                      campanha_codigo_curto: { type: "string", description: "Código curto se houver (ex: REF47, AP0145)" },
-                      quantidade_recebida: { type: "integer", description: "Leads recebidos" },
-                      quantidade_descartado: { type: "integer", description: "Leads descartados" },
-                      quantidade_aguardando_retorno: { type: "integer", description: "Aguardando retorno" },
-                      quantidade_atendimento: { type: "integer", description: "Em atendimento / Atendimento SDR" },
-                      quantidade_passou_corretor: { type: "integer", description: "Passou para corretor (só terceiros)" },
-                      quantidade_visita: { type: "integer", description: "Visitas" },
-                      quantidade_proposta: { type: "integer", description: "Propostas" },
-                      quantidade_venda: { type: "integer", description: "Vendas" },
+                      campanha_codigo_curto: { type: ["string", "null"], description: "Código curto se houver (ex: REF47, AP0145). null se não mencionado." },
+                      quantidade_recebida: { type: ["integer", "null"], description: "Leads recebidos. null se não mencionado." },
+                      quantidade_descartado: { type: ["integer", "null"], description: "Leads descartados. null se não mencionado." },
+                      quantidade_aguardando_retorno: { type: ["integer", "null"], description: "Aguardando retorno. null se não mencionado." },
+                      quantidade_atendimento: { type: ["integer", "null"], description: "Em atendimento / Atendimento SDR. null se não mencionado." },
+                      quantidade_passou_corretor: { type: ["integer", "null"], description: "Passou para corretor. null se não mencionado." },
+                      quantidade_visita: { type: ["integer", "null"], description: "Visitas. null se não mencionado." },
+                      quantidade_proposta: { type: ["integer", "null"], description: "Propostas. null se não mencionado." },
+                      quantidade_venda: { type: ["integer", "null"], description: "Vendas. null se não mencionado." },
                     },
-                    required: ["campanha_nome", "quantidade_recebida"],
+                    required: ["campanha_nome"],
                   },
                 },
               },
