@@ -134,17 +134,18 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
   const funnelSteps = useMemo(() => {
     const totalLeadsMeta = metrics?.total_conversions || 0;
     const f = funnelData || { lead_novo: 0, contato_iniciado: 0, sem_resposta: 0, atendimento: 0, visita_agendada: 0, visita_realizada: 0, proposta: 0, venda: 0, perdido: 0, total: 0 };
-    return [
-      { label: "Total de Leads", value: totalLeadsMeta || f.total, color: "#3b82f6" },
-      { label: "Lead Novo", value: f.lead_novo, color: "#60a5fa" },
-      { label: "Contato Iniciado", value: f.contato_iniciado, color: "#06b6d4" },
-      { label: "Sem Resposta", value: f.sem_resposta, color: "#94a3b8" },
-      { label: "Em Atendimento", value: f.atendimento, color: "#f59e0b" },
-      { label: "Visita", value: f.visita_agendada + f.visita_realizada, color: "#8b5cf6" },
-      { label: "Proposta", value: f.proposta, color: "#ec4899" },
-      { label: "Venda", value: f.venda, color: "#22c55e" },
-      { label: "Perdido", value: f.perdido, color: "#ef4444" },
-    ];
+    const leadsRecebidos = f.total; // total from feedback_funnel
+    return {
+      totalLeads: totalLeadsMeta || leadsRecebidos,
+      leadsRecebidos,
+      steps: [
+        { label: "Descartados", value: f.sem_resposta + f.perdido, color: "#94a3b8" },
+        { label: "Em Atendimento", value: f.atendimento + f.contato_iniciado + f.lead_novo, color: "#f59e0b" },
+        { label: "Visita", value: f.visita_agendada + f.visita_realizada, color: "#8b5cf6" },
+        { label: "Proposta", value: f.proposta, color: "#ec4899" },
+        { label: "Venda", value: f.venda, color: "#22c55e" },
+      ],
+    };
   }, [metrics, funnelData]);
 
   return (
