@@ -51,10 +51,10 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
   const [accountName, setAccountName] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<MetaCampaign | null>(null);
-  const [funnelData, setFunnelData] = useState<{
-    lead_novo: number; contato_iniciado: number; sem_resposta: number;
-    atendimento: number; visita_agendada: number; visita_realizada: number;
-    proposta: number; venda: number; perdido: number; total: number;
+  const [funnelSplit, setFunnelSplit] = useState<{
+    lancamento: { lead_novo: number; contato_iniciado: number; sem_resposta: number; atendimento: number; visita_agendada: number; visita_realizada: number; proposta: number; venda: number; perdido: number; total: number };
+    terceiros: { lead_novo: number; contato_iniciado: number; sem_resposta: number; atendimento: number; visita_agendada: number; visita_realizada: number; proposta: number; venda: number; perdido: number; total: number };
+    all: { lead_novo: number; contato_iniciado: number; sem_resposta: number; atendimento: number; visita_agendada: number; visita_realizada: number; proposta: number; venda: number; perdido: number; total: number };
   } | null>(null);
 
   const metaPeriod = mapPeriod(period);
