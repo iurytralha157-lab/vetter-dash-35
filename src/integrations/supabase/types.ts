@@ -1649,6 +1649,118 @@ export type Database = {
           },
         ]
       }
+      feedback_campanha: {
+        Row: {
+          account_id: string | null
+          ai_json: Json | null
+          ai_modelo: string | null
+          campanha_codigo_curto: string | null
+          campanha_nome: string
+          created_at: string
+          data_referencia: string
+          id: number
+          id_grupo: string | null
+          mensagem_hash: string | null
+          mensagem_original: string
+          nome_origem: string | null
+          numero_grupo: string | null
+          processamento_erro: string | null
+          processamento_status: string | null
+          quantidade_aguardando_retorno: number
+          quantidade_atendimento: number
+          quantidade_descartado: number
+          quantidade_passou_corretor: number
+          quantidade_proposta: number
+          quantidade_recebida: number
+          quantidade_venda: number
+          quantidade_visita: number
+          telefone_origem: string | null
+          tipo_funil: string
+          updated_at: string
+          usuario_origem: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          ai_json?: Json | null
+          ai_modelo?: string | null
+          campanha_codigo_curto?: string | null
+          campanha_nome: string
+          created_at?: string
+          data_referencia?: string
+          id?: never
+          id_grupo?: string | null
+          mensagem_hash?: string | null
+          mensagem_original: string
+          nome_origem?: string | null
+          numero_grupo?: string | null
+          processamento_erro?: string | null
+          processamento_status?: string | null
+          quantidade_aguardando_retorno?: number
+          quantidade_atendimento?: number
+          quantidade_descartado?: number
+          quantidade_passou_corretor?: number
+          quantidade_proposta?: number
+          quantidade_recebida?: number
+          quantidade_venda?: number
+          quantidade_visita?: number
+          telefone_origem?: string | null
+          tipo_funil: string
+          updated_at?: string
+          usuario_origem?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          ai_json?: Json | null
+          ai_modelo?: string | null
+          campanha_codigo_curto?: string | null
+          campanha_nome?: string
+          created_at?: string
+          data_referencia?: string
+          id?: never
+          id_grupo?: string | null
+          mensagem_hash?: string | null
+          mensagem_original?: string
+          nome_origem?: string | null
+          numero_grupo?: string | null
+          processamento_erro?: string | null
+          processamento_status?: string | null
+          quantidade_aguardando_retorno?: number
+          quantidade_atendimento?: number
+          quantidade_descartado?: number
+          quantidade_passou_corretor?: number
+          quantidade_proposta?: number
+          quantidade_recebida?: number
+          quantidade_venda?: number
+          quantidade_visita?: number
+          telefone_origem?: string | null
+          tipo_funil?: string
+          updated_at?: string
+          usuario_origem?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_campanha_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_campanha_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "leads_stats"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "feedback_campanha_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "relatorio_n8n_consolidated"
+            referencedColumns: ["conta_id"]
+          },
+        ]
+      }
       feedback_funnel: {
         Row: {
           account_id: string | null
