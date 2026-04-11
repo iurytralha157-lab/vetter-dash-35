@@ -577,6 +577,8 @@ function getHelpText(clientName: string): string {
     `   LEADS DE 09/04\n` +
     `   Recebi 21 leads, 9 Qualificaram...\n\n` +
     `📊 *#funil* — Ver funil consolidado (30 dias)\n\n` +
+    `🔄 *#followup* — Registrar follow-up de lead\n` +
+    `   Ex: #followup João ligou, quer visitar apt 3Q\n\n` +
     `❓ *#ajuda* — Mostra esta mensagem\n`;
 }
 
