@@ -44,10 +44,10 @@ export default function Dashboard() {
       setIsLoading(true);
       try {
         const [kpis, chart, creatives, automation] = await Promise.all([
-          dashboardService.getKPIData(period),
-          dashboardService.getChartData(period),
-          dashboardService.getTopCreatives(),
-          dashboardService.getAutomationStats(period),
+          dashboardService.getKPIData(period, selectedAccount),
+          dashboardService.getChartData(period, selectedAccount),
+          dashboardService.getTopCreatives(selectedAccount),
+          dashboardService.getAutomationStats(period, selectedAccount),
         ]);
 
         setKpiData(kpis);
@@ -62,7 +62,7 @@ export default function Dashboard() {
     };
 
     loadData();
-  }, [period]);
+  }, [period, selectedAccount]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {

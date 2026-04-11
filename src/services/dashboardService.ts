@@ -71,15 +71,22 @@ const getDateRange = (period: string) => {
  * (same data source as individual account pages)
  */
 const fetchAllAccountsData = async (
-  period: string
+  period: string,
+  accountId?: string | null
 ): Promise<AccountMetaResult[]> => {
-  // Get all active accounts with Meta Ads
-  const { data: accounts, error } = await supabase
+  // Get accounts with Meta Ads
+  let query = supabase
     .from("accounts")
     .select("id, nome_cliente, meta_account_id, status")
     .eq("usa_meta_ads", true)
     .eq("status", "Ativo")
     .not("meta_account_id", "is", null);
+
+  if (accountId) {
+    query = query.eq("id", accountId);
+  }
+
+  const { data: accounts, error } = await query;
 
   if (error) {
     console.error("Error fetching accounts:", error);
@@ -90,7 +97,6 @@ const fetchAllAccountsData = async (
 
   const metaPeriod = periodToMetaParam(period);
 
-  // Fetch data from all accounts in parallel using the same edge function
   const results = await Promise.all(
     accounts.map(async (account) => {
       try {
@@ -130,21 +136,29 @@ const fetchAllAccountsData = async (
 };
 
 export const dashboardService = {
-  async getKPIData(period: string): Promise<KPIData> {
+  async getKPIData(period: string, accountId?: string | null): Promise<KPIData> {
     // Counts from DB (fast)
+    let metaQuery = supabase
+      .from("accounts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "Ativo")
+      .eq("usa_meta_ads", true)
+      .not("meta_account_id", "is", null);
+    let googleQuery = supabase
+      .from("accounts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "Ativo")
+      .eq("usa_google_ads", true);
+
+    if (accountId) {
+      metaQuery = metaQuery.eq("id", accountId);
+      googleQuery = googleQuery.eq("id", accountId);
+    }
+
     const [metaCount, googleCount, metaResults] = await Promise.all([
-      supabase
-        .from("accounts")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "Ativo")
-        .eq("usa_meta_ads", true)
-        .not("meta_account_id", "is", null),
-      supabase
-        .from("accounts")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "Ativo")
-        .eq("usa_google_ads", true),
-      fetchAllAccountsData(period),
+      metaQuery,
+      googleQuery,
+      fetchAllAccountsData(period, accountId),
     ]);
 
     if (metaCount.error) throw metaCount.error;
@@ -179,14 +193,19 @@ export const dashboardService = {
     };
   },
 
-  async getChartData(period: string): Promise<ChartDataPoint[]> {
-    // Try campaign_history first (if populated)
+  async getChartData(period: string, accountId?: string | null): Promise<ChartDataPoint[]> {
     const { startISO, endISO } = getDateRange(period);
-    const { data: historyRows, error } = await supabase
+    let query = supabase
       .from("campaign_history")
       .select("date, spend, leads")
       .gte("date", startISO)
       .lte("date", endISO);
+
+    if (accountId) {
+      query = query.eq("account_id", accountId);
+    }
+
+    const { data: historyRows, error } = await query;
 
     if (error) throw error;
 
@@ -215,14 +234,20 @@ export const dashboardService = {
     return result;
   },
 
-  async getTopCreatives(): Promise<CreativePerformance[]> {
-    const { data, error } = await supabase
+  async getTopCreatives(accountId?: string | null): Promise<CreativePerformance[]> {
+    let query = supabase
       .from("campaign_creatives")
       .select(
         "id, creative_name, ad_name, campaign_name, avg_ctr, avg_hook_rate, total_leads"
       )
       .order("total_leads", { ascending: false })
       .limit(3);
+
+    if (accountId) {
+      query = query.eq("client_id", accountId);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
@@ -234,26 +259,42 @@ export const dashboardService = {
     }));
   },
 
-  async getAutomationStats(period: string): Promise<AutomationStats> {
+  async getAutomationStats(period: string, accountId?: string | null): Promise<AutomationStats> {
     const { startISO, endISO } = getDateRange(period);
 
-    const [sends, reports, leads] = await Promise.all([
-      supabase
+    // Build queries - use type assertion to avoid deep type instantiation
+    const buildSendsQuery = () => {
+      const q = supabase
         .from("relatorio_disparos")
         .select("id", { count: "exact", head: true })
         .gte("data_disparo", startISO)
-        .lte("data_disparo", endISO),
-      supabase
+        .lte("data_disparo", endISO);
+      return accountId ? (q as any).eq("account_id", accountId) : q;
+    };
+
+    const buildReportsQuery = () => {
+      const q = supabase
         .from("relatorio_disparos")
         .select("id", { count: "exact", head: true })
         .eq("status", "sucesso")
         .gte("data_disparo", startISO)
-        .lte("data_disparo", endISO),
-      supabase
+        .lte("data_disparo", endISO);
+      return accountId ? (q as any).eq("account_id", accountId) : q;
+    };
+
+    const buildLeadsQuery = () => {
+      const q = supabase
         .from("leads")
         .select("id", { count: "exact", head: true })
         .gte("created_at", `${startISO}T00:00:00.000Z`)
-        .lte("created_at", `${endISO}T23:59:59.999Z`),
+        .lte("created_at", `${endISO}T23:59:59.999Z`);
+      return accountId ? (q as any).eq("client_id", accountId) : q;
+    };
+
+    const [sends, reports, leads] = await Promise.all([
+      buildSendsQuery(),
+      buildReportsQuery(),
+      buildLeadsQuery(),
     ]);
 
     if (sends.error) throw sends.error;
