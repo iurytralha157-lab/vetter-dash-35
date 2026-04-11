@@ -187,23 +187,29 @@ async function callAIMultiLead(mensagem: string, apiKey: string, model: string):
 
 IMPORTANTE: Uma mensagem pode conter informações sobre MÚLTIPLOS leads. Você DEVE identificar CADA lead mencionado separadamente.
 
+REGRA CRÍTICA:
+- Extraia SOMENTE informações explicitamente presentes na mensagem.
+- Se um campo NÃO foi mencionado, retorne null. NÃO invente valores.
+- NÃO assuma, estime ou complete informações ausentes.
+- Prefira dados incompletos a dados incorretos.
+
 Analise a mensagem e extraia informações estruturadas para CADA lead identificado. Retorne um ARRAY JSON com um objeto por lead.
 
-Campos de cada objeto:
+Campos de cada objeto (retorne null se não mencionado):
 - mensagem_normalizada: resumo específico deste lead
 - lead_nome: nome do lead (se não mencionado, use "Lead 1", "Lead 2", etc.)
-- lead_telefone: telefone do lead se mencionado
+- lead_telefone: telefone do lead se mencionado, senão null
 - etapa_funil: uma de [lead_novo, contato_iniciado, sem_resposta, atendimento, visita_agendada, visita_realizada, proposta, venda, perdido]
 - status_lead: um de [aberto, em_andamento, ganho, perdido]
-- temperatura_lead: um de [frio, morno, quente]
+- temperatura_lead: um de [frio, morno, quente] — null se não inferível
 - resumo: resumo curto da situação DESTE lead específico
-- proxima_acao: próxima ação sugerida para ESTE lead
-- data_proxima_acao: data sugerida para próxima ação (formato YYYY-MM-DD se possível)
-- responsavel_sugerido: nome do responsável se mencionado
-- campanha_nome: nome da campanha se mencionado
-- campaign_id: ID da campanha se mencionado
+- proxima_acao: próxima ação sugerida para ESTE lead, null se não inferível
+- data_proxima_acao: data sugerida (YYYY-MM-DD), null se não mencionada
+- responsavel_sugerido: nome do responsável se mencionado, senão null
+- campanha_nome: nome da campanha se mencionado, senão null
+- campaign_id: ID da campanha se mencionado, senão null
 - confianca: nível de confiança da interpretação (0.0 a 1.0)
-- score_intencao: score de intenção de compra (0 a 100)
+- score_intencao: score de intenção de compra (0 a 100), null se não inferível
 
 Se a mensagem fala de apenas 1 lead, retorne um array com 1 objeto.
 Se fala de 3 leads, retorne um array com 3 objetos.

@@ -133,33 +133,33 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
 
   const lancamentoFunnel = useMemo(() => {
     const totalLeadsMeta = metrics?.total_conversions || 0;
-    const f = funnelData?.lancamento || { recebidos: 0, descartados: 0, aguardando_retorno: 0, atendimento: 0, passou_corretor: 0, visita: 0, proposta: 0, venda: 0 };
+    const f = funnelData?.lancamento;
     return {
-      totalLeads: totalLeadsMeta || f.recebidos,
-      leadsRecebidos: f.recebidos,
+      totalLeads: totalLeadsMeta || f?.recebidos || null,
+      leadsRecebidos: f?.recebidos ?? null,
       steps: [
-        { label: "Descartados", value: f.descartados, color: "#94a3b8" },
-        { label: "Em Atendimento", value: f.atendimento, color: "#f59e0b" },
-        { label: "Visita", value: f.visita, color: "#8b5cf6" },
-        { label: "Proposta", value: f.proposta, color: "#ec4899" },
-        { label: "Venda", value: f.venda, color: "#22c55e" },
+        { label: "Descartados", value: f?.descartados ?? null, color: "#94a3b8" },
+        { label: "Em Atendimento", value: f?.atendimento ?? null, color: "#f59e0b" },
+        { label: "Visita", value: f?.visita ?? null, color: "#8b5cf6" },
+        { label: "Proposta", value: f?.proposta ?? null, color: "#ec4899" },
+        { label: "Venda", value: f?.venda ?? null, color: "#22c55e" },
       ],
     };
   }, [metrics, funnelData]);
 
   const terceirosFunnel = useMemo(() => {
     const totalLeadsMeta = metrics?.total_conversions || 0;
-    const f = funnelData?.terceiros || { recebidos: 0, descartados: 0, aguardando_retorno: 0, atendimento: 0, passou_corretor: 0, visita: 0, proposta: 0, venda: 0 };
+    const f = funnelData?.terceiros;
     return {
-      totalLeads: totalLeadsMeta || f.recebidos,
-      leadsRecebidos: f.recebidos,
+      totalLeads: totalLeadsMeta || f?.recebidos || null,
+      leadsRecebidos: f?.recebidos ?? null,
       steps: [
-        { label: "Descartados", value: f.descartados, color: "#94a3b8" },
-        { label: "Atendimento SDR", value: f.atendimento, color: "#f59e0b" },
-        { label: "Passou para Corretor", value: f.passou_corretor, color: "#0ea5e9" },
-        { label: "Visita", value: f.visita, color: "#8b5cf6" },
-        { label: "Proposta", value: f.proposta, color: "#ec4899" },
-        { label: "Venda", value: f.venda, color: "#22c55e" },
+        { label: "Descartados", value: f?.descartados ?? null, color: "#94a3b8" },
+        { label: "Atendimento SDR", value: f?.atendimento ?? null, color: "#f59e0b" },
+        { label: "Passou para Corretor", value: f?.passou_corretor ?? null, color: "#0ea5e9" },
+        { label: "Visita", value: f?.visita ?? null, color: "#8b5cf6" },
+        { label: "Proposta", value: f?.proposta ?? null, color: "#ec4899" },
+        { label: "Venda", value: f?.venda ?? null, color: "#22c55e" },
       ],
     };
   }, [metrics, funnelData]);
