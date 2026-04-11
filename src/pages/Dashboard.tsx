@@ -1,81 +1,50 @@
-import { useState, useEffect } from "react";
-import { Users, DollarSign, Target, TrendingUp, BarChart3, Zap } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { KPICard } from "@/components/dashboard/KPICard";
-import { KPICardLarge } from "@/components/dashboard/KPICardLarge";
-import { SmartProjectionCard } from "@/components/dashboard/SmartProjectionCard";
-import { ProfitCard } from "@/components/dashboard/ProfitCard";
 import { PeriodSelector, Period } from "@/components/dashboard/PeriodSelector";
 import { AccountSelector } from "@/components/dashboard/AccountSelector";
 import { AccountDashboardView } from "@/components/dashboard/AccountDashboardView";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MetaMetricsGrid } from "@/components/meta/MetaMetricsGrid";
+import { MetaStatusBadge } from "@/components/meta/MetaStatusBadge";
+import { SalesFunnelCard } from "@/components/dashboard/SalesFunnelCard";
+import { MetaCampaignDetailDialog } from "@/components/meta/MetaCampaignDetailDialog";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { metaAdsService } from "@/services/metaAdsService";
+import { fetchCampanhaFunnel, type FunnelTotals } from "@/services/feedbackCampanhaService";
+import { supabase } from "@/integrations/supabase/client";
+import type { MetaCampaign, MetaAccountMetrics } from "@/types/meta";
+import type { MetaPeriod } from "@/components/meta/MetaPeriodFilter";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
+  Activity, Target, Eye, AlertCircle, RefreshCw,
+} from "lucide-react";
+import {
+  LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 
-import {
-  dashboardService,
-  KPIData,
-  ChartDataPoint,
-  CreativePerformance,
-  AutomationStats,
-} from "@/services/dashboardService";
+const currency = (v: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
+
+const formatNumber = (value: number) => {
+  if (value >= 1000000) return (value / 1000000).toFixed(1) + "M";
+  if (value >= 1000) return (value / 1000).toFixed(1) + "K";
+  return Math.round(value).toString();
+};
+
+const mapPeriod = (p: string): MetaPeriod => {
+  if (p === "today") return "today";
+  if (p === "yesterday") return "yesterday";
+  if (p === "7d") return "last_7d";
+  if (p === "15d") return "last_15d";
+  if (p === "30d") return "this_month";
+  return "last_7d";
+};
 
 export default function Dashboard() {
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [period, setPeriod] = useState<Period>("30d");
-  const [kpiData, setKpiData] = useState<KPIData | null>(null);
-  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
-  const [topCreatives, setTopCreatives] = useState<CreativePerformance[]>([]);
-  const [automationStats, setAutomationStats] = useState<AutomationStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (selectedAccount) return; // Skip global load when account is selected
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        const [kpis, chart, creatives, automation] = await Promise.all([
-          dashboardService.getKPIData(period),
-          dashboardService.getChartData(period),
-          dashboardService.getTopCreatives(),
-          dashboardService.getAutomationStats(period),
-        ]);
-
-        setKpiData(kpis);
-        setChartData(chart);
-        setTopCreatives(creatives);
-        setAutomationStats(automation);
-      } catch (error) {
-        console.error("Failed to load dashboard data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadData();
-  }, [period, selectedAccount]);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const miniChartData = chartData.map((d) => ({ value: d.leads }));
 
   return (
     <AppLayout>
@@ -88,202 +57,433 @@ export default function Dashboard() {
           actions={<PeriodSelector value={period} onValueChange={setPeriod} />}
         />
 
-        {/* Account-specific view */}
         {selectedAccount ? (
           <AccountDashboardView accountId={selectedAccount} period={period} />
         ) : (
-          <>
-            {/* Global Dashboard */}
-            {isLoading ? (
-              <div className="grid grid-cols-12 gap-4">
-                <Skeleton className="col-span-12 lg:col-span-6 h-64" />
-                <Skeleton className="col-span-6 lg:col-span-3 h-64" />
-                <Skeleton className="col-span-6 lg:col-span-3 h-64" />
-              </div>
-            ) : (
-              <div className="grid grid-cols-12 gap-4">
-                <div className="col-span-12 lg:col-span-6">
-                  <KPICardLarge
-                    title="Faturamento mensal (atual)"
-                    value={formatCurrency(kpiData?.totalSpend || 0)}
-                    icon={DollarSign}
-                    trend={{ value: 12.5, isPositive: true }}
-                    chartData={miniChartData}
-                    chartColor="hsl(25 95% 53%)"
-                  />
-                </div>
-                <div className="col-span-6 lg:col-span-3">
-                  <SmartProjectionCard
-                    projectedValue={(kpiData?.totalSpend || 0) * 1.25}
-                    confidence={78}
-                  />
-                </div>
-                <div className="col-span-6 lg:col-span-3">
-                  <ProfitCard
-                    value={(kpiData?.totalSpend || 0) * 0.35}
-                    percentage={100}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              {isLoading ? (
-                <>
-                  {[...Array(6)].map((_, i) => (
-                    <Skeleton key={i} className="h-32" />
-                  ))}
-                </>
-              ) : (
-                kpiData && (
-                  <>
-                    <KPICard title="Clientes Meta" value={kpiData.activeClientsMeta} icon={Users} />
-                    <KPICard title="Clientes Google" value={kpiData.activeClientsGoogle} icon={Users} />
-                    <KPICard title="Leads" value={kpiData.leads.toLocaleString()} icon={Target} />
-                    <KPICard title="CTR Médio" value={`${kpiData.avgCTR.toFixed(2)}%`} icon={TrendingUp} />
-                    <KPICard title="CPL Médio" value={formatCurrency(kpiData.avgCPL)} icon={BarChart3} />
-                    <KPICard title="Investimento" value={formatCurrency(kpiData.totalSpend)} icon={DollarSign} />
-                  </>
-                )
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="card-dark border-border/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <Target className="h-4 w-4 text-primary" />
-                    </div>
-                    Leads ao Longo do Tempo
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <Skeleton className="h-64" />
-                  ) : (
-                    <ResponsiveContainer width="100%" height={250}>
-                      <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: "hsl(var(--card))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: "12px",
-                          }}
-                        />
-                        <Line type="monotone" dataKey="leads" stroke="hsl(var(--primary))" strokeWidth={3} dot={{ fill: "hsl(var(--primary))", strokeWidth: 2, r: 4 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="card-dark border-border/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <DollarSign className="h-4 w-4 text-primary" />
-                    </div>
-                    Investimento Diário
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <Skeleton className="h-64" />
-                  ) : (
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: "hsl(var(--card))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: "12px",
-                          }}
-                        />
-                        <Bar dataKey="spend" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="card-dark border-border/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <Zap className="h-4 w-4 text-primary" />
-                    </div>
-                    Estatísticas de Automação
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <Skeleton className="h-32" />
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center p-3 rounded-xl bg-secondary/30">
-                        <span className="text-muted-foreground">Envios WhatsApp</span>
-                        <span className="font-bold text-foreground">{(automationStats?.whatsappSends ?? 0).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-center p-3 rounded-xl bg-secondary/30">
-                        <span className="text-muted-foreground">Relatórios Enviados</span>
-                        <span className="font-bold text-foreground">{(automationStats?.reportsSent ?? 0).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-center p-3 rounded-xl bg-secondary/30">
-                        <span className="text-muted-foreground">Leads Sincronizados</span>
-                        <span className="font-bold text-foreground">{(automationStats?.leadsSynced ?? 0).toLocaleString()}</span>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="card-dark border-border/50 lg:col-span-2">
-                <CardHeader>
-                  <CardTitle>Criativos com Melhor Performance</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <Skeleton className="h-32" />
-                  ) : (
-                    <div className="space-y-3">
-                      {(topCreatives ?? []).map((creative) => (
-                        <div
-                          key={creative.id}
-                          className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors"
-                        >
-                          <span className="font-medium text-foreground">{creative.name}</span>
-                          <div className="flex gap-6 text-sm">
-                            <span className="text-muted-foreground">
-                              CTR: <span className="text-primary font-bold">{creative.ctr.toFixed(2)}%</span>
-                            </span>
-                            <span className="text-muted-foreground">
-                              Hook: <span className="text-success font-bold">{creative.hookRate.toFixed(1)}%</span>
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                      {topCreatives.length === 0 && (
-                        <div className="text-sm text-muted-foreground text-center py-8">
-                          Ainda sem dados suficientes de criativos para exibir.
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </>
+          <GlobalDashboardView period={period} />
         )}
       </div>
     </AppLayout>
+  );
+}
+
+/* ── Global aggregated view ── */
+
+function GlobalDashboardView({ period }: { period: string }) {
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [aggregatedMetrics, setAggregatedMetrics] = useState<MetaAccountMetrics | null>(null);
+  const [allCampaigns, setAllCampaigns] = useState<MetaCampaign[]>([]);
+  const [funnelData, setFunnelData] = useState<{
+    lancamento: FunnelTotals;
+    terceiros: FunnelTotals;
+  } | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState<MetaCampaign | null>(null);
+
+  const metaPeriod = mapPeriod(period);
+
+  const fetchAll = async (forceRefresh = false) => {
+    setLoading(true);
+    if (forceRefresh) setRefreshing(true);
+
+    try {
+      // 1. Get all active accounts with Meta
+      const { data: accounts } = await supabase
+        .from("accounts")
+        .select("id, meta_account_id, nome_cliente")
+        .eq("status", "Ativo")
+        .eq("usa_meta_ads", true)
+        .not("meta_account_id", "is", null);
+
+      if (!accounts || accounts.length === 0) {
+        setAggregatedMetrics(null);
+        setAllCampaigns([]);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
+      // 2. Fetch Meta data for each account in parallel
+      const results = await Promise.all(
+        accounts.map(async (acc) => {
+          try {
+            if (forceRefresh) {
+              metaAdsService.clearCache(`${acc.meta_account_id}_${metaPeriod}`);
+            }
+            const data = await metaAdsService.fetchMetaCampaigns(acc.meta_account_id!, metaPeriod);
+            if (data?.success) {
+              return {
+                accountId: acc.id,
+                accountName: acc.nome_cliente,
+                metrics: data.account_metrics || null,
+                campaigns: (Array.isArray(data.campaigns) ? data.campaigns : []).map((c) => ({
+                  ...c,
+                  _accountName: acc.nome_cliente,
+                })),
+              };
+            }
+          } catch {
+            // skip failed accounts
+          }
+          return null;
+        })
+      );
+
+      const valid = results.filter((r): r is NonNullable<typeof r> => r !== null);
+
+      // 3. Aggregate metrics
+      const totals: MetaAccountMetrics = {
+        total_spend: 0,
+        total_impressions: 0,
+        total_clicks: 0,
+        total_conversions: 0,
+        avg_ctr: 0,
+        avg_cpm: 0,
+        avg_cpc: 0,
+        avg_cpl: 0,
+      };
+
+      for (const v of valid) {
+        if (v.metrics) {
+          totals.total_spend += v.metrics.total_spend || 0;
+          totals.total_impressions += v.metrics.total_impressions || 0;
+          totals.total_clicks += v.metrics.total_clicks || 0;
+          totals.total_conversions += v.metrics.total_conversions || 0;
+        }
+      }
+
+      totals.avg_ctr = totals.total_impressions > 0
+        ? (totals.total_clicks / totals.total_impressions) * 100
+        : 0;
+      totals.avg_cpm = totals.total_impressions > 0
+        ? (totals.total_spend / totals.total_impressions) * 1000
+        : 0;
+      totals.avg_cpc = totals.total_clicks > 0
+        ? totals.total_spend / totals.total_clicks
+        : 0;
+      totals.avg_cpl = totals.total_conversions > 0
+        ? totals.total_spend / totals.total_conversions
+        : 0;
+
+      setAggregatedMetrics(totals);
+
+      // 4. Merge all campaigns
+      const merged = valid.flatMap((v) => v.campaigns);
+      setAllCampaigns(merged);
+
+      // 5. Aggregate funnel data from all accounts
+      const funnelResults = await Promise.all(
+        accounts.map(async (acc) => {
+          try {
+            return await fetchCampanhaFunnel(acc.id);
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      const aggFunnel = {
+        lancamento: { recebidos: null as number | null, descartados: null as number | null, atendimento: null as number | null, visita: null as number | null, proposta: null as number | null, venda: null as number | null, passou_corretor: null as number | null },
+        terceiros: { recebidos: null as number | null, descartados: null as number | null, atendimento: null as number | null, visita: null as number | null, proposta: null as number | null, venda: null as number | null, passou_corretor: null as number | null },
+      };
+
+      const sumField = (current: number | null, add: number | null): number | null => {
+        if (add === null || add === undefined) return current;
+        return (current ?? 0) + add;
+      };
+
+      for (const fr of funnelResults) {
+        if (!fr) continue;
+        for (const key of ["lancamento", "terceiros"] as const) {
+          const src = fr[key];
+          if (!src) continue;
+          const dest = aggFunnel[key];
+          dest.recebidos = sumField(dest.recebidos, src.recebidos);
+          dest.descartados = sumField(dest.descartados, src.descartados);
+          dest.atendimento = sumField(dest.atendimento, src.atendimento);
+          dest.visita = sumField(dest.visita, src.visita);
+          dest.proposta = sumField(dest.proposta, src.proposta);
+          dest.venda = sumField(dest.venda, src.venda);
+          dest.passou_corretor = sumField(dest.passou_corretor, src.passou_corretor);
+        }
+      }
+
+      setFunnelData(aggFunnel as any);
+    } catch (err) {
+      console.error("Failed to load global dashboard:", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAll();
+  }, [metaPeriod]);
+
+  const orderedCampaigns = useMemo(() => {
+    return [...allCampaigns].sort((a, b) => {
+      const aActive = a.status === "ACTIVE" ? 0 : 1;
+      const bActive = b.status === "ACTIVE" ? 0 : 1;
+      if (aActive !== bActive) return aActive - bActive;
+      return (b.insights?.conversions || 0) - (a.insights?.conversions || 0);
+    });
+  }, [allCampaigns]);
+
+  const performanceData = useMemo(() => {
+    if (!allCampaigns.length) return [];
+    return allCampaigns
+      .filter((c) => c.status === "ACTIVE")
+      .slice(0, 10)
+      .map((camp, idx) => ({
+        date: `Camp ${idx + 1}`,
+        impressions: camp.insights?.impressions || 0,
+        clicks: camp.insights?.clicks || 0,
+        conversions: camp.insights?.conversions || 0,
+      }));
+  }, [allCampaigns]);
+
+  // Classify campaigns by funnel type
+  const metaLeadsByFunnel = useMemo(() => {
+    let lancLeads = 0;
+    let tercLeads = 0;
+    for (const camp of allCampaigns) {
+      const name = (camp.name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const leads = camp.insights?.conversions || 0;
+      if (name.includes("lancamento") || name.includes("lançamento")) {
+        lancLeads += leads;
+      } else if (name.includes("terceiro") || name.includes("terceiros")) {
+        tercLeads += leads;
+      }
+    }
+    return { lancamento: lancLeads, terceiros: tercLeads };
+  }, [allCampaigns]);
+
+  const lancamentoFunnel = useMemo(() => {
+    const f = funnelData?.lancamento;
+    const totalFromMeta = metaLeadsByFunnel.lancamento;
+    const recebidos = f?.recebidos ?? null;
+    return {
+      totalLeads: totalFromMeta > 0 ? totalFromMeta : recebidos,
+      leadsRecebidos: recebidos,
+      steps: [
+        { label: "Descartados", value: f?.descartados ?? null, color: "#94a3b8" },
+        { label: "Em Atendimento", value: f?.atendimento ?? null, color: "#f59e0b" },
+        { label: "Visita", value: f?.visita ?? null, color: "#8b5cf6" },
+        { label: "Proposta", value: f?.proposta ?? null, color: "#ec4899" },
+        { label: "Venda", value: f?.venda ?? null, color: "#22c55e" },
+      ],
+    };
+  }, [funnelData, metaLeadsByFunnel]);
+
+  const terceirosFunnel = useMemo(() => {
+    const f = funnelData?.terceiros;
+    const totalFromMeta = metaLeadsByFunnel.terceiros;
+    const recebidos = f?.recebidos ?? null;
+    return {
+      totalLeads: totalFromMeta > 0 ? totalFromMeta : recebidos,
+      leadsRecebidos: recebidos,
+      steps: [
+        { label: "Descartados", value: f?.descartados ?? null, color: "#94a3b8" },
+        { label: "Atendimento SDR", value: f?.atendimento ?? null, color: "#f59e0b" },
+        { label: "Passou para Corretor", value: f?.passou_corretor ?? null, color: "#0ea5e9" },
+        { label: "Visita", value: f?.visita ?? null, color: "#8b5cf6" },
+        { label: "Proposta", value: f?.proposta ?? null, color: "#ec4899" },
+        { label: "Venda", value: f?.venda ?? null, color: "#22c55e" },
+      ],
+    };
+  }, [funnelData, metaLeadsByFunnel]);
+
+  return (
+    <div className="space-y-6">
+      {/* Refresh */}
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => fetchAll(true)}
+          disabled={refreshing}
+          className="gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          Atualizar
+        </Button>
+      </div>
+
+      {/* Aggregated KPIs */}
+      <Card>
+        <CardContent className="p-6">
+          <MetaMetricsGrid metrics={aggregatedMetrics} loading={loading} />
+        </CardContent>
+      </Card>
+
+      {loading ? (
+        <div className="grid grid-cols-12 gap-6">
+          <div className="col-span-8"><Skeleton className="h-80" /></div>
+          <div className="col-span-4"><Skeleton className="h-80" /></div>
+        </div>
+      ) : !aggregatedMetrics ? (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground">Nenhum dado disponível para o período selecionado</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="grid grid-cols-12 gap-6">
+            {/* Performance Chart */}
+            <Card className="col-span-12 lg:col-span-8">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Activity className="w-5 h-5 text-primary" />
+                  Desempenho Consolidado
+                </CardTitle>
+                <CardDescription>Top campanhas ativas de todas as contas</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {performanceData.length > 0 ? (
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={performanceData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
+                        <YAxis stroke="hsl(var(--muted-foreground))" />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "hsl(var(--card))",
+                            border: "1px solid hsl(var(--border))",
+                            borderRadius: "8px",
+                          }}
+                        />
+                        <Legend />
+                        <Line type="monotone" dataKey="impressions" stroke="hsl(var(--primary))" strokeWidth={3} name="Impressões" dot={{ fill: "hsl(var(--primary))", r: 4 }} />
+                        <Line type="monotone" dataKey="clicks" stroke="#10b981" strokeWidth={3} name="Cliques" dot={{ fill: "#10b981", r: 4 }} />
+                        <Line type="monotone" dataKey="conversions" stroke="#f59e0b" strokeWidth={3} name="Conversões" dot={{ fill: "#f59e0b", r: 4 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-80 flex items-center justify-center text-muted-foreground">
+                    Sem dados para exibir
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Funnels */}
+            <div className="col-span-12 lg:col-span-4 grid grid-cols-1 gap-4">
+              <SalesFunnelCard
+                title="Funil de Lançamento"
+                subtitle="Consolidado de todas as contas"
+                totalLeads={lancamentoFunnel.totalLeads}
+                leadsRecebidos={lancamentoFunnel.leadsRecebidos}
+                steps={lancamentoFunnel.steps}
+              />
+              <SalesFunnelCard
+                title="Funil de Terceiros"
+                subtitle="Consolidado de todas as contas"
+                totalLeads={terceirosFunnel.totalLeads}
+                leadsRecebidos={terceirosFunnel.leadsRecebidos}
+                steps={terceirosFunnel.steps}
+              />
+            </div>
+          </div>
+
+          {/* Campaign Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Performance Detalhada por Campanha</CardTitle>
+              <CardDescription>
+                {allCampaigns.length} campanhas de todas as contas • Ordenado por conversões
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {allCampaigns.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-3 px-4 font-medium text-sm">Campanha</th>
+                        <th className="text-left py-3 px-4 font-medium text-sm">Conta</th>
+                        <th className="text-right py-3 px-4 font-medium text-sm">Status</th>
+                        <th className="text-right py-3 px-4 font-medium text-sm">Impressões</th>
+                        <th className="text-right py-3 px-4 font-medium text-sm">Cliques</th>
+                        <th className="text-right py-3 px-4 font-medium text-sm">Gasto</th>
+                        <th className="text-right py-3 px-4 font-medium text-sm">Leads</th>
+                        <th className="text-right py-3 px-4 font-medium text-sm">CPL</th>
+                        <th className="text-right py-3 px-4 font-medium text-sm">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orderedCampaigns.map((campaign) => {
+                        const spend = campaign.insights?.spend || 0;
+                        const conversions = campaign.insights?.conversions || 0;
+                        const cpl = conversions > 0 ? spend / conversions : 0;
+
+                        return (
+                          <tr
+                            key={campaign.id}
+                            className="border-b border-border hover:bg-muted/50 transition-colors cursor-pointer"
+                            onClick={() => {
+                              setSelectedCampaign(campaign);
+                              setDialogOpen(true);
+                            }}
+                          >
+                            <td className="py-4 px-4 font-medium max-w-xs truncate">{campaign.name}</td>
+                            <td className="py-4 px-4 text-sm text-muted-foreground max-w-[150px] truncate">
+                              {(campaign as any)._accountName || "—"}
+                            </td>
+                            <td className="py-4 px-4 text-right">
+                              <MetaStatusBadge status={campaign.status} />
+                            </td>
+                            <td className="py-4 px-4 text-right text-muted-foreground">
+                              {formatNumber(campaign.insights?.impressions || 0)}
+                            </td>
+                            <td className="py-4 px-4 text-right text-primary font-semibold">
+                              {formatNumber(campaign.insights?.clicks || 0)}
+                            </td>
+                            <td className="py-4 px-4 text-right">{currency(spend)}</td>
+                            <td className="py-4 px-4 text-right text-green-600 dark:text-green-400 font-bold">
+                              {conversions}
+                            </td>
+                            <td className="py-4 px-4 text-right">{currency(cpl)}</td>
+                            <td className="py-4 px-4 text-right">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedCampaign(campaign);
+                                  setDialogOpen(true);
+                                }}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="py-12 text-center text-muted-foreground">
+                  <Target className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                  <p>Nenhuma campanha encontrada no período selecionado</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      <MetaCampaignDetailDialog
+        campaign={selectedCampaign}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
+    </div>
   );
 }
