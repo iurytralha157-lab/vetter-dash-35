@@ -31,6 +31,7 @@ import {
 } from "@/services/dashboardService";
 
 export default function Dashboard() {
+  const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [period, setPeriod] = useState<Period>("30d");
   const [kpiData, setKpiData] = useState<KPIData | null>(null);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
@@ -83,6 +84,7 @@ export default function Dashboard() {
           title="Dashboard"
           breadcrumb="Visão Geral"
           subtitle="Desempenho de campanhas"
+          filters={<AccountSelector value={selectedAccount} onValueChange={setSelectedAccount} />}
           actions={<PeriodSelector value={period} onValueChange={setPeriod} />}
         />
 
