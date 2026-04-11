@@ -262,6 +262,13 @@ export const dashboardService = {
   async getAutomationStats(period: string, accountId?: string | null): Promise<AutomationStats> {
     const { startISO, endISO } = getDateRange(period);
 
+    const sendsFilters: Record<string, string> = {
+      ...(accountId ? { account_id: accountId } : {}),
+    };
+    const leadsFilters: Record<string, string> = {
+      ...(accountId ? { client_id: accountId } : {}),
+    };
+
     let sendsQuery = supabase
       .from("relatorio_disparos")
       .select("id", { count: "exact", head: true })
@@ -282,9 +289,9 @@ export const dashboardService = {
       .lte("created_at", `${endISO}T23:59:59.999Z`);
 
     if (accountId) {
-      sendsQuery = sendsQuery.eq("account_id", accountId);
-      reportsQuery = reportsQuery.eq("account_id", accountId);
-      leadsQuery = leadsQuery.eq("client_id", accountId);
+      sendsQuery = sendsQuery.eq("account_id", accountId) as any;
+      reportsQuery = reportsQuery.eq("account_id", accountId) as any;
+      leadsQuery = leadsQuery.eq("client_id", accountId) as any;
     }
 
     const [sends, reports, leads] = await Promise.all([
