@@ -132,11 +132,11 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
   }, [campaigns]);
 
   const lancamentoFunnel = useMemo(() => {
-    const totalLeadsMeta = metrics?.total_conversions || 0;
     const f = funnelData?.lancamento;
+    const recebidos = f?.recebidos ?? null;
     return {
-      totalLeads: totalLeadsMeta || f?.recebidos || null,
-      leadsRecebidos: f?.recebidos ?? null,
+      totalLeads: recebidos,
+      leadsRecebidos: recebidos,
       steps: [
         { label: "Descartados", value: f?.descartados ?? null, color: "#94a3b8" },
         { label: "Em Atendimento", value: f?.atendimento ?? null, color: "#f59e0b" },
@@ -145,14 +145,14 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
         { label: "Venda", value: f?.venda ?? null, color: "#22c55e" },
       ],
     };
-  }, [metrics, funnelData]);
+  }, [funnelData]);
 
   const terceirosFunnel = useMemo(() => {
-    const totalLeadsMeta = metrics?.total_conversions || 0;
     const f = funnelData?.terceiros;
+    const recebidos = f?.recebidos ?? null;
     return {
-      totalLeads: totalLeadsMeta || f?.recebidos || null,
-      leadsRecebidos: f?.recebidos ?? null,
+      totalLeads: recebidos,
+      leadsRecebidos: recebidos,
       steps: [
         { label: "Descartados", value: f?.descartados ?? null, color: "#94a3b8" },
         { label: "Atendimento SDR", value: f?.atendimento ?? null, color: "#f59e0b" },
@@ -162,7 +162,7 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
         { label: "Venda", value: f?.venda ?? null, color: "#22c55e" },
       ],
     };
-  }, [metrics, funnelData]);
+  }, [funnelData]);
 
   return (
     <div className="space-y-6">
