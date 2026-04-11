@@ -599,6 +599,83 @@ function formatDateBR(dateStr: string): string {
   return `${d}/${m}/${y}`;
 }
 
+// ─── Follow-up Handler (isolated module) ───
+
+async function handleFollowup(
+  text: string,
+  account: any,
+  groupJid: string,
+  senderName: string,
+  supabase: any
+): Promise<string> {
+  const followupBody = text.replace(/^#followup\s*/i, "").trim();
+
+  if (!followupBody || followupBody.length < 5) {
+    return `⚠️ *Follow-up vazio!*\n\nEnvie no formato:\n*#followup* João ligou, quer visitar apt 3Q no sábado\n\nDigite *#ajuda* para mais informações.`;
+  }
+
+  const groupNumber = groupJid.replace("@g.us", "");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/process-followup`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({
+        mensagem_original: followupBody,
+        account_id: account.id,
+        cliente_id: account.cliente_id || null,
+        id_grupo: account.id_grupo || groupNumber,
+        numero_grupo: groupNumber,
+        telefone_origem: null,
+        nome_origem: senderName,
+        usuario_origem: senderName,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error("[whatsapp-webhook] Follow-up process error:", result);
+      return `⚠️ Erro ao processar follow-up. Tente novamente.`;
+    }
+
+    if (result.duplicado) {
+      return `⚠️ *Follow-up duplicado!*\n\nEssa mensagem já foi registrada anteriormente.`;
+    }
+
+    const dados = result.dados || {};
+
+    let msg = `✅ *Follow-up registrado!*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `👤 Enviado por: *${senderName}*\n`;
+    msg += `🏢 Conta: *${account.nome_cliente}*\n\n`;
+
+    if (dados.lead_nome) msg += `👤 Lead: *${dados.lead_nome}*\n`;
+    if (dados.etapa_funil) msg += `📊 Etapa: *${dados.etapa_funil.replace(/_/g, " ")}*\n`;
+    if (dados.status_lead) msg += `📋 Status: *${dados.status_lead.replace(/_/g, " ")}*\n`;
+    if (dados.temperatura_lead) msg += `🌡️ Temperatura: *${dados.temperatura_lead}*\n`;
+    if (dados.resumo) msg += `\n📝 *Resumo:* ${dados.resumo}\n`;
+    if (dados.proxima_acao) msg += `➡️ *Próxima ação:* ${dados.proxima_acao}\n`;
+    if (dados.data_proxima_acao) msg += `📅 *Data:* ${dados.data_proxima_acao}\n`;
+
+    if (dados.confianca) {
+      const conf = Math.round(dados.confianca * 100);
+      msg += `\n🎯 Confiança da IA: ${conf}%\n`;
+    }
+
+    return msg;
+  } catch (err) {
+    console.error("[whatsapp-webhook] Follow-up error:", err);
+    return `⚠️ Erro ao processar follow-up. Tente novamente.`;
+  }
+}
+
 async function sendEvolutionMessage(baseUrl: string, apiKey: string, instanceName: string, groupJid: string, text: string) {
   const url = `${baseUrl}/message/sendText/${instanceName}`;
   console.log("[whatsapp-webhook] Sending to:", groupJid, "via", instanceName);
