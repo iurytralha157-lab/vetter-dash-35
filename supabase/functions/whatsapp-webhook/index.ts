@@ -119,7 +119,9 @@ async function processCommand(
   let responseText = "";
 
   try {
-    if (cmd.startsWith("#feedback")) {
+    if (cmd.startsWith("#followup")) {
+      responseText = await handleFollowup(text, account, groupJid, senderName, supabase);
+    } else if (cmd.startsWith("#feedback")) {
       responseText = await handleFeedback(text, account, groupJid, senderName, supabase);
     } else if (cmd === "#funil") {
       responseText = await handleFunil(account, supabase);
