@@ -262,37 +262,34 @@ export const dashboardService = {
   async getAutomationStats(period: string, accountId?: string | null): Promise<AutomationStats> {
     const { startISO, endISO } = getDateRange(period);
 
-    const sendsFilters: Record<string, string> = {
-      ...(accountId ? { account_id: accountId } : {}),
+    // Build queries - use type assertion to avoid deep type instantiation
+    const buildSendsQuery = () => {
+      const q = supabase
+        .from("relatorio_disparos")
+        .select("id", { count: "exact", head: true })
+        .gte("data_disparo", startISO)
+        .lte("data_disparo", endISO);
+      return accountId ? (q as any).eq("account_id", accountId) : q;
     };
-    const leadsFilters: Record<string, string> = {
-      ...(accountId ? { client_id: accountId } : {}),
+
+    const buildReportsQuery = () => {
+      const q = supabase
+        .from("relatorio_disparos")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "sucesso")
+        .gte("data_disparo", startISO)
+        .lte("data_disparo", endISO);
+      return accountId ? (q as any).eq("account_id", accountId) : q;
     };
 
-    let sendsQuery = supabase
-      .from("relatorio_disparos")
-      .select("id", { count: "exact", head: true })
-      .gte("data_disparo", startISO)
-      .lte("data_disparo", endISO);
-
-    let reportsQuery = supabase
-      .from("relatorio_disparos")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "sucesso")
-      .gte("data_disparo", startISO)
-      .lte("data_disparo", endISO);
-
-    let leadsQuery = supabase
-      .from("leads")
-      .select("id", { count: "exact", head: true })
-      .gte("created_at", `${startISO}T00:00:00.000Z`)
-      .lte("created_at", `${endISO}T23:59:59.999Z`);
-
-    if (accountId) {
-      sendsQuery = sendsQuery.eq("account_id", accountId) as any;
-      reportsQuery = reportsQuery.eq("account_id", accountId) as any;
-      leadsQuery = leadsQuery.eq("client_id", accountId) as any;
-    }
+    const buildLeadsQuery = () => {
+      const q = supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", `${startISO}T00:00:00.000Z`)
+        .lte("created_at", `${endISO}T23:59:59.999Z`);
+      return accountId ? (q as any).eq("client_id", accountId) : q;
+    };
 
     const [sends, reports, leads] = await Promise.all([
       sendsQuery,
