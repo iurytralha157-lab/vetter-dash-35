@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
       const accountInfoResponse = await accountInfoPromise;
       if (accountInfoResponse.ok) {
         accountInfo = await accountInfoResponse.json();
-        console.log('Account info:', JSON.stringify({ balance: accountInfo.balance, amount_spent: accountInfo.amount_spent, spend_cap: accountInfo.spend_cap, currency: accountInfo.currency }));
+        console.log('Account info:', JSON.stringify({ balance: accountInfo.balance, amount_spent: accountInfo.amount_spent, spend_cap: accountInfo.spend_cap, currency: accountInfo.currency, account_status: accountInfo.account_status, disable_reason: accountInfo.disable_reason, is_prepay_account: accountInfo.is_prepay_account, funding_source_details: accountInfo.funding_source_details }));
       } else {
         console.warn('Failed to fetch account info:', await accountInfoResponse.text());
       }
