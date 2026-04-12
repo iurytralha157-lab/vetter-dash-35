@@ -131,7 +131,7 @@ async function processCommand(
       responseText = await handleFunil(account, supabase);
     } else if (cmd.startsWith("#campanhas")) {
       const periodArg = cmd.replace("#campanhas", "").trim();
-      responseText = await handleCampanhas(account, supabase, periodArg || null, groupJid);
+      responseText = await handleCampanhas(account, supabase, periodArg || null, groupJid, instanceName);
     } else if (cmd === "#relatorio") {
       return await handleRelatorioAll(account, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
     } else if (cmd === "#todas" || cmd === "#todos") {
@@ -479,7 +479,7 @@ function buildCampaignReport(
   return msg;
 }
 
-async function handleCampanhas(account: any, supabase: any, periodArg: string | null = null, groupJid: string = ''): Promise<string> {
+async function handleCampanhas(account: any, supabase: any, periodArg: string | null = null, groupJid: string = '', instanceName: string = ''): Promise<string> {
   if (!account.meta_account_id) {
     return `⚠️ *${account.nome_cliente}*\nConta sem Meta Ads configurado.`;
   }
@@ -554,6 +554,8 @@ async function handleCampanhas(account: any, supabase: any, periodArg: string | 
             period_label: periodLabel,
             status_filter: statusFilter,
           },
+          instance_name: instanceName,
+          expiry_notified: false,
           created_at: new Date().toISOString(),
           expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         }, { onConflict: 'group_jid,account_id,context_type' });
@@ -612,9 +614,9 @@ async function getActiveContext(supabase: any, groupJid: string, accountId: stri
 
   if (!data) return null;
 
-  // Check if expired
+  // Check if expired - return special marker
   if (new Date(data.expires_at) < new Date()) {
-    return null;
+    return { _expired: true };
   }
 
   return data.context_data;
@@ -622,6 +624,9 @@ async function getActiveContext(supabase: any, groupJid: string, accountId: stri
 
 async function handleSimResponse(account: any, supabase: any, groupJid: string): Promise<string> {
   const ctx = await getActiveContext(supabase, groupJid, account.id);
+  if (ctx?._expired) {
+    return `⏰ *Sessão expirada*\n\nA consulta anterior expirou após 30 min de inatividade.\n\nEnvie *#campanhas* novamente para iniciar uma nova consulta.`;
+  }
   if (!ctx || !ctx.campaigns?.length) {
     return `ℹ️ Nenhuma consulta de campanhas recente.\n\nUse *#campanhas* primeiro para listar as campanhas.`;
   }
@@ -644,6 +649,14 @@ async function handleContextDetailMultiple(
   supabase: any
 ): Promise<Response> {
   const ctx = await getActiveContext(supabase, groupJid, account.id);
+
+  if (ctx?._expired) {
+    const msg = `⏰ *Sessão expirada*\n\nA consulta anterior expirou após 30 min de inatividade.\n\nEnvie *#campanhas* novamente para iniciar uma nova consulta.`;
+    await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, groupJid, msg);
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
 
   if (!ctx || !ctx.campaigns?.length) {
     // No context - fallback to default behavior (today's campaigns)
@@ -751,6 +764,14 @@ async function handleContextDetailAll(
   supabase: any
 ): Promise<Response> {
   const ctx = await getActiveContext(supabase, groupJid, account.id);
+
+  if (ctx?._expired) {
+    const msg = `⏰ *Sessão expirada*\n\nA consulta anterior expirou após 30 min de inatividade.\n\nEnvie *#campanhas* novamente para iniciar uma nova consulta.`;
+    await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, groupJid, msg);
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
 
   if (!ctx || !ctx.campaigns?.length) {
     // Fallback to #relatorio behavior
