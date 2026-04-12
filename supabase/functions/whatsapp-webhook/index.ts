@@ -624,6 +624,9 @@ async function getActiveContext(supabase: any, groupJid: string, accountId: stri
 
 async function handleSimResponse(account: any, supabase: any, groupJid: string): Promise<string> {
   const ctx = await getActiveContext(supabase, groupJid, account.id);
+  if (ctx?._expired) {
+    return `⏰ *Sessão expirada*\n\nA consulta anterior expirou após 30 min de inatividade.\n\nEnvie *#campanhas* novamente para iniciar uma nova consulta.`;
+  }
   if (!ctx || !ctx.campaigns?.length) {
     return `ℹ️ Nenhuma consulta de campanhas recente.\n\nUse *#campanhas* primeiro para listar as campanhas.`;
   }
@@ -646,6 +649,14 @@ async function handleContextDetailMultiple(
   supabase: any
 ): Promise<Response> {
   const ctx = await getActiveContext(supabase, groupJid, account.id);
+
+  if (ctx?._expired) {
+    const msg = `⏰ *Sessão expirada*\n\nA consulta anterior expirou após 30 min de inatividade.\n\nEnvie *#campanhas* novamente para iniciar uma nova consulta.`;
+    await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, groupJid, msg);
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
 
   if (!ctx || !ctx.campaigns?.length) {
     // No context - fallback to default behavior (today's campaigns)
