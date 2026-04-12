@@ -28,11 +28,13 @@ const formatNumber = (value: number) => {
 };
 
 const mapPeriod = (p: string): MetaPeriod => {
-  if (p === "today") return "today";
-  if (p === "yesterday") return "yesterday";
+  // If already a MetaPeriod value, return as-is
+  const validPeriods: MetaPeriod[] = ['today', 'yesterday', 'last_7d', 'last_15d', 'last_30d', 'this_month', 'last_month', 'this_quarter', 'this_year'];
+  if (validPeriods.includes(p as MetaPeriod)) return p as MetaPeriod;
+  // Legacy mapping
   if (p === "7d") return "last_7d";
   if (p === "15d") return "last_15d";
-  if (p === "30d") return "this_month";
+  if (p === "30d") return "last_30d";
   return "last_7d";
 };
 
