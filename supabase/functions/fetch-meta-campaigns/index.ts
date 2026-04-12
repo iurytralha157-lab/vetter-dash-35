@@ -254,15 +254,17 @@ Deno.serve(async (req) => {
     if (accountInsights) {
       let conversions = 0;
       if (accountInsights.actions) {
-        // Sum all lead-related actions for account level
         const leadActions = accountInsights.actions.filter((action: any) => 
           action.action_type === 'lead' ||
           action.action_type === 'offsite_conversion.fb_pixel_lead' ||
           action.action_type === 'onsite_conversion.lead' ||
           action.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
-          action.action_type === 'onsite_conversion.post_save'
+          action.action_type === 'onsite_conversion.total_messaging_connection' ||
+          action.action_type === 'onsite_conversion.messaging_first_reply'
         );
         conversions = leadActions.reduce((sum: number, action: { value?: string }) => sum + parseInt(action.value || '0'), 0);
+        console.log('Account-level lead actions found:', JSON.stringify(leadActions));
+        console.log('Account-level total conversions:', conversions);
       }
 
       accountMetrics = {
