@@ -341,11 +341,15 @@ Deno.serve(async (req) => {
       campaigns: campaignsWithInsights,
       account_metrics: accountMetrics,
       account_balance: accountInfo ? {
-        balance: parseFloat(accountInfo.balance || '0') / 100, // Meta returns in cents
+        balance: parseFloat(accountInfo.balance || '0') / 100,
         amount_spent: parseFloat(accountInfo.amount_spent || '0') / 100,
         spend_cap: accountInfo.spend_cap ? parseFloat(accountInfo.spend_cap) / 100 : null,
         currency: accountInfo.currency || 'BRL',
         account_name: accountInfo.name || null,
+        account_status: accountInfo.account_status || null,
+        disable_reason: accountInfo.disable_reason || null,
+        is_prepay_account: accountInfo.is_prepay_account || false,
+        funding_source_details: accountInfo.funding_source_details || null,
       } : null,
       fetched_at: new Date().toISOString()
     };
