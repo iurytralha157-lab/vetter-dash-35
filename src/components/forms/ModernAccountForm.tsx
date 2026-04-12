@@ -42,6 +42,17 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { evolutionApiService } from "@/services/evolutionApiService";
 
 // Schema simplificado
+const normalizeModoSaldoMeta = (value: unknown): "Cartão" | "Pix" | "Pré-pago (crédito)" | undefined => {
+  if (value === undefined || value === null || value === "") return undefined;
+
+  const normalized = String(value).trim();
+  if (["Cartão", "card_ok", "card_failing"].includes(normalized)) return "Cartão";
+  if (normalized === "Pix") return "Pix";
+  if (["Pré-pago (crédito)", "funds"].includes(normalized)) return "Pré-pago (crédito)";
+
+  return undefined;
+};
+
 const contaSchema = z.object({
   nome_cliente: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
   telefone: z.string().optional().or(z.literal("")),
@@ -55,7 +66,10 @@ const contaSchema = z.object({
   meta_account_id: z.string().optional(),
   meta_business_id: z.string().optional(),
   meta_page_id: z.string().optional(),
-  modo_saldo_meta: z.enum(["Cartão", "Pix", "Pré-pago (crédito)"]).optional(),
+  modo_saldo_meta: z.preprocess(
+    normalizeModoSaldoMeta,
+    z.enum(["Cartão", "Pix", "Pré-pago (crédito)"]).optional()
+  ),
   saldo_meta: z.number().optional(),
   alerta_saldo_baixo: z.number().optional(),
   budget_mensal_meta: z.number().optional(),
@@ -102,7 +116,7 @@ const makeDefaults = (d?: Partial<ContaFormData>): ContaFormData => ({
   meta_account_id: d?.meta_account_id ?? "",
   meta_business_id: d?.meta_business_id ?? "",
   meta_page_id: d?.meta_page_id ?? "",
-  modo_saldo_meta: (d?.modo_saldo_meta as any) ?? "Pix",
+  modo_saldo_meta: normalizeModoSaldoMeta(d?.modo_saldo_meta) ?? "Pix",
   saldo_meta: num(d?.saldo_meta, 0),
   alerta_saldo_baixo: num(d?.alerta_saldo_baixo, 200),
   budget_mensal_meta: num(d?.budget_mensal_meta, 0),
@@ -233,15 +247,19 @@ export function ModernAccountForm({
               }
               form.handleSubmit(handleSubmit, (errors) => {
                 console.error("Validation errors:", errors);
-                // Navigate to the step with errors
+                const firstError = Object.values(errors)[0];
+                const firstMessage = firstError && typeof firstError === "object" && "message" in firstError
+                  ? String(firstError.message)
+                  : "Verifique os campos do formulário";
+
                 if (errors.nome_cliente || errors.id_grupo || errors.telefone || errors.email || errors.link_drive) {
                   setStep(1);
-                  toast({ title: "Erro de validação", description: "Verifique os campos obrigatórios na etapa 1", variant: "destructive" });
-                } else if (errors.canais) {
+                  toast({ title: "Erro de validação", description: firstMessage, variant: "destructive" });
+                } else if (errors.canais || errors.usa_meta_ads || errors.meta_account_id || errors.meta_business_id || errors.meta_page_id || errors.modo_saldo_meta || errors.saldo_meta || errors.alerta_saldo_baixo || errors.budget_mensal_meta || errors.usa_google_ads || errors.google_ads_id || errors.budget_mensal_google) {
                   setStep(2);
-                  toast({ title: "Erro de validação", description: "Selecione pelo menos um canal na etapa 2", variant: "destructive" });
+                  toast({ title: "Erro de validação", description: firstMessage, variant: "destructive" });
                 } else {
-                  toast({ title: "Erro de validação", description: "Verifique os campos do formulário", variant: "destructive" });
+                  toast({ title: "Erro de validação", description: firstMessage, variant: "destructive" });
                 }
               })(e);
             }}
