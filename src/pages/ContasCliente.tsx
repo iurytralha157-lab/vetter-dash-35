@@ -45,8 +45,12 @@ interface AccountData {
   observacoes: string | null;
   created_at: string;
   updated_at: string;
+  id_grupo: string | null;
   usa_meta_ads?: boolean;
   meta_account_id?: string;
+  meta_business_id?: string;
+  meta_page_id?: string;
+  modo_saldo_meta?: string;
   saldo_meta?: number;
   alerta_saldo_baixo?: number;
   budget_mensal_meta?: number;
@@ -56,6 +60,8 @@ interface AccountData {
   link_drive?: string;
   canal_relatorio?: string;
   horario_relatorio?: string;
+  notificacao_saldo_baixo?: boolean;
+  notificacao_erro_sync?: boolean;
   gestor_name?: string;
   cliente_nome?: string;
   total_budget?: number;
