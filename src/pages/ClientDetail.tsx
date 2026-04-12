@@ -262,23 +262,10 @@ export default function ClientDetailPage() {
                         {hasPaymentIssue ? <ShieldAlert className="h-5 w-5 text-destructive" /> : <DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground font-medium">
-                          {isPrepay ? 'Saldo Pré-pago (tempo real)' : 'Status da Conta Meta (tempo real)'}
+                        <p className="text-xs text-muted-foreground font-medium">Saldo Disponível (tempo real)</p>
+                        <p className={`text-2xl font-bold ${hasPaymentIssue ? 'text-destructive' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                          {currency(accountBalance.balance)}
                         </p>
-                        {isPrepay ? (
-                          <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
-                            {currency(accountBalance.balance)}
-                          </p>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            {hasPaymentIssue ? (
-                              <AlertTriangle className="h-4 w-4 text-destructive" />
-                            ) : (
-                              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                            )}
-                            <span className={`text-lg font-bold ${st.color}`}>{st.label}</span>
-                          </div>
-                        )}
                       </div>
                     </div>
                     <div className="flex gap-6 text-sm">
@@ -286,17 +273,21 @@ export default function ClientDetailPage() {
                         <p className="text-xs text-muted-foreground">Total Gasto</p>
                         <p className="font-semibold">{currency(accountBalance.amount_spent)}</p>
                       </div>
-                      {isPrepay && accountBalance.spend_cap !== null && accountBalance.spend_cap > 0 && (
+                      {accountBalance.spend_cap !== null && accountBalance.spend_cap > 0 && (
                         <div className="text-right">
                           <p className="text-xs text-muted-foreground">Limite</p>
                           <p className="font-semibold">{currency(accountBalance.spend_cap)}</p>
                         </div>
                       )}
                       <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Tipo</p>
+                        <p className="text-xs text-muted-foreground">Status</p>
                         <div className="flex items-center gap-1">
-                          <CreditCard className="h-3 w-3" />
-                          <p className="font-semibold text-xs">{fundingType}</p>
+                          {hasPaymentIssue ? (
+                            <AlertTriangle className="h-3 w-3 text-destructive" />
+                          ) : (
+                            <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                          )}
+                          <p className={`font-semibold text-xs ${st.color}`}>{st.label}</p>
                         </div>
                       </div>
                     </div>
