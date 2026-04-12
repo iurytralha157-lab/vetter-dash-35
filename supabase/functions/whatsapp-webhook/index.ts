@@ -765,6 +765,14 @@ async function handleContextDetailAll(
 ): Promise<Response> {
   const ctx = await getActiveContext(supabase, groupJid, account.id);
 
+  if (ctx?._expired) {
+    const msg = `⏰ *Sessão expirada*\n\nA consulta anterior expirou após 30 min de inatividade.\n\nEnvie *#campanhas* novamente para iniciar uma nova consulta.`;
+    await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, groupJid, msg);
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
   if (!ctx || !ctx.campaigns?.length) {
     // Fallback to #relatorio behavior
     return await handleRelatorioAll(account, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
