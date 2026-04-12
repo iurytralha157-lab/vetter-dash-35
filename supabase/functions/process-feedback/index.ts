@@ -148,8 +148,59 @@ Deno.serve(async (req) => {
       }
     }
 
-    // === If force_update, delete old feedback for this account+date range first ===
+    // === If force_update, apply stage protection rules ===
     if (force_update) {
+      const isAdmin = body.is_admin === true;
+
+      // Fetch existing feedback for this period
+      const { data: existingRows } = await supabase
+        .from("feedback_campanha")
+        .select("campanha_nome, quantidade_passou_corretor, quantidade_visita, quantidade_proposta, quantidade_venda, quantidade_descartado, quantidade_atendimento")
+        .eq("account_id", account_id)
+        .gte("data_referencia", dataInicio)
+        .lte("data_referencia", dataFim)
+        .neq("campanha_nome", "desconhecida");
+
+      // RULE: Once a campaign has advanced stages (corretor, visita, proposta, venda),
+      // non-admin users cannot set those values to 0 or move leads back to descartado/atendimento SDR
+      if (!isAdmin && existingRows && existingRows.length > 0) {
+        const advancedStages = ["quantidade_passou_corretor", "quantidade_visita", "quantidade_proposta", "quantidade_venda"] as const;
+
+        for (const camp of campaigns) {
+          const existingCamp = existingRows.find((r: any) =>
+            r.campanha_nome?.toLowerCase() === camp.campanha_nome?.toLowerCase()
+          );
+          if (!existingCamp) continue;
+
+          // Preserve advanced stage values — cannot reduce them
+          for (const stage of advancedStages) {
+            const existingVal = existingCamp[stage] || 0;
+            const newVal = camp[stage] ?? null;
+            if (existingVal > 0 && (newVal === null || newVal < existingVal)) {
+              (camp as any)[stage] = existingVal;
+              console.log(`[process-feedback] Protected stage "${stage}" for "${camp.campanha_nome}": kept ${existingVal} (user tried ${newVal})`);
+            }
+          }
+
+          // Cannot increase descartado or atendimento if advanced stages exist
+          const hasAdvanced = advancedStages.some(s => (existingCamp[s] || 0) > 0);
+          if (hasAdvanced) {
+            const existingDescartado = existingCamp.quantidade_descartado || 0;
+            const existingAtendimento = existingCamp.quantidade_atendimento || 0;
+
+            if (camp.quantidade_descartado != null && camp.quantidade_descartado > existingDescartado) {
+              camp.quantidade_descartado = existingDescartado;
+              console.log(`[process-feedback] Blocked descartado increase for "${camp.campanha_nome}" (has advanced stages)`);
+            }
+            if (camp.quantidade_atendimento != null && camp.quantidade_atendimento > existingAtendimento) {
+              camp.quantidade_atendimento = existingAtendimento;
+              console.log(`[process-feedback] Blocked atendimento increase for "${camp.campanha_nome}" (has advanced stages)`);
+            }
+          }
+        }
+      }
+
+      // Delete old records to replace with new
       const { error: deleteError } = await supabase
         .from("feedback_campanha")
         .delete()
