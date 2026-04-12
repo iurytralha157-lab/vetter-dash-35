@@ -349,10 +349,21 @@ export default function ContasCliente() {
               : account.status === "Pausado" ? "bg-yellow-500"
               : "bg-muted-foreground";
 
+            // Balance-based card styling
+            const saldo = account.saldo_meta ?? 0;
+            const limite = account.alerta_saldo_baixo ?? 200;
+            const isZeroBalance = account.usa_meta_ads && saldo <= 0;
+            const isLowBalance = account.usa_meta_ads && !isZeroBalance && saldo < limite;
+            const cardBorderClass = isZeroBalance
+              ? "border-red-500/50 hover:border-red-500/70"
+              : isLowBalance
+              ? "border-yellow-500/50 hover:border-yellow-500/70"
+              : "border-border hover:border-primary/25";
+
             return (
               <Card
                 key={account.id}
-                className="relative overflow-hidden transition-colors cursor-pointer border-border hover:border-primary/25"
+                className={`relative overflow-hidden transition-colors cursor-pointer ${cardBorderClass}`}
                 onClick={() => handleViewAccount(account.id)}
               >
                 <div className={`absolute left-0 top-0 h-full w-1 ${statusColor}`} />
