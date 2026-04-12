@@ -1045,11 +1045,15 @@ function getHelpText(clientName: string): string {
     `💸 *#gasto* — Investimento por período\n` +
     `   Ex: #gasto 7, #gasto 30, #gasto março\n\n` +
     `📊 *#campanhas* — Campanhas ativas com gasto hoje\n` +
-    `📊 *#campanhas 7* — Campanhas dos últimos 7 dias\n` +
-    `📊 *#campanhas março* — Campanhas de um mês\n` +
-    `📊 *#campanhas 01/03 a 15/03* — Período específico\n` +
-    `📋 *#campanha{N}* — Relatório da campanha N\n` +
-    `📑 *#relatorio* — Relatório de todas as campanhas\n\n` +
+    `📊 *#campanhas 7* — Últimos 7 dias\n` +
+    `📊 *#campanhas março* — Mês específico\n` +
+    `📊 *#campanhas 01/03 a 15/03* — Período específico\n\n` +
+    `📋 Após listar campanhas:\n` +
+    `   *#1*, *#2*... — Relatório da campanha N\n` +
+    `   *#1 #3* — Várias campanhas\n` +
+    `   *#todas* — Relatório de todas\n` +
+    `   *#sim* — Ver opções disponíveis\n\n` +
+    `📑 *#relatorio* — Relatório de todas as campanhas ativas\n\n` +
     `👥 *#leads* — Resumo de leads\n` +
     `👥 *#leads{N}* — Leads da campanha N\n\n` +
     `📊 *#resumo* — Resumo geral\n` +
