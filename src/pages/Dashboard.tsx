@@ -75,7 +75,7 @@ export default function Dashboard() {
 
 /* ── Global aggregated view ── */
 
-function GlobalDashboardView({ period, refreshKey, onRefreshingChange }: { period: string; refreshKey: number; onRefreshingChange: (v: boolean) => void }) {
+function GlobalDashboardView({ period, customRange, refreshKey, onRefreshingChange }: { period: string; customRange?: { from: Date; to: Date }; refreshKey: number; onRefreshingChange: (v: boolean) => void }) {
   const [loading, setLoading] = useState(true);
   const [aggregatedMetrics, setAggregatedMetrics] = useState<MetaAccountMetrics | null>(null);
   const [allCampaigns, setAllCampaigns] = useState<MetaCampaign[]>([]);
@@ -116,7 +116,7 @@ function GlobalDashboardView({ period, refreshKey, onRefreshingChange }: { perio
             if (forceRefresh) {
               metaAdsService.clearCache(`${acc.meta_account_id}_${metaPeriod}`);
             }
-            const data = await metaAdsService.fetchMetaCampaigns(acc.meta_account_id!, metaPeriod);
+            const data = await metaAdsService.fetchMetaCampaigns(acc.meta_account_id!, metaPeriod, metaPeriod === 'custom' ? customRange : undefined);
             if (data?.success) {
               return {
                 accountId: acc.id,
@@ -220,7 +220,7 @@ function GlobalDashboardView({ period, refreshKey, onRefreshingChange }: { perio
 
   useEffect(() => {
     fetchAll(refreshKey > 0);
-  }, [metaPeriod, refreshKey]);
+  }, [metaPeriod, refreshKey, customRange]);
 
   const orderedCampaigns = useMemo(() => {
     return [...allCampaigns].sort((a, b) => {
