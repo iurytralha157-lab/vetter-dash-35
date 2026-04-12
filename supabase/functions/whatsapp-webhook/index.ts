@@ -123,6 +123,8 @@ async function processCommand(
       responseText = await handleFollowup(text, account, groupJid, senderName, supabase);
     } else if (cmd.startsWith("#feedback")) {
       responseText = await handleFeedback(text, account, groupJid, senderName, supabase);
+    } else if (cmd === "#saldo") {
+      responseText = await handleSaldo(account, supabase);
     } else if (cmd === "#funil") {
       responseText = await handleFunil(account, supabase);
     } else if (cmd === "#campanhas") {
