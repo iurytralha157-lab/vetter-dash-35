@@ -15,5 +15,8 @@ verify_jwt = true
 [functions.balance-alert]
 verify_jwt = false
 
+[functions.sync-balances]
+verify_jwt = false
+
 [functions.send-webhook-notification]
 verify_jwt = true
