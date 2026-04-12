@@ -614,9 +614,9 @@ async function getActiveContext(supabase: any, groupJid: string, accountId: stri
 
   if (!data) return null;
 
-  // Check if expired
+  // Check if expired - return special marker
   if (new Date(data.expires_at) < new Date()) {
-    return null;
+    return { _expired: true };
   }
 
   return data.context_data;
