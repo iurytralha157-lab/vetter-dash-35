@@ -146,8 +146,8 @@ Deno.serve(async (req) => {
     
     console.log('Date config:', { since, until, period, datePreset });
 
-    // Fetch account info (balance, amount_spent, spend_cap)
-    const accountInfoUrl = `${META_BASE_URL}/${formattedAccountId}?fields=balance,amount_spent,spend_cap,currency,name&access_token=${accessToken}`;
+    // Fetch account info (balance, billing status, payment details)
+    const accountInfoUrl = `${META_BASE_URL}/${formattedAccountId}?fields=balance,amount_spent,spend_cap,currency,name,account_status,disable_reason,is_prepay_account,funding_source_details&access_token=${accessToken}`;
     console.log('Fetching account info from Meta API...');
     const accountInfoPromise = fetch(accountInfoUrl);
 
@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
       const accountInfoResponse = await accountInfoPromise;
       if (accountInfoResponse.ok) {
         accountInfo = await accountInfoResponse.json();
-        console.log('Account info:', JSON.stringify({ balance: accountInfo.balance, amount_spent: accountInfo.amount_spent, spend_cap: accountInfo.spend_cap, currency: accountInfo.currency }));
+        console.log('Account info:', JSON.stringify({ balance: accountInfo.balance, amount_spent: accountInfo.amount_spent, spend_cap: accountInfo.spend_cap, currency: accountInfo.currency, account_status: accountInfo.account_status, disable_reason: accountInfo.disable_reason, is_prepay_account: accountInfo.is_prepay_account, funding_source_details: accountInfo.funding_source_details }));
       } else {
         console.warn('Failed to fetch account info:', await accountInfoResponse.text());
       }
@@ -341,11 +341,15 @@ Deno.serve(async (req) => {
       campaigns: campaignsWithInsights,
       account_metrics: accountMetrics,
       account_balance: accountInfo ? {
-        balance: parseFloat(accountInfo.balance || '0') / 100, // Meta returns in cents
+        balance: parseFloat(accountInfo.balance || '0') / 100,
         amount_spent: parseFloat(accountInfo.amount_spent || '0') / 100,
         spend_cap: accountInfo.spend_cap ? parseFloat(accountInfo.spend_cap) / 100 : null,
         currency: accountInfo.currency || 'BRL',
         account_name: accountInfo.name || null,
+        account_status: accountInfo.account_status || null,
+        disable_reason: accountInfo.disable_reason || null,
+        is_prepay_account: accountInfo.is_prepay_account || false,
+        funding_source_details: accountInfo.funding_source_details || null,
       } : null,
       fetched_at: new Date().toISOString()
     };

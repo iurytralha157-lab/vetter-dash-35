@@ -36,6 +36,10 @@ export interface MetaAccountBalance {
   spend_cap: number | null;
   currency: string;
   account_name: string | null;
+  account_status: number | null;
+  disable_reason: number | null;
+  is_prepay_account: boolean;
+  funding_source_details: any | null;
 }
 
 export interface MetaAdsResponse {
