@@ -580,25 +580,252 @@ async function handleResumo(account: any, supabase: any): Promise<string> {
 }
 
 function getHelpText(clientName: string): string {
-  return `🤖 *Comandos disponíveis - ${clientName}*\n` +
-    `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `💰 *#saldo* — Consultar saldo em tempo real\n\n` +
-    `📊 *#campanhas* — Lista todas as campanhas\n` +
-    `📋 *#campanha{N}* — Detalhes da campanha N\n` +
-    `   Ex: #campanha1, #campanha2\n\n` +
-    `👥 *#leads* — Resumo de leads por campanha\n` +
-    `👥 *#leads{N}* — Leads detalhados da campanha N\n\n` +
-    `📊 *#resumo* — Resumo geral da conta\n\n` +
-    `📝 *#feedback* — Registrar feedback por campanha\n` +
-    `   Ex: #feedback\n` +
-    `   terceiros\n` +
-    `   referente à campanha REF47\n` +
-    `   recebidos 2\n` +
-    `   atendimento SDR 2\n\n` +
-    `📊 *#funil* — Ver funil consolidado (30 dias)\n\n` +
-    `🔄 *#followup* — Registrar follow-up de lead\n` +
-    `   Ex: #followup João ligou, quer visitar apt 3Q\n\n` +
-    `❓ *#ajuda* — Mostra esta mensagem\n`;
+  return `🤖 *Comandos - ${clientName}*\n\n` +
+    `💰 *#saldo* — Saldo em tempo real\n` +
+    `💸 *#gasto* — Investimento por período\n` +
+    `   Ex: #gasto 7, #gasto 30, #gasto março\n\n` +
+    `📊 *#campanhas* — Lista campanhas\n` +
+    `📋 *#campanha{N}* — Detalhes da campanha N\n\n` +
+    `👥 *#leads* — Resumo de leads\n` +
+    `👥 *#leads{N}* — Leads da campanha N\n\n` +
+    `📊 *#resumo* — Resumo geral\n` +
+    `📝 *#feedback* — Registrar feedback\n` +
+    `📊 *#funil* — Funil consolidado\n` +
+    `🔄 *#followup* — Registrar follow-up\n\n` +
+    `❓ *#ajuda* — Esta mensagem`;
+}
+
+// ─── Saldo Handler ───
+
+async function handleSaldo(
+  account: { id: string; nome_cliente: string; meta_account_id: string | null },
+  supabase: any
+): Promise<string> {
+  if (!account.meta_account_id) {
+    return `⚠️ *${account.nome_cliente}*\nConta sem Meta Ads configurado.`;
+  }
+
+  const accessToken = Deno.env.get('META_ACCESS_TOKEN');
+  if (!accessToken) {
+    return `⚠️ Token do Meta não configurado. Contate o administrador.`;
+  }
+
+  const formattedId = account.meta_account_id.startsWith('act_')
+    ? account.meta_account_id
+    : `act_${account.meta_account_id}`;
+
+  try {
+    const url = `https://graph.facebook.com/v21.0/${formattedId}?fields=balance,spend_cap,funding_source_details,is_prepay_account,currency&access_token=${accessToken}`;
+    const res = await fetch(url);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[whatsapp-webhook] #saldo Meta API error for ${account.nome_cliente}:`, errText.slice(0, 300));
+      return `⚠️ Erro ao consultar saldo. Tente novamente.`;
+    }
+
+    const data = await res.json();
+
+    const isPrepay = data.is_prepay_account === true;
+    const fundingType = data.funding_source_details?.type;
+    const displayString = data.funding_source_details?.display_string || '';
+    const isCardAccount = fundingType === 1 || fundingType === 2;
+
+    let fundsAmount: number | null = null;
+    const balanceMatch = displayString.match(/R\$\s?([\d.,]+)/);
+    if (balanceMatch) {
+      fundsAmount = parseFloat(balanceMatch[1].replace(/\./g, '').replace(',', '.'));
+    }
+
+    const balanceRaw = parseFloat(data.balance || '0') / 100;
+    const spendCap = data.spend_cap ? parseFloat(data.spend_cap) / 100 : null;
+
+    const fmtCurrency = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
+
+    let msg = `💰 *Saldo - ${account.nome_cliente}*\n\n`;
+
+    if (fundsAmount !== null && fundsAmount > 0) {
+      msg += `💰 Fundos: *${fmtCurrency(fundsAmount)}*\n`;
+      if (isCardAccount && balanceRaw > 0) {
+        msg += `💳 Devedor: *${fmtCurrency(balanceRaw)}*\n`;
+      }
+    } else if (isPrepay) {
+      msg += `💰 Pré-pago: *${fmtCurrency(balanceRaw)}*\n`;
+    } else if (isCardAccount) {
+      msg += `💳 Devedor: *${fmtCurrency(balanceRaw)}*\n`;
+      msg += `📋 ${displayString}\n`;
+      msg += `_Cartão - cobrado automaticamente_\n`;
+    } else {
+      msg += `💰 Saldo: *${fmtCurrency(balanceRaw)}*\n`;
+    }
+
+    if (spendCap && spendCap > 0) {
+      msg += `🔒 Limite: *${fmtCurrency(spendCap)}*\n`;
+    }
+
+    // Estimation
+    const { data: accData } = await supabase
+      .from('accounts')
+      .select('media_gasto_diario')
+      .eq('id', account.id)
+      .single();
+
+    if (accData?.media_gasto_diario && accData.media_gasto_diario > 0) {
+      const saldoAtual = fundsAmount ?? (isPrepay ? balanceRaw : null);
+      if (saldoAtual !== null && saldoAtual > 0) {
+        const diasEstimados = Math.floor(saldoAtual / accData.media_gasto_diario);
+        msg += `⏳ ~${diasEstimados} dia(s) restante(s)\n`;
+      }
+    }
+
+    msg += `\n🕐 _Tempo real_`;
+
+    return msg;
+  } catch (err) {
+    console.error(`[whatsapp-webhook] #saldo error:`, err);
+    return `⚠️ Erro ao consultar saldo. Tente novamente.`;
+  }
+}
+
+// ─── Gasto Handler ───
+
+async function handleGasto(
+  text: string,
+  account: { id: string; nome_cliente: string; meta_account_id: string | null },
+  supabase: any
+): Promise<string> {
+  if (!account.meta_account_id) {
+    return `⚠️ *${account.nome_cliente}*\nConta sem Meta Ads configurado.`;
+  }
+
+  const accessToken = Deno.env.get('META_ACCESS_TOKEN');
+  if (!accessToken) {
+    return `⚠️ Token do Meta não configurado.`;
+  }
+
+  const formattedId = account.meta_account_id.startsWith('act_')
+    ? account.meta_account_id
+    : `act_${account.meta_account_id}`;
+
+  const arg = text.toLowerCase().replace('#gasto', '').trim();
+
+  let since: string;
+  let until: string;
+  let periodLabel: string;
+
+  const today = new Date();
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+
+  const monthNames: Record<string, number> = {
+    janeiro: 0, fevereiro: 1, 'março': 2, marco: 2, abril: 3, maio: 4, junho: 5,
+    julho: 6, agosto: 7, setembro: 8, outubro: 9, novembro: 10, dezembro: 11,
+  };
+
+  const monthLabels = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  const monthMatch = arg.match(/^(janeiro|fevereiro|março|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*(?:de\s*)?(\d{4})?$/i);
+  const rangeMatch = arg.match(/^(\d{1,2}\/\d{1,2}\/\d{4})\s*(?:a|ate|até)\s*(\d{1,2}\/\d{1,2}\/\d{4})$/i);
+  const daysMatch = arg.match(/^(\d+)$/);
+
+  if (monthMatch) {
+    const mName = monthMatch[1].toLowerCase().replace('ç', 'c');
+    const monthIdx = monthNames[mName] ?? monthNames[monthMatch[1].toLowerCase()];
+    if (monthIdx === undefined) {
+      return `⚠️ Mês não reconhecido.`;
+    }
+    const year = monthMatch[2] ? parseInt(monthMatch[2]) : (monthIdx <= today.getMonth() ? today.getFullYear() : today.getFullYear() - 1);
+    const start = new Date(year, monthIdx, 1);
+    const end = new Date(year, monthIdx + 1, 0);
+    if (end > today) end.setTime(today.getTime());
+    since = fmt(start);
+    until = fmt(end);
+    periodLabel = `${monthLabels[monthIdx]}/${year}`;
+  } else if (rangeMatch) {
+    const parseDate = (s: string) => {
+      const [d, m, y] = s.split('/').map(Number);
+      return new Date(y, m - 1, d);
+    };
+    const start = parseDate(rangeMatch[1]);
+    const end = parseDate(rangeMatch[2]);
+    since = fmt(start);
+    until = fmt(end);
+    periodLabel = `${rangeMatch[1]} a ${rangeMatch[2]}`;
+  } else if (daysMatch) {
+    const days = parseInt(daysMatch[1]);
+    const start = new Date(today);
+    start.setDate(start.getDate() - days + 1);
+    since = fmt(start);
+    until = fmt(today);
+    periodLabel = `Últimos ${days} dias`;
+  } else if (!arg) {
+    const start = new Date(today);
+    start.setDate(start.getDate() - 29);
+    since = fmt(start);
+    until = fmt(today);
+    periodLabel = `Últimos 30 dias`;
+  } else {
+    return `💸 *Como usar #gasto:*\n\n` +
+      `▸ *#gasto* — Últimos 30 dias\n` +
+      `▸ *#gasto 7* — Últimos 7 dias\n` +
+      `▸ *#gasto 15* — Últimos 15 dias\n` +
+      `▸ *#gasto março* — Mês de março\n` +
+      `▸ *#gasto janeiro 2025* — Jan/2025\n` +
+      `▸ *#gasto 01/03/2025 a 15/03/2025*`;
+  }
+
+  try {
+    const url = `https://graph.facebook.com/v21.0/${formattedId}/insights?fields=spend,impressions,clicks,actions&time_range={"since":"${since}","until":"${until}"}&access_token=${accessToken}`;
+    const res = await fetch(url);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[whatsapp-webhook] #gasto Meta API error:`, errText.slice(0, 300));
+      return `⚠️ Erro ao consultar gastos. Tente novamente.`;
+    }
+
+    const result = await res.json();
+    const insights = result.data?.[0];
+
+    if (!insights) {
+      return `💸 *Investimento - ${account.nome_cliente}*\n\n📅 ${periodLabel}\n\nSem dados neste período.`;
+    }
+
+    const spend = parseFloat(insights.spend || '0');
+    const impressions = parseInt(insights.impressions || '0');
+    const clicks = parseInt(insights.clicks || '0');
+    const ctr = impressions > 0 ? (clicks / impressions * 100) : 0;
+
+    let leads = 0;
+    if (insights.actions) {
+      for (const action of insights.actions) {
+        if (action.action_type === 'lead' || action.action_type === 'onsite_conversion.messaging_conversation_started_7d') {
+          leads += parseInt(action.value || '0');
+        }
+      }
+    }
+
+    const fmtCurrency = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
+    const cpl = leads > 0 ? spend / leads : 0;
+
+    let msg = `💸 *Investimento - ${account.nome_cliente}*\n\n`;
+    msg += `📅 ${periodLabel}\n\n`;
+    msg += `💰 Investido: *${fmtCurrency(spend)}*\n`;
+    msg += `👀 Impressões: *${impressions.toLocaleString('pt-BR')}*\n`;
+    msg += `🖱️ Cliques: *${clicks.toLocaleString('pt-BR')}*\n`;
+    msg += `📊 CTR: *${ctr.toFixed(2)}%*\n`;
+
+    if (leads > 0) {
+      msg += `👥 Leads: *${leads}*\n`;
+      msg += `💵 CPL: *${fmtCurrency(cpl)}*\n`;
+    }
+
+    msg += `\n🕐 _Tempo real_`;
+
+    return msg;
+  } catch (err) {
+    console.error(`[whatsapp-webhook] #gasto error:`, err);
+    return `⚠️ Erro ao consultar gastos. Tente novamente.`;
+  }
 }
 
 // ─── Saldo Handler ───
