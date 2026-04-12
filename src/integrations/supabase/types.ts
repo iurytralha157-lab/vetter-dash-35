@@ -3033,6 +3033,58 @@ export type Database = {
           },
         ]
       }
+      whatsapp_chat_context: {
+        Row: {
+          account_id: string
+          context_data: Json
+          context_type: string
+          created_at: string
+          expires_at: string
+          group_jid: string
+          id: string
+        }
+        Insert: {
+          account_id: string
+          context_data?: Json
+          context_type?: string
+          created_at?: string
+          expires_at?: string
+          group_jid: string
+          id?: string
+        }
+        Update: {
+          account_id?: string
+          context_data?: Json
+          context_type?: string
+          created_at?: string
+          expires_at?: string
+          group_jid?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_chat_context_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_chat_context_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "leads_stats"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_chat_context_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "relatorio_n8n_consolidated"
+            referencedColumns: ["conta_id"]
+          },
+        ]
+      }
       whatsapp_groups: {
         Row: {
           created_at: string | null
