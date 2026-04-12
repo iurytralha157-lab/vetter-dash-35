@@ -158,7 +158,9 @@ Deno.serve(async (req) => {
       
       console.log(`Account insights: received ${insightsArray.length} records`);
       if (insightsArray.length > 0) {
-        console.log('First insight record:', JSON.stringify(insightsArray[0]).substring(0, 200));
+        // Log ALL action types to debug lead counting
+        const allActions = insightsArray[0]?.actions || [];
+        console.log('All account action_types:', JSON.stringify(allActions.map((a: any) => ({ type: a.action_type, value: a.value }))));
       }
       
       accountInsights = insightsArray[0] || null;
