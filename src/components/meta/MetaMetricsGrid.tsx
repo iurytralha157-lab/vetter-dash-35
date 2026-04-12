@@ -93,7 +93,9 @@ export function MetaMetricsGrid({ metrics, loading, balance }: MetaMetricsGridPr
       >
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-muted-foreground">Saldo Disponível</p>
+            <p className="text-sm font-medium text-muted-foreground">
+              {balance?.is_prepay_account ? 'Fundos Disponíveis' : 'Saldo Devedor'}
+            </p>
             <div className={`p-2 rounded-lg ${hasPaymentIssue ? 'bg-red-500/10' : 'bg-emerald-500/10 dark:bg-emerald-500/20'}`}>
               {hasPaymentIssue 
                 ? <AlertTriangle className="h-5 w-5 text-destructive" /> 
