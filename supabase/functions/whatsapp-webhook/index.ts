@@ -125,6 +125,8 @@ async function processCommand(
       responseText = await handleFeedback(text, account, groupJid, senderName, supabase);
     } else if (cmd === "#saldo") {
       responseText = await handleSaldo(account, supabase);
+    } else if (cmd.startsWith("#gasto")) {
+      responseText = await handleGasto(text, account, supabase);
     } else if (cmd === "#funil") {
       responseText = await handleFunil(account, supabase);
     } else if (cmd === "#campanhas") {
