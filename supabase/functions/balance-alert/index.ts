@@ -92,6 +92,7 @@ Deno.serve(async (req) => {
           });
 
           const sendText = await sendRes.text();
+          console.log(`[balance-alert] Response for ${acc.nome_cliente}:`, sendText.slice(0, 300));
           
           if (sendRes.ok) {
             console.log(`[balance-alert] ✅ Alerta enviado para ${acc.nome_cliente} (${alertType})`);
