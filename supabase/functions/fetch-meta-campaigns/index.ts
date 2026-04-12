@@ -176,7 +176,7 @@ Deno.serve(async (req) => {
             ? `date_preset=${datePreset}` 
             : `time_range={"since":"${since}","until":"${until}"}`;
           
-          const campaignInsightsUrl = `${META_BASE_URL}/${campaign.id}/insights?fields=impressions,reach,clicks,spend,ctr,cpc,cpm,actions,cost_per_action_type&${campaignTimeParam}&action_report_time=impression&access_token=${accessToken}`;
+          const campaignInsightsUrl = `${META_BASE_URL}/${campaign.id}/insights?fields=impressions,reach,clicks,spend,ctr,cpc,cpm,actions,cost_per_action_type&${campaignTimeParam}&access_token=${accessToken}`;
           
           const response = await fetch(campaignInsightsUrl);
           if (!response.ok) {
@@ -195,13 +195,14 @@ Deno.serve(async (req) => {
           let costPerConversion = null;
           
           if (insights?.actions) {
-            // Sum all lead-related actions
+            // Sum all lead/messaging-related actions — these are the "Results" Meta shows
             const leadActions = insights.actions.filter((action: any) => 
               action.action_type === 'lead' ||
               action.action_type === 'offsite_conversion.fb_pixel_lead' ||
               action.action_type === 'onsite_conversion.lead' ||
               action.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
-              action.action_type === 'onsite_conversion.post_save'
+              action.action_type === 'onsite_conversion.total_messaging_connection' ||
+              action.action_type === 'onsite_conversion.messaging_first_reply'
             );
             conversions = leadActions.reduce((sum: number, action: { value?: string }) => sum + parseInt(action.value || '0'), 0);
           }
