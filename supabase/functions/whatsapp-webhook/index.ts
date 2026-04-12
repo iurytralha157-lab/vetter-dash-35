@@ -131,10 +131,19 @@ async function processCommand(
       responseText = await handleFunil(account, supabase);
     } else if (cmd.startsWith("#campanhas")) {
       const periodArg = cmd.replace("#campanhas", "").trim();
-      responseText = await handleCampanhas(account, supabase, periodArg || null);
+      responseText = await handleCampanhas(account, supabase, periodArg || null, groupJid);
     } else if (cmd === "#relatorio") {
-      // Send individual reports for each active campaign with delay
       return await handleRelatorioAll(account, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
+    } else if (cmd === "#todas" || cmd === "#todos") {
+      // Send detailed reports for all campaigns from context
+      return await handleContextDetailAll(account, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
+    } else if (cmd === "#sim") {
+      // User said "yes" to seeing detailed reports - ask which one
+      responseText = await handleSimResponse(account, supabase, groupJid);
+    } else if (cmd.match(/^#\d+(\s+#?\d+)*$/)) {
+      // Matches "#1", "#2", "#1 #3", "#1 2 3" etc.
+      const numbers = cmd.match(/\d+/g)!.map(Number);
+      return await handleContextDetailMultiple(account, numbers, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
     } else if (cmd.startsWith("#campanha")) {
       const num = parseInt(cmd.replace("#campanha", "").trim());
       responseText = await handleCampanhaDetail(account, num, supabase);
