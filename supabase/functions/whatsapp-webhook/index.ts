@@ -584,12 +584,70 @@ async function handleFeedback(
       }
     }
 
-    if (followupResult?.leads_count > 0) {
-      msg += `\n👥 *${followupResult.leads_count} lead(s) individual(is) registrado(s) no funil*\n`;
+    // Show individual leads registered in funnel
+    const leadsCount = followupResult?.leads_count || 0;
+    if (leadsCount > 0) {
+      msg += `\n👥 *${leadsCount} lead(s) registrado(s) no funil:*\n`;
+      if (followupResult?.dados && Array.isArray(followupResult.dados)) {
+        for (const lead of followupResult.dados) {
+          const tempIcon = lead.temperatura_lead === "quente" ? "🔴" : lead.temperatura_lead === "morno" ? "🟡" : "🔵";
+          const etapaLabel = {
+            lead_novo: "Novo",
+            contato_iniciado: "Contato iniciado",
+            sem_resposta: "Sem resposta",
+            atendimento: "Em atendimento",
+            visita_agendada: "Visita agendada",
+            visita_realizada: "Visita realizada",
+            proposta: "Proposta",
+            venda: "Venda",
+            perdido: "Perdido",
+          }[lead.etapa_funil] || lead.etapa_funil || "—";
+          msg += `   ${tempIcon} ${lead.lead_nome || "Lead"} — ${etapaLabel}\n`;
+        }
+      }
     }
 
     msg += periodMsg;
     msg += crossRefMsg;
+
+    // 6. Follow-up: check if there are more leads from campaigns not covered
+    try {
+      let totalCampaignLeads = 0;
+      if (crossRefMsg === "") {
+        // Cross-ref wasn't done above, try now
+        let query = supabase
+          .from("campaign_history")
+          .select("leads")
+          .eq("account_id", account.id);
+        if (dataInicio === dataFim) {
+          query = query.eq("date", dataInicio);
+        } else {
+          query = query.gte("date", dataInicio).lte("date", dataFim);
+        }
+        const { data: campData } = await query;
+        if (campData) {
+          totalCampaignLeads = campData.reduce((s: number, c: any) => s + (c.leads || 0), 0);
+        }
+      }
+
+      // Total reported across both systems
+      let totalReported = leadsCount;
+      if (feedbackResult.campanhas && Array.isArray(feedbackResult.campanhas)) {
+        const campReported = feedbackResult.campanhas.reduce((s: number, c: any) => s + (c.recebidos || 0), 0);
+        if (campReported > totalReported) totalReported = campReported;
+      }
+
+      if (totalCampaignLeads > 0 && totalReported > 0 && totalCampaignLeads > totalReported) {
+        const diff = totalCampaignLeads - totalReported;
+        msg += `\n💬 *E os outros ${diff} lead(s)?*\n`;
+        msg += `Registramos *${totalCampaignLeads} leads* nas campanhas desse período, mas o feedback cobriu apenas *${totalReported}*.\n`;
+        msg += `Como estão os outros *${diff}*? Responda com:\n`;
+        msg += `*#feedback* _status dos ${diff} leads restantes_\n`;
+      }
+    } catch (followUpErr) {
+      console.error("[whatsapp-webhook] Follow-up check error:", followUpErr);
+    }
+
     msg += `\n💡 Use *#funil* para ver o funil consolidado.`;
     return msg;
   } catch (err) {
