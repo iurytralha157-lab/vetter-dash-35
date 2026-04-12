@@ -228,25 +228,35 @@ async function callAI(mensagem: string, apiKey: string, model: string): Promise<
 
 A mensagem segue o formato:
 #feedback
-<tipo_funil> (lancamento ou terceiros)
+<tipo_funil> (lancamento ou terceiros — se não informado, infira pelo contexto; se menciona SDR ou corretor, é "terceiros"; se não mencionar, é "lancamento")
 
-referente à campanha <NOME>
-recebidos <N>
-descartados <N>
-aguardando retorno <N>
-em atendimento <N> (ou "atendimento SDR" para terceiros)
-passou para corretor <N> (apenas terceiros)
-visita <N>
-proposta <N>
-venda <N>
+Pode haver MÚLTIPLAS campanhas na mesma mensagem, identificadas por códigos como "47:", "ap0145:", "REF47", etc.
 
-Pode haver MÚLTIPLAS campanhas na mesma mensagem.
+MAPEAMENTO DE ETAPAS (CRÍTICO — leia com atenção):
 
-REGRA CRÍTICA:
+| O que o usuário escreve | Campo correto |
+|---|---|
+| "lead recebido", "recebidos", "chegou" | quantidade_recebida |
+| "descartado", "descarte", "lixo" | quantidade_descartado |
+| "aguardando retorno", "sem resposta", "não respondeu" | quantidade_aguardando_retorno |
+| "atendimento SDR", "em atendimento" (sem mencionar corretor) | quantidade_atendimento |
+| "passou para corretor", "com o corretor", "em atendimento com o corretor", "corretor atendendo", "atendimento corretor" | quantidade_passou_corretor |
+| "visita", "visitou" | quantidade_visita |
+| "proposta", "enviou proposta" | quantidade_proposta |
+| "venda", "vendeu", "fechou" | quantidade_venda |
+
+REGRA CRÍTICA sobre "corretor":
+- Qualquer menção a CORRETOR indica "quantidade_passou_corretor", NUNCA "quantidade_atendimento".
+- "em atendimento com o corretor" = quantidade_passou_corretor
+- "atendimento SDR" ou apenas "em atendimento" (SEM mencionar corretor) = quantidade_atendimento
+
+REGRA sobre leads recebidos:
+- "quantidade_recebida" é o total de leads que chegaram naquela campanha, independente do status posterior.
+
+REGRA CRÍTICA de valores:
 - Extraia SOMENTE os campos explicitamente mencionados na mensagem.
 - Se um campo NÃO foi mencionado, retorne null para esse campo. NÃO retorne 0.
 - NÃO invente, assuma ou estime valores.
-- NÃO preencha campos ausentes com 0 ou qualquer outro valor.
 - Somente retorne um número quando ele estiver explícito na mensagem.
 
 PERÍODO/DATA:
@@ -260,9 +270,16 @@ PERÍODO/DATA:
 - "hoje" = data atual.
 
 Extraia:
-1. tipo_funil: "lancamento" ou "terceiros" (da linha logo após #feedback)
+1. tipo_funil: "lancamento" ou "terceiros"
 2. data_inicio e data_fim: o período do feedback (null se não mencionado)
 3. Para cada campanha mencionada, extraia APENAS as quantidades explicitamente informadas
+
+EXEMPLO:
+Mensagem: "47: 2 lead recebido, aguardando retorno / ap0145: 3 lead recebido, 2 em atendimento com o corretor"
+Resultado esperado:
+- tipo_funil: "terceiros" (mencionou corretor)
+- campanha "47": quantidade_recebida=2, quantidade_aguardando_retorno=2
+- campanha "ap0145": quantidade_recebida=3, quantidade_passou_corretor=2
 
 Retorne usando a tool extract_feedback_campaigns.`;
 
