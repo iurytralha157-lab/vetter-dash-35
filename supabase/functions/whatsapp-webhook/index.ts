@@ -64,6 +64,166 @@ Deno.serve(async (req) => {
       ""
     ).trim();
 
+    // Check for audio message
+    const isAudio = !!(message.audioMessage);
+    const messageId = key.id;
+
+    if (isAudio) {
+      // Process audio: download, transcribe, interpret
+      console.log("[whatsapp-webhook] Audio message detected, messageId:", messageId);
+
+      const groupNumber = remoteJid.replace("@g.us", "");
+      const possibleFormats = [groupNumber, `${groupNumber}-group`, remoteJid];
+
+      let account: any = null;
+      for (const fmt of possibleFormats) {
+        const { data: accData } = await supabase
+          .from("accounts")
+          .select("id, nome_cliente, meta_account_id, cliente_id")
+          .eq("id_grupo", fmt)
+          .single();
+        if (accData) {
+          account = accData;
+          break;
+        }
+      }
+
+      if (!account) {
+        return new Response(JSON.stringify({ ignored: true, reason: "no linked account for audio" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const senderName = data.pushName || key.participant || "Desconhecido";
+
+      try {
+        // 1. Download audio via Evolution API getBase64FromMediaMessage
+        const base64Res = await fetch(
+          `${evolutionUrl}/chat/getBase64FromMediaMessage/${instanceName}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", apikey: evolutionKey },
+            body: JSON.stringify({ message: { key }, convertToMp4: false }),
+          }
+        );
+
+        if (!base64Res.ok) {
+          console.error("[whatsapp-webhook] Failed to download audio:", await base64Res.text());
+          return new Response(JSON.stringify({ ignored: true, reason: "audio download failed" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const base64Data = await base64Res.json();
+        const audioBase64 = base64Data.base64 || base64Data.data;
+
+        if (!audioBase64) {
+          console.error("[whatsapp-webhook] No base64 data in response");
+          return new Response(JSON.stringify({ ignored: true, reason: "no audio data" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // 2. Use AI Gateway (Gemini) to transcribe and interpret the audio
+        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+        if (!LOVABLE_API_KEY) {
+          console.error("[whatsapp-webhook] LOVABLE_API_KEY not configured");
+          return new Response(JSON.stringify({ ignored: true, reason: "no AI key" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const mimetype = message.audioMessage?.mimetype || "audio/ogg";
+
+        const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              {
+                role: "system",
+                content: `Você é um assistente que transcreve áudios de WhatsApp e identifica comandos.
+A palavra-chave de ativação é "Vetter" (ou variações como "better", "véter", "veter").
+
+Se o áudio começar com a palavra-chave "Vetter", extraia o comando e retorne-o no formato de hashtag.
+Se NÃO começar com "Vetter", retorne exatamente: IGNORAR
+
+Comandos disponíveis:
+- #campanhas [período] — ex: "campanhas dos últimos 7 dias" → #campanhas 7
+- #campanha [número] — ex: "campanha número 3" → #campanha 3
+- #saldo — consultar saldo
+- #gasto [período] — ex: "gasto de março" → #gasto março
+- #leads — ver leads
+- #resumo — resumo geral
+- #funil — ver funil de vendas
+- #comandos — listar comandos
+- #feedback [texto] — registrar feedback
+- #followup [texto] — registrar follow-up
+
+Exemplos:
+- "Vetter, me mostra as campanhas dos últimos 7 dias" → #campanhas 7
+- "Vetter, qual o saldo?" → #saldo
+- "Vetter, quanto gastou esse mês?" → #gasto mês
+- "Vetter, me dá um resumo" → #resumo
+- "Vetter, quero ver o gasto de janeiro até março" → #gasto 01/01 a 31/03
+- "Oi pessoal, tudo bem?" → IGNORAR (não começa com Vetter)
+
+Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
+              },
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "input_audio",
+                    input_audio: {
+                      data: audioBase64,
+                      format: mimetype.includes("ogg") ? "ogg" : mimetype.includes("mp4") ? "mp4" : "mp3",
+                    },
+                  },
+                ],
+              },
+            ],
+          }),
+        });
+
+        if (!aiResponse.ok) {
+          const errText = await aiResponse.text();
+          console.error("[whatsapp-webhook] AI transcription error:", aiResponse.status, errText.slice(0, 300));
+          return new Response(JSON.stringify({ ignored: true, reason: "transcription failed" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const aiResult = await aiResponse.json();
+        const interpretedCommand = (aiResult.choices?.[0]?.message?.content || "").trim();
+        console.log("[whatsapp-webhook] Audio interpreted as:", interpretedCommand);
+
+        if (!interpretedCommand || interpretedCommand === "IGNORAR" || !interpretedCommand.startsWith("#")) {
+          console.log("[whatsapp-webhook] Audio not a Vetter command, ignoring");
+          return new Response(JSON.stringify({ ignored: true, reason: "not a vetter command" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // 3. Send "processing" message and execute the command
+        await sendEvolutionMessage(
+          evolutionUrl, evolutionKey, instanceName, remoteJid,
+          `🎙️ *Comando por voz recebido!*\n_"${interpretedCommand}"_\n\nProcessando...`
+        );
+
+        return await processCommand(interpretedCommand, account, remoteJid, instanceName, evolutionUrl, evolutionKey, supabase, senderName);
+      } catch (audioErr) {
+        console.error("[whatsapp-webhook] Audio processing error:", audioErr);
+        return new Response(JSON.stringify({ ignored: true, reason: "audio error" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     if (!text || !text.startsWith("#")) {
       return new Response(JSON.stringify({ ignored: true, reason: "not a command" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
