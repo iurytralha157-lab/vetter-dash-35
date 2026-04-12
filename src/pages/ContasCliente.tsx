@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ModernAccountForm } from "@/components/forms/ModernAccountForm";
+import { buildManagedAccountUpdate, updateAccount } from "@/services/accountsService";
 import {
   Search,
   Plus,
@@ -197,7 +198,7 @@ export default function ContasCliente() {
     try {
       // Get current user ID for gestor_id
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       const accountData = {
         nome_cliente: data.nome_cliente,
         telefone: data.telefone || '',
@@ -226,8 +227,7 @@ export default function ContasCliente() {
       };
 
       if (editingAccount) {
-        const { error } = await supabase.from("accounts").update(accountData).eq("id", editingAccount.id);
-        if (error) throw error;
+        await updateAccount(editingAccount.id, buildManagedAccountUpdate(data));
         toast({ title: "Sucesso", description: "Conta atualizada com sucesso" });
       } else {
         const { error } = await supabase.from("accounts").insert({ ...accountData, created_at: new Date().toISOString() });

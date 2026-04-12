@@ -25,6 +25,7 @@ import { AccountModal } from "./AccountModal";
 import { AccountFormData } from "./AccountForm";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { buildLegacyAccountUpdate, updateAccount } from "@/services/accountsService";
 
 interface Account {
   id: string;
@@ -104,18 +105,7 @@ export function AccountsSection({ clientId }: AccountsSectionProps) {
                             'meta_account_id';
       
       if (editingAccount) {
-        // Update existing account
-        const { error } = await supabase
-          .from('accounts')
-          .update({
-            canais: [data.tipo],
-            [accountIdField]: data.account_id,
-            status: data.status,
-            observacoes: data.observacoes || null,
-          })
-          .eq('id', editingAccount.id);
-
-        if (error) throw error;
+        await updateAccount(editingAccount.id, buildLegacyAccountUpdate(data));
 
         toast({
           title: "Sucesso!",
