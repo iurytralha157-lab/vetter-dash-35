@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { MetaAdsResponse, MetaCampaign, MetaAccountMetrics } from "@/types/meta";
 import type { MetaPeriod } from "@/components/meta/MetaPeriodFilter";
 import {
-  AlertCircle, RefreshCw, Eye, DollarSign, Target, TrendingUp,
+  AlertCircle, RefreshCw, Eye, DollarSign, Target, TrendingUp, Users, Wallet, BarChart3,
 } from "lucide-react";
 import {
   BarChart, Bar,
