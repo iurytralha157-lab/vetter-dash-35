@@ -157,7 +157,7 @@ async function processCommand(
     } else if (cmd === "#ajuda" || cmd === "#help" || cmd === "#comandos") {
       responseText = getHelpText(account.nome_cliente);
     } else {
-      responseText = `❓ Comando não reconhecido.\n\nDigite *#ajuda* para ver os comandos disponíveis.`;
+      responseText = `❓ Comando não reconhecido.\n\nDigite *#comandos* para ver todos os comandos disponíveis.`;
     }
   } catch (err) {
     console.error("[whatsapp-webhook] Command error:", err);
