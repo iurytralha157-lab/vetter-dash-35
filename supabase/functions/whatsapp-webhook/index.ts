@@ -422,26 +422,25 @@ async function handleFeedback(
   senderName: string,
   supabase: any
 ): Promise<string> {
-  // Remove the #feedback prefix - keep the body (tipo_funil + campaigns)
   const feedbackBody = text.replace(/^#feedback\s*/i, "").trim();
 
   if (!feedbackBody || feedbackBody.length < 5) {
-    return `⚠️ *Feedback vazio!*\n\nEnvie no formato:\n*#feedback*\nterceiros\n\nreferente à campanha REF47\nrecebidos 2\natendimento SDR 2\n\nDigite *#ajuda* para mais informações.`;
+    return `⚠️ *Feedback vazio!*\n\nEnvie no formato:\n*#feedback*\n4 leads recebidos\n2 em atendimento\n1 descartado\n1 sem resposta\n\nOu com campanhas:\n*#feedback*\nterceiros\nreferente à campanha REF47\nrecebidos 2\natendimento SDR 2\n\nDigite *#ajuda* para mais informações.`;
   }
 
-  // Call the process-feedback edge function
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const response = await fetch(`${supabaseUrl}/functions/v1/process-feedback`, {
+  try {
+    // 1. Process aggregate campaign feedback via process-feedback
+    const feedbackResponse = await fetch(`${supabaseUrl}/functions/v1/process-feedback`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${serviceRoleKey}`,
       },
       body: JSON.stringify({
-        mensagem_original: text, // full message including #feedback
+        mensagem_original: text,
         account_id: account.id,
         id_grupo: groupJid,
         numero_grupo: groupJid,
@@ -451,30 +450,114 @@ async function handleFeedback(
       }),
     });
 
-    const result = await response.json();
+    const feedbackResult = await feedbackResponse.json();
 
-    if (!response.ok || !result.success) {
-      console.error("[whatsapp-webhook] process-feedback error:", result);
-      return `⚠️ Erro ao processar feedback: ${result.error || "erro desconhecido"}`;
+    if (!feedbackResponse.ok || !feedbackResult.success) {
+      console.error("[whatsapp-webhook] process-feedback error:", feedbackResult);
+      return `⚠️ Erro ao processar feedback: ${feedbackResult.error || "erro desconhecido"}`;
     }
 
-    if (result.duplicado) {
+    if (feedbackResult.duplicado) {
       return `⚠️ Essa mensagem já foi processada anteriormente.`;
     }
 
+    // 2. Also process individual leads via process-followup (for feedback_funnel)
+    let followupResult: any = null;
+    try {
+      const followupResponse = await fetch(`${supabaseUrl}/functions/v1/process-followup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          mensagem_original: text,
+          account_id: account.id,
+          cliente_id: account.cliente_id || null,
+          id_grupo: groupJid,
+          numero_grupo: groupJid,
+          telefone_origem: null,
+          nome_origem: senderName,
+          usuario_origem: senderName,
+        }),
+      });
+      followupResult = await followupResponse.json();
+    } catch (e) {
+      console.error("[whatsapp-webhook] followup from feedback error:", e);
+    }
+
+    // 3. Cross-reference with campaign data — check yesterday's leads
+    let crossRefMsg = "";
+    try {
+      const nowBRT = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+      const yesterday = new Date(nowBRT);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+      // Get leads from campaign_history for yesterday
+      const { data: campData } = await supabase
+        .from("campaign_history")
+        .select("campaign_name, leads, spend")
+        .eq("account_id", account.id)
+        .eq("date", yesterdayStr);
+
+      if (campData && campData.length > 0) {
+        const totalCampaignLeads = campData.reduce((s: number, c: any) => s + (c.leads || 0), 0);
+
+        // Extract total reported from feedback
+        let totalReported = 0;
+        if (feedbackResult.campanhas && Array.isArray(feedbackResult.campanhas)) {
+          totalReported = feedbackResult.campanhas.reduce((s: number, c: any) => s + (c.recebidos || 0), 0);
+        }
+
+        if (totalCampaignLeads > 0 && totalReported > 0) {
+          const diff = totalCampaignLeads - totalReported;
+          if (diff > 0) {
+            crossRefMsg = `\n⚠️ *Atenção:* Nas campanhas registramos *${totalCampaignLeads} leads* ontem, mas o feedback reportou apenas *${totalReported}*.\n`;
+            crossRefMsg += `📌 Faltam *${diff} lead(s)* sem feedback. Qual foi o status deles?\n`;
+            crossRefMsg += `\n_Responda com #feedback informando o status dos ${diff} leads restantes._\n`;
+          } else if (diff < 0) {
+            crossRefMsg += `\nℹ️ O feedback reportou *${totalReported} leads*, acima dos *${totalCampaignLeads}* registrados nas campanhas ontem. Pode incluir leads de outros dias.\n`;
+          }
+        }
+
+        // Show campaign breakdown
+        const activeCamps = campData.filter((c: any) => (c.leads || 0) > 0);
+        if (activeCamps.length > 0) {
+          crossRefMsg += `\n📊 *Campanhas ontem (${yesterdayStr.split('-').reverse().join('/')}):*\n`;
+          for (const c of activeCamps) {
+            crossRefMsg += `   • ${c.campaign_name}: *${c.leads || 0}* leads\n`;
+          }
+        }
+      }
+    } catch (crossRefErr) {
+      console.error("[whatsapp-webhook] Cross-reference error:", crossRefErr);
+    }
+
+    // 4. Build response message
     let msg = `✅ *Feedback registrado com sucesso!*\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
     msg += `👤 Enviado por: *${senderName}*\n`;
     msg += `🏢 Conta: *${account.nome_cliente}*\n`;
-    msg += `📋 Tipo: *${result.tipo_funil === "terceiros" ? "Terceiros" : "Lançamento"}*\n\n`;
-    msg += `📊 *${result.campanhas_count} campanha(s) registrada(s):*\n`;
 
-    if (result.campanhas && Array.isArray(result.campanhas)) {
-      for (const c of result.campanhas) {
-        msg += `   • ${c.nome} — ${c.recebidos} recebidos\n`;
+    if (feedbackResult.tipo_funil) {
+      msg += `📋 Tipo: *${feedbackResult.tipo_funil === "terceiros" ? "Terceiros" : "Lançamento"}*\n`;
+    }
+
+    if (feedbackResult.campanhas_count > 0) {
+      msg += `\n📊 *${feedbackResult.campanhas_count} campanha(s) registrada(s):*\n`;
+      if (feedbackResult.campanhas && Array.isArray(feedbackResult.campanhas)) {
+        for (const c of feedbackResult.campanhas) {
+          msg += `   • ${c.nome}${c.recebidos ? ` — ${c.recebidos} recebidos` : ""}\n`;
+        }
       }
     }
 
+    if (followupResult?.leads_count > 0) {
+      msg += `\n👥 *${followupResult.leads_count} lead(s) individual(is) registrado(s) no funil*\n`;
+    }
+
+    msg += crossRefMsg;
     msg += `\n💡 Use *#funil* para ver o funil consolidado.`;
     return msg;
   } catch (err) {
