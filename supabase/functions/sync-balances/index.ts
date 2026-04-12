@@ -8,6 +8,87 @@ const corsHeaders = {
 const META_API_VERSION = 'v21.0';
 const META_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 
+/**
+ * Determines balance mode based on Meta API data.
+ * 
+ * Modes:
+ * - "funds"           → Has prepaid funds (PIX/boleto). Monitor balance normally.
+ * - "card_ok"         → Uses credit/debit card, no payment issues. DON'T alert.
+ * - "card_failing"    → Uses card but has payment failures. ALERT about card issue.
+ * - "card_and_funds"  → Has both card AND funds. Monitor funds, mention card in alerts.
+ * - "prepay"          → Prepay account without parsed funds. Monitor balance.
+ * - "unknown"         → Could not determine. Monitor as fallback.
+ */
+function classifyAccount(data: any): {
+  finalBalance: number;
+  balanceType: string;
+  hasCard: boolean;
+  cardFailing: boolean;
+  fundsAmount: number | null;
+  debtAmount: number;
+} {
+  const isPrepay = data.is_prepay_account === true;
+  const fundingDetails = data.funding_source_details;
+  const displayString = fundingDetails?.display_string || '';
+  
+  // Detect card: funding_source_details.type 1=credit_card, 2=debit_card
+  // Also check display_string for card indicators
+  const fundingType = fundingDetails?.type;
+  const hasCard = fundingType === 1 || fundingType === 2 || 
+    /mastercard|visa|elo|amex|cartão|card|\*{3,}/i.test(displayString);
+
+  // Raw balance from Meta (in cents) - for card accounts this is "saldo devedor"
+  const balanceRaw = parseFloat(data.balance || '0') / 100;
+  const debtAmount = balanceRaw;
+
+  // Try to parse funds amount from display_string (e.g. "Saldo disponível (R$752,95 BRL)")
+  let fundsAmount: number | null = null;
+  const fundsMatch = displayString.match(/(?:saldo|disponível|balance)[^R$]*R\$\s?([\d.,]+)/i);
+  if (fundsMatch) {
+    fundsAmount = parseFloat(fundsMatch[1].replace(/\./g, '').replace(',', '.'));
+  }
+  // Also try simpler pattern for funding sources that just show "R$XXX,XX"
+  if (fundsAmount === null && !hasCard) {
+    const simpleMatch = displayString.match(/R\$\s?([\d.,]+)/);
+    if (simpleMatch) {
+      fundsAmount = parseFloat(simpleMatch[1].replace(/\./g, '').replace(',', '.'));
+    }
+  }
+
+  // Detect payment failures via account_status
+  // 1=ACTIVE, 2=DISABLED, 3=UNSETTLED, 7=PENDING_RISK_REVIEW, 9=PENDING_SETTLEMENT
+  // 100=IN_GRACE_PERIOD, 101=TEMPORARILY_UNAVAILABLE
+  const accountStatus = data.account_status;
+  const disableReason = data.disable_reason;
+  const hasPaymentIssue = accountStatus === 3 || accountStatus === 100 || 
+    (accountStatus === 2 && disableReason === 3);
+
+  let finalBalance: number;
+  let balanceType: string;
+
+  if (hasCard && fundsAmount !== null && fundsAmount > 0) {
+    // Has both card AND funds
+    finalBalance = fundsAmount;
+    balanceType = hasPaymentIssue ? 'card_failing' : 'card_and_funds';
+  } else if (hasCard && (fundsAmount === null || fundsAmount === 0)) {
+    // Card only, no meaningful funds
+    finalBalance = 0;
+    balanceType = hasPaymentIssue ? 'card_failing' : 'card_ok';
+  } else if (fundsAmount !== null) {
+    // Funds only (PIX/boleto), no card
+    finalBalance = fundsAmount;
+    balanceType = 'funds';
+  } else if (isPrepay) {
+    finalBalance = balanceRaw;
+    balanceType = 'prepay';
+  } else {
+    finalBalance = balanceRaw;
+    balanceType = 'unknown';
+  }
+
+  return { finalBalance, balanceType, hasCard, cardFailing: hasPaymentIssue, fundsAmount, debtAmount };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -36,7 +117,7 @@ Deno.serve(async (req) => {
 
     console.log(`[sync-balances] Sincronizando saldo de ${accounts?.length || 0} contas...`);
 
-    const results: { account: string; old_balance: number; new_balance: number | null; status: string; balance_type: string }[] = [];
+    const results: { account: string; old_balance: number; new_balance: number | null; status: string; balance_type: string; has_card: boolean }[] = [];
 
     // Process in batches of 5 to avoid rate limits
     const batchSize = 5;
@@ -49,80 +130,41 @@ Deno.serve(async (req) => {
           : `act_${acc.meta_account_id}`;
 
         try {
-          const url = `${META_BASE_URL}/${formattedId}?fields=balance,amount_spent,spend_cap,funding_source_details,account_status,disable_reason,is_prepay_account&access_token=${accessToken}`;
+          const url = `${META_BASE_URL}/${formattedId}?fields=balance,amount_spent,spend_cap,funding_source_details,account_status,disable_reason,is_prepay_account,currency,name&access_token=${accessToken}`;
           const res = await fetch(url);
 
           if (!res.ok) {
             const errText = await res.text();
             console.warn(`[sync-balances] ❌ ${acc.nome_cliente}: ${errText.slice(0, 200)}`);
-            results.push({ account: acc.nome_cliente, old_balance: acc.saldo_meta ?? 0, new_balance: null, status: 'error', balance_type: 'unknown' });
+            results.push({ account: acc.nome_cliente, old_balance: acc.saldo_meta ?? 0, new_balance: null, status: 'error', balance_type: 'unknown', has_card: false });
             return;
           }
 
           const data = await res.json();
+          const classification = classifyAccount(data);
 
-          // Determine account type and extract the correct balance
-          const isPrepay = data.is_prepay_account === true;
-          const fundingType = data.funding_source_details?.type; // 1=credit_card, 2=debit_card, 4=funds
-          const displayString = data.funding_source_details?.display_string || '';
-          const isCardAccount = fundingType === 1 || fundingType === 2;
-
-          // Try to parse funds amount from display_string (e.g. "Saldo disponível (R$752,95 BRL)")
-          let fundsAmount: number | null = null;
-          const balanceMatch = displayString.match(/R\$\s?([\d.,]+)/);
-          if (balanceMatch) {
-            fundsAmount = parseFloat(balanceMatch[1].replace(/\./g, '').replace(',', '.'));
-          }
-
-          // Raw balance from Meta (in cents) - this is "saldo devedor" for card accounts
-          const balanceRaw = parseFloat(data.balance || '0') / 100;
-
-          let finalBalance: number;
-          let balanceType: string;
-
-          if (fundsAmount !== null) {
-            // Has funds (pre-paid deposit) - use funds amount regardless of card
-            finalBalance = fundsAmount;
-            balanceType = 'funds';
-          } else if (isPrepay) {
-            // Pre-pay account without parsed funds - use raw balance
-            finalBalance = balanceRaw;
-            balanceType = 'prepay';
-          } else if (isCardAccount) {
-            // Card-only account - balance is "saldo devedor" (amount to be charged)
-            // We store it but mark it so alerts know not to trigger
-            // Store as negative to indicate it's debt, or store 0 to skip alerts
-            // Better: store null/0 for saldo_meta since it's not a spendable balance
-            finalBalance = 0; // Card accounts don't have a "spendable" balance to monitor
-            balanceType = 'card_only';
-            console.log(`[sync-balances] ℹ️ ${acc.nome_cliente}: Conta com cartão (saldo devedor: R$ ${balanceRaw.toFixed(2)}) - não monitorar saldo`);
-          } else {
-            // Unknown type, use raw balance as fallback
-            finalBalance = balanceRaw;
-            balanceType = 'unknown';
-          }
+          console.log(`[sync-balances] 🔍 ${acc.nome_cliente}: type=${classification.balanceType}, card=${classification.hasCard}, cardFail=${classification.cardFailing}, funds=${classification.fundsAmount}, debt=${classification.debtAmount.toFixed(2)}, status=${data.account_status}, display="${data.funding_source_details?.display_string || 'N/A'}"`);
 
           // Update the account
           const { error: updateError } = await supabase
             .from('accounts')
             .update({
-              saldo_meta: finalBalance,
+              saldo_meta: classification.finalBalance,
               last_balance_check_meta: new Date().toISOString(),
-              // Store the balance mode so alerts know how to handle
-              modo_saldo_meta: balanceType,
+              modo_saldo_meta: classification.balanceType,
             })
             .eq('id', acc.id);
 
           if (updateError) {
             console.warn(`[sync-balances] ❌ Update failed for ${acc.nome_cliente}:`, updateError.message);
-            results.push({ account: acc.nome_cliente, old_balance: acc.saldo_meta ?? 0, new_balance: finalBalance, status: 'update_error', balance_type: balanceType });
+            results.push({ account: acc.nome_cliente, old_balance: acc.saldo_meta ?? 0, new_balance: classification.finalBalance, status: 'update_error', balance_type: classification.balanceType, has_card: classification.hasCard });
           } else {
-            console.log(`[sync-balances] ✅ ${acc.nome_cliente}: R$ ${(acc.saldo_meta ?? 0).toFixed(2)} → R$ ${finalBalance.toFixed(2)} (${balanceType})`);
-            results.push({ account: acc.nome_cliente, old_balance: acc.saldo_meta ?? 0, new_balance: finalBalance, status: 'synced', balance_type: balanceType });
+            console.log(`[sync-balances] ✅ ${acc.nome_cliente}: R$ ${(acc.saldo_meta ?? 0).toFixed(2)} → R$ ${classification.finalBalance.toFixed(2)} (${classification.balanceType})`);
+            results.push({ account: acc.nome_cliente, old_balance: acc.saldo_meta ?? 0, new_balance: classification.finalBalance, status: 'synced', balance_type: classification.balanceType, has_card: classification.hasCard });
           }
         } catch (err) {
           console.warn(`[sync-balances] ❌ ${acc.nome_cliente}:`, err);
-          results.push({ account: acc.nome_cliente, old_balance: acc.saldo_meta ?? 0, new_balance: null, status: 'error', balance_type: 'unknown' });
+          results.push({ account: acc.nome_cliente, old_balance: acc.saldo_meta ?? 0, new_balance: null, status: 'error', balance_type: 'unknown', has_card: false });
         }
       });
 
@@ -136,15 +178,17 @@ Deno.serve(async (req) => {
 
     const synced = results.filter(r => r.status === 'synced').length;
     const errors = results.filter(r => r.status !== 'synced').length;
-    const cardOnly = results.filter(r => r.balance_type === 'card_only').length;
+    const cardOk = results.filter(r => r.balance_type === 'card_ok').length;
+    const cardFailing = results.filter(r => r.balance_type === 'card_failing').length;
 
-    console.log(`[sync-balances] Concluído. ${synced} sincronizados (${cardOnly} contas com cartão ignoradas), ${errors} erros.`);
+    console.log(`[sync-balances] Concluído. ${synced} sincronizados, ${cardOk} contas com cartão OK, ${cardFailing} com problemas de cartão, ${errors} erros.`);
 
     return new Response(JSON.stringify({
       success: true,
       total: accounts?.length || 0,
       synced,
-      card_only_skipped: cardOnly,
+      card_ok: cardOk,
+      card_failing: cardFailing,
       errors,
       details: results,
     }), {

@@ -57,35 +57,66 @@ Deno.serve(async (req) => {
       const limiteAlerta = acc.alerta_saldo_baixo ?? 200;
       const modoSaldo = acc.modo_saldo_meta || 'unknown';
 
-      // CRITICAL: Skip card-only accounts - they don't have a real "balance" to monitor
-      // The "balance" field for card accounts is "saldo devedor" (amount to be charged),
-      // NOT available funds. We only alert for accounts with actual funds/prepaid balance.
-      if (modoSaldo === 'card_only') {
-        console.log(`[balance-alert] ⏭️ Pulando ${acc.nome_cliente} - conta com cartão (sem fundos para monitorar)`);
-        skipped.push(acc.nome_cliente);
-        continue;
-      }
-
       let message = '';
       let alertType = '';
 
-      if (saldo === 0 || saldo <= 0) {
-        // URGENT: Zero balance
-        alertType = 'saldo_zero';
-        message = `🚨 *URGENTE - Saldo Zerado!*\n\n` +
-          `A conta *${acc.nome_cliente}* está *sem saldo* no Meta Ads.\n\n` +
-          `⚠️ As campanhas serão pausadas automaticamente.\n\n` +
-          `💰 Podemos gerar o PIX para recarga?\n` +
-          `Responda aqui para agilizarmos.`;
-      } else if (saldo < limiteAlerta) {
-        // Low balance warning
-        alertType = 'saldo_baixo';
-        message = `⚠️ *Alerta de Saldo Baixo*\n\n` +
-          `A conta *${acc.nome_cliente}* está com saldo abaixo do limite configurado.\n\n` +
-          `💰 Saldo atual: *R$ ${saldo.toFixed(2).replace('.', ',')}*\n` +
-          `🔔 Limite de alerta: *R$ ${limiteAlerta.toFixed(2).replace('.', ',')}*\n\n` +
-          `📋 Podemos gerar o PIX para recarga?\n` +
-          `Responda aqui para agilizarmos.`;
+      // ─── Smart alert logic based on account payment mode ───
+      
+      if (modoSaldo === 'card_ok') {
+        // Card is working fine, no funds to monitor → SKIP
+        console.log(`[balance-alert] ⏭️ ${acc.nome_cliente} - Cartão ativo e funcionando, sem alerta necessário`);
+        skipped.push(`${acc.nome_cliente} (cartão OK)`);
+        continue;
+      }
+
+      if (modoSaldo === 'card_failing') {
+        // Card has payment issues → ALERT about card problem
+        alertType = 'cartao_com_problema';
+        message = `🚨 *Problema de Pagamento - Cartão*\n\n` +
+          `A conta *${acc.nome_cliente}* está com *falha no cartão de crédito*.\n\n` +
+          `⚠️ O Meta não conseguiu debitar o cartão cadastrado.\n` +
+          `As campanhas podem ser pausadas se o problema persistir.\n\n` +
+          `📋 Verifique o cartão no Gerenciador de Anúncios ou entre em contato com o banco.\n` +
+          `Responda aqui se precisar de ajuda.`;
+      } else if (modoSaldo === 'card_and_funds') {
+        // Has card + funds: card is working, but funds are getting low
+        if (saldo <= 0) {
+          // Funds zeroed but card covers it → mild informational, no urgency
+          console.log(`[balance-alert] ℹ️ ${acc.nome_cliente} - Fundos zerados mas cartão ativo, sem alerta`);
+          skipped.push(`${acc.nome_cliente} (fundos zero + cartão OK)`);
+          continue;
+        } else if (saldo < limiteAlerta) {
+          alertType = 'fundos_baixo_com_cartao';
+          message = `ℹ️ *Aviso - Fundos Baixos*\n\n` +
+            `A conta *${acc.nome_cliente}* está utilizando cartão de crédito, ` +
+            `porém os fundos disponíveis estão abaixo do limite.\n\n` +
+            `💰 Fundos disponíveis: *R$ ${saldo.toFixed(2).replace('.', ',')}*\n` +
+            `🔔 Limite configurado: *R$ ${limiteAlerta.toFixed(2).replace('.', ',')}*\n` +
+            `💳 Cartão: Ativo e funcionando\n\n` +
+            `ℹ️ O cartão está cobrindo os gastos normalmente.\n` +
+            `Deseja recarregar os fundos mesmo assim?`;
+        } else {
+          // Funds above threshold, card working → no alert needed
+          continue;
+        }
+      } else {
+        // Standard funds/prepay/unknown accounts → normal alert logic
+        if (saldo <= 0) {
+          alertType = 'saldo_zero';
+          message = `🚨 *URGENTE - Saldo Zerado!*\n\n` +
+            `A conta *${acc.nome_cliente}* está *sem saldo* no Meta Ads.\n\n` +
+            `⚠️ As campanhas serão pausadas automaticamente.\n\n` +
+            `💰 Podemos gerar o PIX para recarga?\n` +
+            `Responda aqui para agilizarmos.`;
+        } else if (saldo < limiteAlerta) {
+          alertType = 'saldo_baixo';
+          message = `⚠️ *Alerta de Saldo Baixo*\n\n` +
+            `A conta *${acc.nome_cliente}* está com saldo abaixo do limite configurado.\n\n` +
+            `💰 Saldo atual: *R$ ${saldo.toFixed(2).replace('.', ',')}*\n` +
+            `🔔 Limite de alerta: *R$ ${limiteAlerta.toFixed(2).replace('.', ',')}*\n\n` +
+            `📋 Podemos gerar o PIX para recarga?\n` +
+            `Responda aqui para agilizarmos.`;
+        }
       }
 
       if (message && acc.id_grupo) {
@@ -95,7 +126,7 @@ Deno.serve(async (req) => {
             number: groupJid,
             text: message,
           };
-          console.log(`[balance-alert] Sending to ${acc.nome_cliente} (${modoSaldo}), group: ${acc.id_grupo}`);
+          console.log(`[balance-alert] Sending to ${acc.nome_cliente} (${modoSaldo}), type: ${alertType}`);
 
           const sendRes = await fetch(`${baseUrl}/message/sendText/${instanceName}`, {
             method: 'POST',
@@ -136,34 +167,34 @@ Deno.serve(async (req) => {
       for (const admin of admins || []) {
         const zeroCount = alerts.filter(a => a.type === 'saldo_zero').length;
         const lowCount = alerts.filter(a => a.type === 'saldo_baixo').length;
+        const cardFailCount = alerts.filter(a => a.type === 'cartao_com_problema').length;
+        const fundsLowCardCount = alerts.filter(a => a.type === 'fundos_baixo_com_cartao').length;
         
         let title = '💰 Resumo de Saldo';
-        let notifMessage = '';
+        const parts: string[] = [];
         
-        if (zeroCount > 0) {
-          notifMessage += `🚨 ${zeroCount} conta(s) sem saldo. `;
-        }
-        if (lowCount > 0) {
-          notifMessage += `⚠️ ${lowCount} conta(s) com saldo baixo.`;
-        }
+        if (zeroCount > 0) parts.push(`🚨 ${zeroCount} conta(s) sem saldo`);
+        if (lowCount > 0) parts.push(`⚠️ ${lowCount} conta(s) com saldo baixo`);
+        if (cardFailCount > 0) parts.push(`💳 ${cardFailCount} conta(s) com problema no cartão`);
+        if (fundsLowCardCount > 0) parts.push(`ℹ️ ${fundsLowCardCount} conta(s) com fundos baixos (cartão ativo)`);
 
         await supabase.from('user_notifications').insert({
           user_id: admin.user_id,
           type: 'balance_alert',
           title,
-          message: notifMessage.trim(),
+          message: parts.join('. ') + '.',
           reference_type: 'balance',
         });
       }
     }
 
-    console.log(`[balance-alert] Concluído. ${alerts.length} alertas enviados, ${skipped.length} contas com cartão puladas.`);
+    console.log(`[balance-alert] Concluído. ${alerts.length} alertas enviados, ${skipped.length} contas puladas.`);
 
     return new Response(JSON.stringify({
       success: true,
       total_checked: accounts?.length || 0,
       alerts_sent: alerts.length,
-      card_accounts_skipped: skipped.length,
+      skipped_count: skipped.length,
       skipped_accounts: skipped,
       details: alerts,
     }), {
