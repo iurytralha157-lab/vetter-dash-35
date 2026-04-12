@@ -129,8 +129,9 @@ async function processCommand(
       responseText = await handleGasto(text, account, supabase);
     } else if (cmd === "#funil") {
       responseText = await handleFunil(account, supabase);
-    } else if (cmd === "#campanhas") {
-      responseText = await handleCampanhas(account, supabase);
+    } else if (cmd.startsWith("#campanhas")) {
+      const periodArg = cmd.replace("#campanhas", "").trim();
+      responseText = await handleCampanhas(account, supabase, periodArg || null);
     } else if (cmd === "#relatorio") {
       // Send individual reports for each active campaign with delay
       return await handleRelatorioAll(account, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
