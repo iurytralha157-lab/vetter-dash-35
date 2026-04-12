@@ -78,21 +78,23 @@ Deno.serve(async (req) => {
 
       if (message && acc.id_grupo) {
         try {
-          // Send message to the group via Evolution API
+          const payload = {
+            number: acc.id_grupo,
+            text: message,
+          };
+          console.log(`[balance-alert] Sending to ${acc.nome_cliente}, group: ${acc.id_grupo}, payload keys:`, Object.keys(payload), 'text length:', message.length);
+
           const sendRes = await fetch(`${baseUrl}/message/sendText/${instanceName}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               apikey: evolutionApiKey,
             },
-            body: JSON.stringify({
-              number: acc.id_grupo,
-              text: message,
-            }),
+            body: JSON.stringify(payload),
           });
 
           const sendText = await sendRes.text();
-          console.log(`[balance-alert] Response for ${acc.nome_cliente}:`, sendText.slice(0, 300));
+          console.log(`[balance-alert] Response ${sendRes.status} for ${acc.nome_cliente}:`, sendText.slice(0, 500));
           
           if (sendRes.ok) {
             console.log(`[balance-alert] ✅ Alerta enviado para ${acc.nome_cliente} (${alertType})`);
