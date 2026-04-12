@@ -1677,9 +1677,6 @@ async function handleSaldo(
       msg += `💰 Saldo: *${fmtCurrency(balanceRaw)}*\n`;
     }
 
-    if (spendCap && spendCap > 0) {
-      msg += `🔒 Limite: *${fmtCurrency(spendCap)}*\n`;
-    }
 
     // Estimation
     const { data: accData } = await supabase
