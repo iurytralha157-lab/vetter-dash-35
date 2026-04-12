@@ -191,9 +191,14 @@ export function UnifiedPeriodFilter({
         <Calendar
           mode="range"
           selected={displayedRange}
-          onSelect={(range) =>
-            setPendingRange(range ? { from: range.from, to: range.to } : undefined)
-          }
+          onSelect={(range) => {
+            if (range?.from && !range?.to) {
+              // Single date clicked — treat as single-day range
+              setPendingRange({ from: range.from, to: range.from });
+            } else {
+              setPendingRange(range ? { from: range.from, to: range.to } : undefined);
+            }
+          }}
           defaultMonth={defaultMonth}
           locale={pt}
           className="rounded-md border p-2 pointer-events-auto"
