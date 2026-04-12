@@ -16,8 +16,8 @@ interface SalesFunnelCardProps {
 }
 
 export function SalesFunnelCard({ title, subtitle, totalLeads, leadsRecebidos, steps }: SalesFunnelCardProps) {
-  // Filter out steps where value is null (not informed)
-  const visibleSteps = steps.filter(s => s.value !== null && s.value !== undefined);
+  // Show all steps - only hide if value is null (not informed) when no data at all
+  const visibleSteps = steps;
   const recebidos = leadsRecebidos ?? 0;
   const total = totalLeads ?? recebidos;
 
