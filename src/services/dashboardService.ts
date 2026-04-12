@@ -43,17 +43,31 @@ interface AccountMetaResult {
 }
 
 const daysFromPeriod = (period: string) => {
-  if (period === "30d") return 30;
-  if (period === "15d") return 15;
-  if (period === "7d") return 7;
-  return 1;
+  switch (period) {
+    case "today": case "yesterday": return 1;
+    case "7d": case "last_7d": return 7;
+    case "15d": case "last_15d": return 15;
+    case "30d": case "last_30d": case "this_month": return 30;
+    case "last_month": return 30;
+    case "this_quarter": return 90;
+    case "this_year": return 365;
+    default: return 7;
+  }
 };
 
 const periodToMetaParam = (period: string): string => {
-  if (period === "30d") return "last_30d";
-  if (period === "15d") return "last_14d";
-  if (period === "7d") return "last_7d";
-  return "yesterday";
+  switch (period) {
+    case "today": return "today";
+    case "yesterday": return "yesterday";
+    case "7d": case "last_7d": return "last_7d";
+    case "15d": case "last_15d": return "last_14d";
+    case "30d": case "last_30d": return "last_30d";
+    case "this_month": return "this_month";
+    case "last_month": return "last_month";
+    case "this_quarter": return "last_90d";
+    case "this_year": return "last_365d";
+    default: return "last_7d";
+  }
 };
 
 const dateToISO = (d: Date) => d.toISOString().slice(0, 10);
