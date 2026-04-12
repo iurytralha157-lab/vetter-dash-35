@@ -18,7 +18,7 @@ import { MetaCampaignDetailDialog } from "@/components/meta/MetaCampaignDetailDi
 import { MetaStatusBadge } from "@/components/meta/MetaStatusBadge";
 import { ModernAccountForm } from "@/components/forms/ModernAccountForm";
 import { metaAdsService } from "@/services/metaAdsService";
-import type { MetaAdsResponse, MetaCampaign, MetaAccountMetrics } from "@/types/meta";
+import type { MetaAdsResponse, MetaCampaign, MetaAccountMetrics, MetaAccountBalance } from "@/types/meta";
 import {
   ArrowLeft, ExternalLink, RefreshCw, FolderOpen, Building2, Mail, Phone,
   User, Check, X, BarChart3, Link2, TrendingUp, AlertCircle, Instagram,
