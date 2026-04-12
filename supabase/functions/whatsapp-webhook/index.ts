@@ -829,18 +829,6 @@ async function handleGasto(
 }
 
 
-  const accessToken = Deno.env.get('META_ACCESS_TOKEN');
-  if (!accessToken) {
-    return `⚠️ Token do Meta não configurado. Contate o administrador.`;
-  }
-
-  const formattedId = account.meta_account_id.startsWith('act_')
-    ? account.meta_account_id
-    : `act_${account.meta_account_id}`;
-
-  try {
-    const url = `https://graph.facebook.com/v21.0/${formattedId}?fields=balance,amount_spent,spend_cap,funding_source_details,is_prepay_account,account_status,currency&access_token=${accessToken}`;
-    const res = await fetch(url);
 
     if (!res.ok) {
       const errText = await res.text();
