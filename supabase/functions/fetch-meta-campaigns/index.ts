@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
       ? `date_preset=${datePreset}` 
       : `time_range={"since":"${since}","until":"${until}"}`;
     
-    const insightsUrl = `${META_BASE_URL}/${formattedAccountId}/insights?fields=impressions,reach,clicks,spend,ctr,cpc,cpm,actions,cost_per_action_type&${insightsTimeParam}&action_report_time=impression&access_token=${accessToken}`;
+    const insightsUrl = `${META_BASE_URL}/${formattedAccountId}/insights?fields=impressions,reach,clicks,spend,ctr,cpc,cpm,actions,cost_per_action_type&${insightsTimeParam}&access_token=${accessToken}`;
     
     console.log('Fetching account insights from Meta API...');
     const insightsResponse = await fetch(insightsUrl);
@@ -158,7 +158,9 @@ Deno.serve(async (req) => {
       
       console.log(`Account insights: received ${insightsArray.length} records`);
       if (insightsArray.length > 0) {
-        console.log('First insight record:', JSON.stringify(insightsArray[0]).substring(0, 200));
+        // Log ALL action types to debug lead counting
+        const allActions = insightsArray[0]?.actions || [];
+        console.log('All account action_types:', JSON.stringify(allActions.map((a: any) => ({ type: a.action_type, value: a.value }))));
       }
       
       accountInsights = insightsArray[0] || null;
@@ -174,7 +176,7 @@ Deno.serve(async (req) => {
             ? `date_preset=${datePreset}` 
             : `time_range={"since":"${since}","until":"${until}"}`;
           
-          const campaignInsightsUrl = `${META_BASE_URL}/${campaign.id}/insights?fields=impressions,reach,clicks,spend,ctr,cpc,cpm,actions,cost_per_action_type&${campaignTimeParam}&action_report_time=impression&access_token=${accessToken}`;
+          const campaignInsightsUrl = `${META_BASE_URL}/${campaign.id}/insights?fields=impressions,reach,clicks,spend,ctr,cpc,cpm,actions,cost_per_action_type&${campaignTimeParam}&access_token=${accessToken}`;
           
           const response = await fetch(campaignInsightsUrl);
           if (!response.ok) {
@@ -188,33 +190,52 @@ Deno.serve(async (req) => {
           const data = await response.json();
           const insights = data.data?.[0] || null;
           
-          // Extract conversions from actions array
+          // Extract conversions based on campaign objective
+          // Meta "Results" metric maps to specific action_type per objective
           let conversions = 0;
           let costPerConversion = null;
           
           if (insights?.actions) {
-            // Sum all lead-related actions
-            const leadActions = insights.actions.filter((action: any) => 
-              action.action_type === 'lead' ||
-              action.action_type === 'offsite_conversion.fb_pixel_lead' ||
-              action.action_type === 'onsite_conversion.lead' ||
-              action.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
-              action.action_type === 'onsite_conversion.post_save'
-            );
-            conversions = leadActions.reduce((sum: number, action: { value?: string }) => sum + parseInt(action.value || '0'), 0);
+            const objective = campaign.objective;
+            let resultActionType: string;
+            
+            // Pick the correct action type based on campaign objective
+            if (objective === 'OUTCOME_ENGAGEMENT' || objective === 'MESSAGES') {
+              // WhatsApp/Messaging campaigns → conversations started
+              resultActionType = 'onsite_conversion.messaging_conversation_started_7d';
+            } else if (objective === 'OUTCOME_LEADS' || objective === 'LEAD_GENERATION') {
+              // Lead gen campaigns → lead actions
+              resultActionType = 'lead';
+            } else {
+              // Fallback: try lead first, then messaging
+              resultActionType = 'lead';
+            }
+            
+            // Find the primary result action
+            const primaryAction = insights.actions.find((a: any) => a.action_type === resultActionType);
+            if (primaryAction) {
+              conversions = parseInt(primaryAction.value || '0');
+            } else {
+              // Fallback: try other lead-like actions in priority order
+              const fallbackTypes = [
+                'onsite_conversion.messaging_conversation_started_7d',
+                'lead',
+                'onsite_conversion.lead',
+                'offsite_conversion.fb_pixel_lead'
+              ];
+              for (const fallbackType of fallbackTypes) {
+                const fallbackAction = insights.actions.find((a: any) => a.action_type === fallbackType);
+                if (fallbackAction) {
+                  conversions = parseInt(fallbackAction.value || '0');
+                  break;
+                }
+              }
+            }
           }
 
           if (insights?.cost_per_action_type && conversions > 0) {
-            // Find the most relevant cost per action
-            const costActions = insights.cost_per_action_type.filter((action: any) => 
-              action.action_type === 'lead' ||
-              action.action_type === 'offsite_conversion.fb_pixel_lead' ||
-              action.action_type === 'onsite_conversion.lead'
-            );
-            if (costActions.length > 0) {
-              // Use the first lead cost action found
-              costPerConversion = parseFloat(costActions[0].value);
-            }
+            const spend = parseFloat(insights.spend || '0');
+            costPerConversion = conversions > 0 ? spend / conversions : null;
           }
 
           return {
@@ -246,21 +267,15 @@ Deno.serve(async (req) => {
       })
     );
 
-    // Calculate account-level metrics
+    // Calculate account-level metrics by summing per-campaign conversions
+    // This avoids double-counting from overlapping action_types at account level
     let accountMetrics = null;
     if (accountInsights) {
-      let conversions = 0;
-      if (accountInsights.actions) {
-        // Sum all lead-related actions for account level
-        const leadActions = accountInsights.actions.filter((action: any) => 
-          action.action_type === 'lead' ||
-          action.action_type === 'offsite_conversion.fb_pixel_lead' ||
-          action.action_type === 'onsite_conversion.lead' ||
-          action.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
-          action.action_type === 'onsite_conversion.post_save'
-        );
-        conversions = leadActions.reduce((sum: number, action: { value?: string }) => sum + parseInt(action.value || '0'), 0);
-      }
+      const totalConversions = campaignsWithInsights.reduce((sum: number, c: any) => {
+        return sum + (c.insights?.conversions || 0);
+      }, 0);
+      
+      console.log('Account-level total conversions (sum of campaigns):', totalConversions);
 
       accountMetrics = {
         total_spend: parseFloat(accountInsights.spend || '0'),
@@ -269,7 +284,7 @@ Deno.serve(async (req) => {
         avg_ctr: parseFloat(accountInsights.ctr || '0'),
         avg_cpc: parseFloat(accountInsights.cpc || '0'),
         avg_cpm: parseFloat(accountInsights.cpm || '0'),
-        total_conversions: conversions
+        total_conversions: totalConversions
       };
     }
 
