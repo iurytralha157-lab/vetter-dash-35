@@ -384,6 +384,7 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
                         <th className="text-right py-3 px-4 font-medium text-sm">Cliques</th>
                         <th className="text-right py-3 px-4 font-medium text-sm">Gasto</th>
                         <th className="text-right py-3 px-4 font-medium text-sm">Leads</th>
+                        <th className="text-right py-3 px-4 font-medium text-sm">Seguidores</th>
                         <th className="text-right py-3 px-4 font-medium text-sm">CPL</th>
                         <th className="text-right py-3 px-4 font-medium text-sm">Ações</th>
                       </tr>
@@ -392,6 +393,7 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
                       {activeCampaigns.map((campaign) => {
                         const spend = campaign.insights?.spend || 0;
                         const conversions = campaign.insights?.conversions || 0;
+                        const followers = campaign.insights?.followers || 0;
                         const cpl = conversions > 0 ? spend / conversions : 0;
                         return (
                           <tr
