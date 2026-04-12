@@ -250,15 +250,20 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
 
     // If no account found, check if this is the team group
     if (!account) {
+      // Check system_settings for team group JID, with hardcoded fallback
+      const HARDCODED_TEAM_GROUPS = ["120363419496533710@g.us"];
+      
       const { data: teamSetting } = await supabase
         .from("system_settings")
         .select("value, enabled")
         .eq("key", "team_group_jid")
         .single();
 
-      const teamGroupJids = teamSetting?.enabled
-        ? (teamSetting.value || "").split(",").map((s: string) => s.trim()).filter(Boolean)
-        : [];
+      let teamGroupJids = [...HARDCODED_TEAM_GROUPS];
+      if (teamSetting?.enabled && teamSetting.value) {
+        const fromDb = teamSetting.value.split(",").map((s: string) => s.trim()).filter(Boolean);
+        teamGroupJids = [...new Set([...teamGroupJids, ...fromDb])];
+      }
 
       if (teamGroupJids.includes(remoteJid) || teamGroupJids.includes(groupNumber)) {
         isTeamGroup = true;
