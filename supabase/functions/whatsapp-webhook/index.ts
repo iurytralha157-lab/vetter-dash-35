@@ -98,12 +98,13 @@ Deno.serve(async (req) => {
 
       try {
         // 1. Download audio via Evolution API getBase64FromMediaMessage
+        // Must pass the complete message object (key + audioMessage) for media decryption
         const base64Res = await fetch(
           `${evolutionUrl}/chat/getBase64FromMediaMessage/${instanceName}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json", apikey: evolutionKey },
-            body: JSON.stringify({ message: { key }, convertToMp4: false }),
+            body: JSON.stringify({ message: { key, message }, convertToMp4: false }),
           }
         );
 
