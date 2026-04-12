@@ -642,6 +642,7 @@ async function handleFeedback(
 
       existingMsg += `\n━━━━━━━━━━━━━━━━━━━━━━\n`;
       existingMsg += `🔄 *Deseja substituir esses dados pelo novo feedback?*\n\n`;
+      existingMsg += `⚠️ _Etapas avançadas (Corretor, Visita, Proposta, Venda) não podem ser reduzidas._\n\n`;
       existingMsg += `Envie *#atualizar* para confirmar a substituição.\n`;
       existingMsg += `Ou envie outro comando para cancelar.`;
 
