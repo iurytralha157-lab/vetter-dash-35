@@ -21,11 +21,7 @@ import {
 const currency = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
 
-const formatNumber = (value: number) => {
-  if (value >= 1000000) return (value / 1000000).toFixed(1) + "M";
-  if (value >= 1000) return (value / 1000).toFixed(1) + "K";
-  return Math.round(value).toString();
-};
+const formatNumber = (value: number) => new Intl.NumberFormat('pt-BR').format(Math.round(value));
 
 const mapPeriod = (p: string): MetaPeriod => {
   // If already a MetaPeriod value, return as-is

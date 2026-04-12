@@ -34,11 +34,7 @@ const safe = (n: number | null | undefined, fallback = 0) => (typeof n === "numb
 
 const currency = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
 
-const formatNumber = (value: number) => {
-  if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
-  if (value >= 1000) return (value / 1000).toFixed(1) + 'K';
-  return Math.round(value).toString();
-};
+const formatNumber = (value: number) => new Intl.NumberFormat('pt-BR').format(Math.round(value));
 
 const getLeads = (c: MetaCampaign) => {
   const conv = (c as any)?.insights?.conversions;
@@ -51,6 +47,7 @@ export default function ClientDetailPage() {
   const { toast } = useToast();
 
   const [period, setPeriod] = useState<MetaPeriod>("last_7d");
+  const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | undefined>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -90,7 +87,7 @@ export default function ClientDetailPage() {
       metaAdsService.clearCache(`${metaAccountId}_${period}`);
     }
     try {
-      const data = await metaAdsService.fetchMetaCampaigns(metaAccountId, period);
+      const data = await metaAdsService.fetchMetaCampaigns(metaAccountId, period, customRange);
       if (!data?.success) throw new Error(data?.error || "Falha ao buscar Meta Ads");
       setResp(data);
       setMetrics(data.account_metrics || null);
@@ -110,7 +107,7 @@ export default function ClientDetailPage() {
 
   useEffect(() => {
     if (metaAccountId) fetchMeta();
-  }, [metaAccountId, period]);
+  }, [metaAccountId, period, customRange]);
 
   const orderedCampaigns = useMemo(() => {
     return [...campaigns].sort((a, b) => {
@@ -212,7 +209,7 @@ export default function ClientDetailPage() {
               <Pencil className="h-4 w-4" />
               Editar
             </Button>
-            <UnifiedPeriodFilter value={period} onChange={(v) => setPeriod(v as MetaPeriod)} />
+            <UnifiedPeriodFilter value={period} customRange={customRange} onChange={(v, cr) => { setPeriod(v as MetaPeriod); setCustomRange(cr); }} />
             <Button
               variant="outline"
               size="icon"

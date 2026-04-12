@@ -1,6 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { MetaAdsResponse } from "@/types/meta";
 import type { MetaPeriod } from "@/components/meta/MetaPeriodFilter";
+import { format } from "date-fns";
+
+interface CustomDateRange {
+  from: Date;
+  to: Date;
+}
 
 const CACHE_KEY_PREFIX = 'meta_ads_cache_';
 
@@ -23,13 +29,15 @@ export const metaAdsService = {
    * Fetches Meta Ads campaigns and metrics for a given account
    * Implements local caching to reduce API calls
    */
-  async fetchMetaCampaigns(metaAccountId: string, period: MetaPeriod = 'last_7d'): Promise<MetaAdsResponse> {
+  async fetchMetaCampaigns(metaAccountId: string, period: MetaPeriod = 'last_7d', customRange?: CustomDateRange): Promise<MetaAdsResponse> {
     if (!metaAccountId) {
       throw new Error('Meta Account ID é obrigatório');
     }
 
     // Check cache first (cache key includes period parameter)
-    const cacheKey = `${metaAccountId}_${period}`;
+    const cacheKey = period === 'custom' && customRange
+      ? `${metaAccountId}_custom_${format(customRange.from, 'yyyy-MM-dd')}_${format(customRange.to, 'yyyy-MM-dd')}`
+      : `${metaAccountId}_${period}`;
     const cached = this.getCachedData(cacheKey, period);
     if (cached) {
       console.log('Using cached Meta Ads data for period:', period);
@@ -39,8 +47,14 @@ export const metaAdsService = {
     try {
       console.log('Fetching fresh Meta Ads data for account:', metaAccountId, 'Period:', period);
 
+      const body: any = { meta_account_id: metaAccountId, period };
+      if (period === 'custom' && customRange) {
+        body.since = format(customRange.from, 'yyyy-MM-dd');
+        body.until = format(customRange.to, 'yyyy-MM-dd');
+      }
+
       const { data, error } = await supabase.functions.invoke('fetch-meta-campaigns', {
-        body: { meta_account_id: metaAccountId, period }
+        body
       });
 
       if (error) {

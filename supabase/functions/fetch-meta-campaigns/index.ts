@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { meta_account_id, period = 'last_7d' } = await req.json();
+    const { meta_account_id, period = 'last_7d', since: customSince, until: customUntil } = await req.json();
     
     console.log('Fetching Meta campaigns for account:', meta_account_id, 'Period:', period);
 
@@ -109,10 +109,38 @@ Deno.serve(async (req) => {
         since = formatDate(lastMonthStart);
         until = formatDate(lastMonthEnd);
         break;
+      case 'last_30d':
+        datePreset = 'last_30d';
+        const last30 = new Date(now);
+        last30.setDate(last30.getDate() - 30);
+        since = formatDate(last30);
+        until = formatDate(now);
+        break;
+      case 'this_quarter':
+        const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+        since = formatDate(quarterStart);
+        until = formatDate(now);
+        break;
+      case 'this_year':
+        const yearStart = new Date(now.getFullYear(), 0, 1);
+        since = formatDate(yearStart);
+        until = formatDate(now);
+        break;
+      case 'custom':
+        if (customSince && customUntil) {
+          since = customSince;
+          until = customUntil;
+        } else {
+          const defaultStart = new Date(now);
+          defaultStart.setDate(defaultStart.getDate() - 7);
+          since = formatDate(defaultStart);
+          until = formatDate(now);
+        }
+        break;
       default:
-        const defaultStart = new Date(now);
-        defaultStart.setDate(defaultStart.getDate() - 7);
-        since = formatDate(defaultStart);
+        const defaultStart2 = new Date(now);
+        defaultStart2.setDate(defaultStart2.getDate() - 7);
+        since = formatDate(defaultStart2);
         until = formatDate(now);
     }
     
