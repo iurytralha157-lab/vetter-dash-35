@@ -78,8 +78,9 @@ Deno.serve(async (req) => {
 
       if (message && acc.id_grupo) {
         try {
+          const groupJid = acc.id_grupo!.includes('@') ? acc.id_grupo! : `${acc.id_grupo}@g.us`;
           const payload = {
-            number: acc.id_grupo,
+            number: groupJid,
             text: message,
           };
           console.log(`[balance-alert] Sending to ${acc.nome_cliente}, group: ${acc.id_grupo}, payload keys:`, Object.keys(payload), 'text length:', message.length);
