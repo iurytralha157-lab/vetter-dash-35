@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { MetaPeriodFilter, type MetaPeriod } from "@/components/meta/MetaPeriodFilter";
+import { type MetaPeriod } from "@/components/meta/MetaPeriodFilter";
+import { UnifiedPeriodFilter } from "@/components/ui/unified-period-filter";
 import { MetaMetricsGrid } from "@/components/meta/MetaMetricsGrid";
 import { MetaCampaignTable } from "@/components/meta/MetaCampaignTable";
 import { MetaCampaignDetailDialog } from "@/components/meta/MetaCampaignDetailDialog";
@@ -211,7 +212,7 @@ export default function ClientDetailPage() {
               <Pencil className="h-4 w-4" />
               Editar
             </Button>
-            <MetaPeriodFilter value={period} onChange={setPeriod} />
+            <UnifiedPeriodFilter value={period} onChange={(v) => setPeriod(v as MetaPeriod)} />
             <Button
               variant="outline"
               size="icon"
