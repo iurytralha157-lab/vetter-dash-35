@@ -828,15 +828,6 @@ async function handleGasto(
   }
 }
 
-// ─── Saldo Handler ───
-
-async function handleSaldo(
-  account: { id: string; nome_cliente: string; meta_account_id: string | null },
-  supabase: any
-): Promise<string> {
-  if (!account.meta_account_id) {
-    return `⚠️ *${account.nome_cliente}*\n\nConta sem Meta Ads configurado.`;
-  }
 
   const accessToken = Deno.env.get('META_ACCESS_TOKEN');
   if (!accessToken) {
