@@ -387,87 +387,247 @@ async function handleFunil(account: any, supabase: any): Promise<string> {
 
 // ─── Existing Command Handlers ───
 
-async function handleCampanhas(account: any, supabase: any): Promise<string> {
-  const { data: campaigns } = await supabase
-    .from("meta_campaigns")
-    .select("campaign_name, status, spend, leads, impressions, clicks, cpl")
-    .eq("account_id", account.meta_account_id)
-    .order("spend", { ascending: false });
+async function fetchMetaCampaignInsights(
+  metaAccountId: string,
+  accessToken: string
+): Promise<any[]> {
+  const formattedId = metaAccountId.startsWith('act_') ? metaAccountId : `act_${metaAccountId}`;
+  const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-  if (!campaigns || campaigns.length === 0) {
-    return `📊 *${account.nome_cliente}*\n\nNenhuma campanha encontrada.`;
+  const url = `https://graph.facebook.com/v21.0/${formattedId}/campaigns?fields=name,status,insights.time_range({"since":"${todayStr}","until":"${todayStr}"}){spend,impressions,reach,clicks,cpm,ctr,actions}&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE","PAUSED"]}]&limit=50&access_token=${accessToken}`;
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('[whatsapp-webhook] Meta campaigns API error:', errText.slice(0, 300));
+    throw new Error('Erro ao consultar campanhas no Meta');
   }
 
-  const activeCampaigns = campaigns.filter((c: any) => c.status === "ACTIVE");
+  const result = await res.json();
+  return result.data || [];
+}
 
-  let msg = `📊 *Campanhas - ${account.nome_cliente}*\n`;
-  msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-  msg += `✅ Ativas: ${activeCampaigns.length} | 📋 Total: ${campaigns.length}\n\n`;
+function buildCampaignReport(
+  accountName: string,
+  campaign: any,
+  dateStr: string
+): string {
+  const insights = campaign.insights?.data?.[0];
+  const spend = insights ? parseFloat(insights.spend || '0') : 0;
+  const impressions = insights ? parseInt(insights.impressions || '0') : 0;
+  const reach = insights ? parseInt(insights.reach || '0') : 0;
+  const clicks = insights ? parseInt(insights.clicks || '0') : 0;
+  const ctr = insights ? parseFloat(insights.ctr || '0') : 0;
+  const cpm = insights ? parseFloat(insights.cpm || '0') : 0;
 
-  campaigns.forEach((c: any, i: number) => {
-    const statusIcon = c.status === "ACTIVE" ? "🟢" : "🔴";
-    const spend = formatCurrency(c.spend || 0);
-    const leads = c.leads || 0;
-    const cpl = c.cpl ? formatCurrency(c.cpl) : "N/A";
-    msg += `${statusIcon} *${i + 1}.* ${c.campaign_name}\n`;
-    msg += `   💰 Gasto: ${spend} | 👥 Leads: ${leads} | CPL: ${cpl}\n\n`;
-  });
+  // Extract leads from actions
+  let leads = 0;
+  let leadType = '';
+  if (insights?.actions) {
+    for (const action of insights.actions) {
+      if (action.action_type === 'onsite_conversion.messaging_conversation_started_7d') {
+        leads += parseInt(action.value || '0');
+        leadType = 'Mensagens (WhatsApp)';
+      } else if (action.action_type === 'lead') {
+        leads += parseInt(action.value || '0');
+        leadType = leadType || 'Formulário';
+      }
+    }
+  }
 
-  msg += `\n💡 Use *#campanha{número}* para ver detalhes`;
+  const fmtCurrency = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
+  const costPerLead = leads > 0 ? spend / leads : 0;
+
+  let msg = `📊 *RELATÓRIO DE CAMPANHA*\n`;
+  msg += `   Conta de Anúncio: ${accountName}\n`;
+  msg += `📅 Data: ${dateStr}\n\n`;
+  msg += `⚙️ *CAMPANHA:*\n`;
+  msg += `   ${campaign.name}\n\n`;
+  msg += `💲 *INVESTIMENTO & RESULTADOS:*\n`;
+  msg += `  · Gasto: ${fmtCurrency(spend)}\n`;
+  msg += `  · Mensagens: ${leads}\n`;
+  msg += `  · Custo por Mensagens: ${fmtCurrency(costPerLead)}\n`;
+  msg += `  · Alcance: ${reach.toLocaleString('pt-BR')}\n`;
+  msg += `  · Cliques no link: ${clicks.toLocaleString('pt-BR')}\n`;
+  msg += `  · CTR: ${ctr.toFixed(2)}%\n`;
+  msg += `  · CPM: ${fmtCurrency(cpm)}`;
+
+  if (leads > 0) {
+    msg += `\n\n📊 *DETALHES DE CONVERSÃO:*\n`;
+    msg += `  · ${leadType}: ${leads}\n\n`;
+    msg += `❓ *Como está a qualificação desses leads?*`;
+  }
+
   return msg;
 }
 
+async function handleCampanhas(account: any, supabase: any): Promise<string> {
+  if (!account.meta_account_id) {
+    return `⚠️ *${account.nome_cliente}*\nConta sem Meta Ads configurado.`;
+  }
+
+  const accessToken = Deno.env.get('META_ACCESS_TOKEN');
+  if (!accessToken) {
+    return `⚠️ Token do Meta não configurado.`;
+  }
+
+  try {
+    const campaigns = await fetchMetaCampaignInsights(account.meta_account_id, accessToken);
+
+    if (campaigns.length === 0) {
+      return `📊 *${account.nome_cliente}*\n\nNenhuma campanha encontrada.`;
+    }
+
+    // Sort by spend descending
+    campaigns.sort((a: any, b: any) => {
+      const spendA = a.insights?.data?.[0] ? parseFloat(a.insights.data[0].spend || '0') : 0;
+      const spendB = b.insights?.data?.[0] ? parseFloat(b.insights.data[0].spend || '0') : 0;
+      return spendB - spendA;
+    });
+
+    const activeCampaigns = campaigns.filter((c: any) => c.status === 'ACTIVE');
+    const fmtCurrency = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
+
+    let msg = `📊 *Campanhas - ${account.nome_cliente}*\n\n`;
+    msg += `✅ Ativas: ${activeCampaigns.length} | 📋 Total: ${campaigns.length}\n\n`;
+
+    campaigns.forEach((c: any, i: number) => {
+      const statusIcon = c.status === 'ACTIVE' ? '🟢' : '🔴';
+      const insights = c.insights?.data?.[0];
+      const spend = insights ? parseFloat(insights.spend || '0') : 0;
+
+      let leads = 0;
+      if (insights?.actions) {
+        for (const action of insights.actions) {
+          if (action.action_type === 'lead' || action.action_type === 'onsite_conversion.messaging_conversation_started_7d') {
+            leads += parseInt(action.value || '0');
+          }
+        }
+      }
+
+      const cpl = leads > 0 ? fmtCurrency(spend / leads) : 'N/A';
+      msg += `${statusIcon} *${i + 1}.* ${c.name}\n`;
+      msg += `   💰 ${fmtCurrency(spend)} | 👥 ${leads} leads | CPL: ${cpl}\n\n`;
+    });
+
+    msg += `💡 *#campanha{N}* — Relatório detalhado\n`;
+    msg += `💡 *#relatorio* — Relatório de todas`;
+
+    return msg;
+  } catch (err) {
+    console.error('[whatsapp-webhook] #campanhas error:', err);
+    return `⚠️ Erro ao consultar campanhas. Tente novamente.`;
+  }
+}
+
 async function handleCampanhaDetail(account: any, num: number, supabase: any): Promise<string> {
-  const { data: campaigns } = await supabase
-    .from("meta_campaigns")
-    .select("*")
-    .eq("account_id", account.meta_account_id)
-    .order("spend", { ascending: false });
-
-  if (!campaigns || campaigns.length === 0) {
-    return `📊 *${account.nome_cliente}*\n\nNenhuma campanha encontrada.`;
+  if (!account.meta_account_id) {
+    return `⚠️ *${account.nome_cliente}*\nConta sem Meta Ads configurado.`;
   }
 
-  if (isNaN(num) || num < 1 || num > campaigns.length) {
-    return `⚠️ Campanha #${num} não encontrada.\n\nUse *#campanhas* para ver a lista (1 a ${campaigns.length}).`;
+  const accessToken = Deno.env.get('META_ACCESS_TOKEN');
+  if (!accessToken) {
+    return `⚠️ Token do Meta não configurado.`;
   }
 
-  const c = campaigns[num - 1];
-  const statusIcon = c.status === "ACTIVE" ? "🟢 Ativa" : "🔴 Pausada";
+  try {
+    const campaigns = await fetchMetaCampaignInsights(account.meta_account_id, accessToken);
 
-  let msg = `📋 *Detalhes da Campanha #${num}*\n`;
-  msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-  msg += `📌 *${c.campaign_name}*\n`;
-  msg += `📊 Status: ${statusIcon}\n`;
-  msg += `🎯 Objetivo: ${c.objective || "N/A"}\n\n`;
-  msg += `💰 *Investimento*\n`;
-  msg += `   Gasto total: ${formatCurrency(c.spend || 0)}\n`;
-  msg += `   Orçamento diário: ${c.daily_budget ? formatCurrency(c.daily_budget) : "N/A"}\n\n`;
-  msg += `📈 *Desempenho*\n`;
-  msg += `   👁️ Impressões: ${formatNumber(c.impressions || 0)}\n`;
-  msg += `   👆 Cliques: ${formatNumber(c.clicks || 0)}\n`;
-  msg += `   📊 CTR: ${c.ctr ? (c.ctr).toFixed(2) + "%" : "N/A"}\n`;
-  msg += `   💵 CPC: ${c.cpc ? formatCurrency(c.cpc) : "N/A"}\n\n`;
-  msg += `👥 *Leads*\n`;
-  msg += `   Total: ${c.leads || 0}\n`;
-  msg += `   CPL: ${c.cpl ? formatCurrency(c.cpl) : "N/A"}\n`;
+    if (campaigns.length === 0) {
+      return `📊 *${account.nome_cliente}*\n\nNenhuma campanha encontrada.`;
+    }
 
-  const { data: insights } = await supabase
-    .from("campaign_insights")
-    .select("date, spend, leads, clicks, impressions")
-    .eq("campaign_id", c.id)
-    .order("date", { ascending: false })
-    .limit(7);
+    // Sort by spend descending (same order as #campanhas)
+    campaigns.sort((a: any, b: any) => {
+      const spendA = a.insights?.data?.[0] ? parseFloat(a.insights.data[0].spend || '0') : 0;
+      const spendB = b.insights?.data?.[0] ? parseFloat(b.insights.data[0].spend || '0') : 0;
+      return spendB - spendA;
+    });
 
-  if (insights && insights.length > 0) {
-    msg += `\n📅 *Últimos ${insights.length} dias*\n`;
-    insights.reverse().forEach((d: any) => {
-      const date = new Date(d.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-      msg += `   ${date}: 💰${formatCurrency(d.spend || 0)} | 👥${d.leads || 0} leads | 👆${d.clicks || 0} cliques\n`;
+    if (isNaN(num) || num < 1 || num > campaigns.length) {
+      return `⚠️ Campanha #${num} não encontrada.\n\nUse *#campanhas* para ver a lista (1 a ${campaigns.length}).`;
+    }
+
+    const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const dateStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+
+    return buildCampaignReport(account.nome_cliente, campaigns[num - 1], dateStr);
+  } catch (err) {
+    console.error('[whatsapp-webhook] #campanha detail error:', err);
+    return `⚠️ Erro ao consultar campanha. Tente novamente.`;
+  }
+}
+
+async function handleRelatorioAll(
+  account: any,
+  groupJid: string,
+  instanceName: string,
+  evolutionUrl: string,
+  evolutionKey: string,
+  supabase: any
+): Promise<Response> {
+  if (!account.meta_account_id) {
+    const msg = `⚠️ *${account.nome_cliente}*\nConta sem Meta Ads configurado.`;
+    await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, groupJid, msg);
+    return new Response(JSON.stringify({ success: true, command: '#relatorio' }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 
-  return msg;
+  const accessToken = Deno.env.get('META_ACCESS_TOKEN');
+  if (!accessToken) {
+    const msg = `⚠️ Token do Meta não configurado.`;
+    await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, groupJid, msg);
+    return new Response(JSON.stringify({ success: true, command: '#relatorio' }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  try {
+    const campaigns = await fetchMetaCampaignInsights(account.meta_account_id, accessToken);
+
+    // Only active campaigns with spend
+    const activeCampaigns = campaigns.filter((c: any) => {
+      if (c.status !== 'ACTIVE') return false;
+      const spend = c.insights?.data?.[0] ? parseFloat(c.insights.data[0].spend || '0') : 0;
+      return spend > 0;
+    });
+
+    if (activeCampaigns.length === 0) {
+      const msg = `📊 *${account.nome_cliente}*\n\nNenhuma campanha ativa com gasto hoje.`;
+      await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, groupJid, msg);
+      return new Response(JSON.stringify({ success: true, command: '#relatorio' }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
+    const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const dateStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+
+    // Send header message
+    await sendEvolutionMessage(
+      evolutionUrl, evolutionKey, instanceName, groupJid,
+      `📊 *Relatório de Campanhas - ${account.nome_cliente}*\n\n📅 ${dateStr}\n✅ ${activeCampaigns.length} campanha(s) ativa(s) com gasto\n\n_Enviando relatórios individuais..._`
+    );
+
+    // Send each campaign report with delay
+    for (let i = 0; i < activeCampaigns.length; i++) {
+      await new Promise(r => setTimeout(r, 2000)); // 2s delay between messages
+      const report = buildCampaignReport(account.nome_cliente, activeCampaigns[i], dateStr);
+      await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, groupJid, report);
+    }
+  } catch (err) {
+    console.error('[whatsapp-webhook] #relatorio error:', err);
+    await sendEvolutionMessage(
+      evolutionUrl, evolutionKey, instanceName, groupJid,
+      `⚠️ Erro ao gerar relatório. Tente novamente.`
+    );
+  }
+
+  return new Response(JSON.stringify({ success: true, command: '#relatorio' }), {
+    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+  });
 }
 
 async function handleLeads(account: any, supabase: any): Promise<string> {
