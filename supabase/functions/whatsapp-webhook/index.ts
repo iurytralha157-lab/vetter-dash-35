@@ -131,7 +131,7 @@ async function processCommand(
       responseText = await handleFunil(account, supabase);
     } else if (cmd.startsWith("#campanhas")) {
       const periodArg = cmd.replace("#campanhas", "").trim();
-      responseText = await handleCampanhas(account, supabase, periodArg || null, groupJid);
+      responseText = await handleCampanhas(account, supabase, periodArg || null, groupJid, instanceName);
     } else if (cmd === "#relatorio") {
       return await handleRelatorioAll(account, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
     } else if (cmd === "#todas" || cmd === "#todos") {
@@ -479,7 +479,7 @@ function buildCampaignReport(
   return msg;
 }
 
-async function handleCampanhas(account: any, supabase: any, periodArg: string | null = null, groupJid: string = ''): Promise<string> {
+async function handleCampanhas(account: any, supabase: any, periodArg: string | null = null, groupJid: string = '', instanceName: string = ''): Promise<string> {
   if (!account.meta_account_id) {
     return `⚠️ *${account.nome_cliente}*\nConta sem Meta Ads configurado.`;
   }
