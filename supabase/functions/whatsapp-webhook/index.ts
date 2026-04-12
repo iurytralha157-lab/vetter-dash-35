@@ -129,8 +129,9 @@ async function processCommand(
       responseText = await handleGasto(text, account, supabase);
     } else if (cmd === "#funil") {
       responseText = await handleFunil(account, supabase);
-    } else if (cmd === "#campanhas") {
-      responseText = await handleCampanhas(account, supabase);
+    } else if (cmd.startsWith("#campanhas")) {
+      const periodArg = cmd.replace("#campanhas", "").trim();
+      responseText = await handleCampanhas(account, supabase, periodArg || null);
     } else if (cmd === "#relatorio") {
       // Send individual reports for each active campaign with delay
       return await handleRelatorioAll(account, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
@@ -389,13 +390,20 @@ async function handleFunil(account: any, supabase: any): Promise<string> {
 
 async function fetchMetaCampaignInsights(
   metaAccountId: string,
-  accessToken: string
+  accessToken: string,
+  since?: string,
+  until?: string,
+  statusFilter: string[] = ["ACTIVE", "PAUSED"]
 ): Promise<any[]> {
   const formattedId = metaAccountId.startsWith('act_') ? metaAccountId : `act_${metaAccountId}`;
   const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-  const url = `https://graph.facebook.com/v21.0/${formattedId}/campaigns?fields=name,status,insights.time_range({"since":"${todayStr}","until":"${todayStr}"}){spend,impressions,reach,clicks,cpm,ctr,actions}&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE","PAUSED"]}]&limit=50&access_token=${accessToken}`;
+  const sinceDate = since || todayStr;
+  const untilDate = until || todayStr;
+  const filterJson = JSON.stringify(statusFilter.map(s => s));
+
+  const url = `https://graph.facebook.com/v21.0/${formattedId}/campaigns?fields=name,status,insights.time_range({"since":"${sinceDate}","until":"${untilDate}"}){spend,impressions,reach,clicks,cpm,ctr,actions}&filtering=[{"field":"effective_status","operator":"IN","value":${filterJson}}]&limit=100&access_token=${accessToken}`;
 
   const res = await fetch(url);
   if (!res.ok) {
@@ -462,7 +470,7 @@ function buildCampaignReport(
   return msg;
 }
 
-async function handleCampanhas(account: any, supabase: any): Promise<string> {
+async function handleCampanhas(account: any, supabase: any, periodArg: string | null = null): Promise<string> {
   if (!account.meta_account_id) {
     return `⚠️ *${account.nome_cliente}*\nConta sem Meta Ads configurado.`;
   }
@@ -473,27 +481,56 @@ async function handleCampanhas(account: any, supabase: any): Promise<string> {
   }
 
   try {
-    const campaigns = await fetchMetaCampaignInsights(account.meta_account_id, accessToken);
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    let since: string | undefined;
+    let until: string | undefined;
+    let periodLabel = 'Hoje';
+    // Which statuses to query - for period queries include all
+    let statusFilter = ["ACTIVE"];
 
-    if (campaigns.length === 0) {
-      return `📊 *${account.nome_cliente}*\n\nNenhuma campanha encontrada.`;
+    if (periodArg) {
+      const parsed = parsePeriodArg(periodArg);
+      if (parsed) {
+        since = parsed.since;
+        until = parsed.until;
+        periodLabel = parsed.label;
+        // When querying a period, include all statuses since campaigns may have been paused
+        statusFilter = ["ACTIVE", "PAUSED", "ARCHIVED"];
+      }
+    }
+
+    const campaigns = await fetchMetaCampaignInsights(account.meta_account_id, accessToken, since, until, statusFilter);
+
+    // Filter: only campaigns with spend > 0 or impressions > 0
+    const activeCampaigns = campaigns.filter((c: any) => {
+      const insights = c.insights?.data?.[0];
+      if (!insights) return false;
+      const spend = parseFloat(insights.spend || '0');
+      const impressions = parseInt(insights.impressions || '0');
+      return spend > 0 || impressions > 0;
+    });
+
+    if (activeCampaigns.length === 0) {
+      return `📊 *${account.nome_cliente}*\n📅 ${periodLabel}\n\nNenhuma campanha ativa com veiculação neste período.\n\n💡 Use *#campanhas 7* para ver últimos 7 dias\n💡 Use *#campanhas março* para ver um mês específico`;
     }
 
     // Sort by spend descending
-    campaigns.sort((a: any, b: any) => {
+    activeCampaigns.sort((a: any, b: any) => {
       const spendA = a.insights?.data?.[0] ? parseFloat(a.insights.data[0].spend || '0') : 0;
       const spendB = b.insights?.data?.[0] ? parseFloat(b.insights.data[0].spend || '0') : 0;
       return spendB - spendA;
     });
 
-    const activeCampaigns = campaigns.filter((c: any) => c.status === 'ACTIVE');
     const fmtCurrency = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
 
-    let msg = `📊 *Campanhas - ${account.nome_cliente}*\n\n`;
-    msg += `✅ Ativas: ${activeCampaigns.length} | 📋 Total: ${campaigns.length}\n\n`;
+    let totalSpend = 0;
+    let totalLeads = 0;
 
-    campaigns.forEach((c: any, i: number) => {
-      const statusIcon = c.status === 'ACTIVE' ? '🟢' : '🔴';
+    let msg = `📊 *Campanhas Ativas - ${account.nome_cliente}*\n`;
+    msg += `📅 ${periodLabel}\n`;
+    msg += `✅ ${activeCampaigns.length} campanha(s) com veiculação\n\n`;
+
+    activeCampaigns.forEach((c: any, i: number) => {
       const insights = c.insights?.data?.[0];
       const spend = insights ? parseFloat(insights.spend || '0') : 0;
 
@@ -506,19 +543,81 @@ async function handleCampanhas(account: any, supabase: any): Promise<string> {
         }
       }
 
+      totalSpend += spend;
+      totalLeads += leads;
+
       const cpl = leads > 0 ? fmtCurrency(spend / leads) : 'N/A';
-      msg += `${statusIcon} *${i + 1}.* ${c.name}\n`;
+      msg += `🟢 *${i + 1}.* ${c.name}\n`;
       msg += `   💰 ${fmtCurrency(spend)} | 👥 ${leads} leads | CPL: ${cpl}\n\n`;
     });
 
+    msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `💰 *Total:* ${fmtCurrency(totalSpend)} | 👥 *${totalLeads} leads*\n\n`;
     msg += `💡 *#campanha{N}* — Relatório detalhado\n`;
-    msg += `💡 *#relatorio* — Relatório de todas`;
+    msg += `💡 *#campanhas 7* — Últimos 7 dias\n`;
+    msg += `💡 *#campanhas março* — Mês específico`;
 
     return msg;
   } catch (err) {
     console.error('[whatsapp-webhook] #campanhas error:', err);
     return `⚠️ Erro ao consultar campanhas. Tente novamente.`;
   }
+}
+
+/**
+ * Parses period arguments like "7", "30", "março", "janeiro 2025", "01/03 a 15/03"
+ */
+function parsePeriodArg(arg: string): { since: string; until: string; label: string } | null {
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  // Number of days: "7", "15", "30"
+  const daysMatch = arg.match(/^(\d+)$/);
+  if (daysMatch) {
+    const days = parseInt(daysMatch[1]);
+    const since = new Date(now);
+    since.setDate(since.getDate() - days);
+    return {
+      since: `${since.getFullYear()}-${String(since.getMonth() + 1).padStart(2, '0')}-${String(since.getDate()).padStart(2, '0')}`,
+      until: todayStr,
+      label: `Últimos ${days} dias`,
+    };
+  }
+
+  // Date range: "01/03 a 15/03" or "01/03/2025 a 15/03/2025"
+  const rangeMatch = arg.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\s*a\s*(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/i);
+  if (rangeMatch) {
+    const y1 = rangeMatch[3] ? (rangeMatch[3].length === 2 ? 2000 + parseInt(rangeMatch[3]) : parseInt(rangeMatch[3])) : now.getFullYear();
+    const y2 = rangeMatch[6] ? (rangeMatch[6].length === 2 ? 2000 + parseInt(rangeMatch[6]) : parseInt(rangeMatch[6])) : now.getFullYear();
+    return {
+      since: `${y1}-${String(parseInt(rangeMatch[2])).padStart(2, '0')}-${String(parseInt(rangeMatch[1])).padStart(2, '0')}`,
+      until: `${y2}-${String(parseInt(rangeMatch[5])).padStart(2, '0')}-${String(parseInt(rangeMatch[4])).padStart(2, '0')}`,
+      label: `${rangeMatch[1]}/${rangeMatch[2]} a ${rangeMatch[4]}/${rangeMatch[5]}`,
+    };
+  }
+
+  // Month name: "março", "janeiro 2025"
+  const months: Record<string, number> = {
+    janeiro: 1, fevereiro: 2, março: 3, marco: 3, abril: 4, maio: 5, junho: 6,
+    julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12
+  };
+
+  const monthMatch = arg.match(/^([a-záéíóúâêîôûãõç]+)\s*(\d{4})?$/i);
+  if (monthMatch) {
+    const monthName = monthMatch[1].toLowerCase();
+    const monthNum = months[monthName];
+    if (monthNum) {
+      const year = monthMatch[2] ? parseInt(monthMatch[2]) : now.getFullYear();
+      const lastDay = new Date(year, monthNum, 0).getDate();
+      return {
+        since: `${year}-${String(monthNum).padStart(2, '0')}-01`,
+        until: `${year}-${String(monthNum).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
+        label: `${monthMatch[1].charAt(0).toUpperCase() + monthMatch[1].slice(1)} ${year}`,
+      };
+    }
+  }
+
+  return null;
 }
 
 async function handleCampanhaDetail(account: any, num: number, supabase: any): Promise<string> {
@@ -748,7 +847,10 @@ function getHelpText(clientName: string): string {
     `💰 *#saldo* — Saldo em tempo real\n` +
     `💸 *#gasto* — Investimento por período\n` +
     `   Ex: #gasto 7, #gasto 30, #gasto março\n\n` +
-    `📊 *#campanhas* — Lista campanhas\n` +
+    `📊 *#campanhas* — Campanhas ativas com gasto hoje\n` +
+    `📊 *#campanhas 7* — Campanhas dos últimos 7 dias\n` +
+    `📊 *#campanhas março* — Campanhas de um mês\n` +
+    `📊 *#campanhas 01/03 a 15/03* — Período específico\n` +
     `📋 *#campanha{N}* — Relatório da campanha N\n` +
     `📑 *#relatorio* — Relatório de todas as campanhas\n\n` +
     `👥 *#leads* — Resumo de leads\n` +
