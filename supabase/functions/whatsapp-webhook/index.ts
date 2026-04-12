@@ -418,6 +418,9 @@ async function processCommand(
     } else if (cmd === "#todas" || cmd === "#todos") {
       // Send detailed reports for all campaigns from context
       return await handleContextDetailAll(account, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
+    } else if (cmd === "#atualizar") {
+      // User confirmed they want to update existing feedback
+      responseText = await handleFeedbackUpdate(account, groupJid, senderName, supabase);
     } else if (cmd === "#sim") {
       // User said "yes" to seeing detailed reports - ask which one
       responseText = await handleSimResponse(account, supabase, groupJid);
