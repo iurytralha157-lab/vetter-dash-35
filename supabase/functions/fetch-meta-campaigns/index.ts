@@ -267,23 +267,15 @@ Deno.serve(async (req) => {
       })
     );
 
-    // Calculate account-level metrics
+    // Calculate account-level metrics by summing per-campaign conversions
+    // This avoids double-counting from overlapping action_types at account level
     let accountMetrics = null;
     if (accountInsights) {
-      let conversions = 0;
-      if (accountInsights.actions) {
-        const leadActions = accountInsights.actions.filter((action: any) => 
-          action.action_type === 'lead' ||
-          action.action_type === 'offsite_conversion.fb_pixel_lead' ||
-          action.action_type === 'onsite_conversion.lead' ||
-          action.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
-          action.action_type === 'onsite_conversion.total_messaging_connection' ||
-          action.action_type === 'onsite_conversion.messaging_first_reply'
-        );
-        conversions = leadActions.reduce((sum: number, action: { value?: string }) => sum + parseInt(action.value || '0'), 0);
-        console.log('Account-level lead actions found:', JSON.stringify(leadActions));
-        console.log('Account-level total conversions:', conversions);
-      }
+      const totalConversions = campaignsWithInsights.reduce((sum: number, c: any) => {
+        return sum + (c.insights?.conversions || 0);
+      }, 0);
+      
+      console.log('Account-level total conversions (sum of campaigns):', totalConversions);
 
       accountMetrics = {
         total_spend: parseFloat(accountInsights.spend || '0'),
@@ -292,7 +284,7 @@ Deno.serve(async (req) => {
         avg_ctr: parseFloat(accountInsights.ctr || '0'),
         avg_cpc: parseFloat(accountInsights.cpc || '0'),
         avg_cpm: parseFloat(accountInsights.cpm || '0'),
-        total_conversions: conversions
+        total_conversions: totalConversions
       };
     }
 
