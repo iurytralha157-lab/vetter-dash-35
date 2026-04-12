@@ -390,13 +390,20 @@ async function handleFunil(account: any, supabase: any): Promise<string> {
 
 async function fetchMetaCampaignInsights(
   metaAccountId: string,
-  accessToken: string
+  accessToken: string,
+  since?: string,
+  until?: string,
+  statusFilter: string[] = ["ACTIVE", "PAUSED"]
 ): Promise<any[]> {
   const formattedId = metaAccountId.startsWith('act_') ? metaAccountId : `act_${metaAccountId}`;
   const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-  const url = `https://graph.facebook.com/v21.0/${formattedId}/campaigns?fields=name,status,insights.time_range({"since":"${todayStr}","until":"${todayStr}"}){spend,impressions,reach,clicks,cpm,ctr,actions}&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE","PAUSED"]}]&limit=50&access_token=${accessToken}`;
+  const sinceDate = since || todayStr;
+  const untilDate = until || todayStr;
+  const filterJson = JSON.stringify(statusFilter.map(s => s));
+
+  const url = `https://graph.facebook.com/v21.0/${formattedId}/campaigns?fields=name,status,insights.time_range({"since":"${sinceDate}","until":"${untilDate}"}){spend,impressions,reach,clicks,cpm,ctr,actions}&filtering=[{"field":"effective_status","operator":"IN","value":${filterJson}}]&limit=100&access_token=${accessToken}`;
 
   const res = await fetch(url);
   if (!res.ok) {
