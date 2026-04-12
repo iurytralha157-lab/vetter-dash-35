@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const text = (
+    let text = (
       message.conversation ||
       message.extendedTextMessage?.text ||
       ""
