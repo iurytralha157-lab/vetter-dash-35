@@ -829,13 +829,6 @@ async function handleGasto(
 }
 
 
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error(`[whatsapp-webhook] #saldo Meta API error for ${account.nome_cliente}:`, errText.slice(0, 300));
-      return `⚠️ Erro ao consultar saldo no Meta. Tente novamente.`;
-    }
-
     const data = await res.json();
 
     const isPrepay = data.is_prepay_account === true;
