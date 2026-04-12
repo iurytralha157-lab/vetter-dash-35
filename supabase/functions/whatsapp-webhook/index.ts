@@ -131,10 +131,19 @@ async function processCommand(
       responseText = await handleFunil(account, supabase);
     } else if (cmd.startsWith("#campanhas")) {
       const periodArg = cmd.replace("#campanhas", "").trim();
-      responseText = await handleCampanhas(account, supabase, periodArg || null);
+      responseText = await handleCampanhas(account, supabase, periodArg || null, groupJid);
     } else if (cmd === "#relatorio") {
-      // Send individual reports for each active campaign with delay
       return await handleRelatorioAll(account, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
+    } else if (cmd === "#todas" || cmd === "#todos") {
+      // Send detailed reports for all campaigns from context
+      return await handleContextDetailAll(account, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
+    } else if (cmd === "#sim") {
+      // User said "yes" to seeing detailed reports - ask which one
+      responseText = await handleSimResponse(account, supabase, groupJid);
+    } else if (cmd.match(/^#\d+(\s+#?\d+)*$/)) {
+      // Matches "#1", "#2", "#1 #3", "#1 2 3" etc.
+      const numbers = cmd.match(/\d+/g)!.map(Number);
+      return await handleContextDetailMultiple(account, numbers, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
     } else if (cmd.startsWith("#campanha")) {
       const num = parseInt(cmd.replace("#campanha", "").trim());
       responseText = await handleCampanhaDetail(account, num, supabase);
@@ -470,7 +479,7 @@ function buildCampaignReport(
   return msg;
 }
 
-async function handleCampanhas(account: any, supabase: any, periodArg: string | null = null): Promise<string> {
+async function handleCampanhas(account: any, supabase: any, periodArg: string | null = null, groupJid: string = ''): Promise<string> {
   if (!account.meta_account_id) {
     return `⚠️ *${account.nome_cliente}*\nConta sem Meta Ads configurado.`;
   }
@@ -485,7 +494,6 @@ async function handleCampanhas(account: any, supabase: any, periodArg: string | 
     let since: string | undefined;
     let until: string | undefined;
     let periodLabel = 'Hoje';
-    // Which statuses to query - for period queries include all
     let statusFilter = ["ACTIVE"];
 
     if (periodArg) {
@@ -494,7 +502,6 @@ async function handleCampanhas(account: any, supabase: any, periodArg: string | 
         since = parsed.since;
         until = parsed.until;
         periodLabel = parsed.label;
-        // When querying a period, include all statuses since campaigns may have been paused
         statusFilter = ["ACTIVE", "PAUSED", "ARCHIVED"];
       }
     }
@@ -526,7 +533,36 @@ async function handleCampanhas(account: any, supabase: any, periodArg: string | 
     let totalSpend = 0;
     let totalLeads = 0;
 
-    let msg = `📊 *Campanhas Ativas - ${account.nome_cliente}*\n`;
+    // Save campaign names and period to context for conversational follow-up
+    const campaignList = activeCampaigns.map((c: any, i: number) => ({
+      index: i + 1,
+      id: c.id,
+      name: c.name,
+    }));
+
+    // Store context in DB
+    if (groupJid) {
+      try {
+        await supabase.from('whatsapp_chat_context').upsert({
+          group_jid: groupJid,
+          account_id: account.id,
+          context_type: 'campanhas',
+          context_data: {
+            campaigns: campaignList,
+            since: since || null,
+            until: until || null,
+            period_label: periodLabel,
+            status_filter: statusFilter,
+          },
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        }, { onConflict: 'group_jid,account_id,context_type' });
+      } catch (ctxErr) {
+        console.warn('[whatsapp-webhook] Failed to save context:', ctxErr);
+      }
+    }
+
+    let msg = `📊 *Campanhas - ${account.nome_cliente}*\n`;
     msg += `📅 ${periodLabel}\n`;
     msg += `✅ ${activeCampaigns.length} campanha(s) com veiculação\n\n`;
 
@@ -547,21 +583,182 @@ async function handleCampanhas(account: any, supabase: any, periodArg: string | 
       totalLeads += leads;
 
       const cpl = leads > 0 ? fmtCurrency(spend / leads) : 'N/A';
-      msg += `🟢 *${i + 1}.* ${c.name}\n`;
+      msg += `*${i + 1}.* ${c.name}\n`;
       msg += `   💰 ${fmtCurrency(spend)} | 👥 ${leads} leads | CPL: ${cpl}\n\n`;
     });
 
     msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
     msg += `💰 *Total:* ${fmtCurrency(totalSpend)} | 👥 *${totalLeads} leads*\n\n`;
-    msg += `💡 *#campanha{N}* — Relatório detalhado\n`;
-    msg += `💡 *#campanhas 7* — Últimos 7 dias\n`;
-    msg += `💡 *#campanhas março* — Mês específico`;
+    msg += `📋 *Quer ver o relatório detalhado de alguma campanha?*\n`;
+    msg += `Envie *#1*, *#2*... ou *#todas* para ver todas.`;
 
     return msg;
   } catch (err) {
     console.error('[whatsapp-webhook] #campanhas error:', err);
     return `⚠️ Erro ao consultar campanhas. Tente novamente.`;
   }
+}
+
+// ─── Context-based Conversational Handlers ───
+
+async function getActiveContext(supabase: any, groupJid: string, accountId: string): Promise<any | null> {
+  const { data } = await supabase
+    .from('whatsapp_chat_context')
+    .select('context_data, created_at, expires_at')
+    .eq('group_jid', groupJid)
+    .eq('account_id', accountId)
+    .eq('context_type', 'campanhas')
+    .single();
+
+  if (!data) return null;
+
+  // Check if expired
+  if (new Date(data.expires_at) < new Date()) {
+    return null;
+  }
+
+  return data.context_data;
+}
+
+async function handleSimResponse(account: any, supabase: any, groupJid: string): Promise<string> {
+  const ctx = await getActiveContext(supabase, groupJid, account.id);
+  if (!ctx || !ctx.campaigns?.length) {
+    return `ℹ️ Nenhuma consulta de campanhas recente.\n\nUse *#campanhas* primeiro para listar as campanhas.`;
+  }
+
+  let msg = `📋 *Qual campanha deseja ver em detalhe?*\n\n`;
+  ctx.campaigns.forEach((c: any) => {
+    msg += `*#${c.index}* — ${c.name}\n`;
+  });
+  msg += `\nOu envie *#todas* para ver todas.`;
+  return msg;
+}
+
+async function handleContextDetailMultiple(
+  account: any,
+  numbers: number[],
+  groupJid: string,
+  instanceName: string,
+  evolutionUrl: string,
+  evolutionKey: string,
+  supabase: any
+): Promise<Response> {
+  const ctx = await getActiveContext(supabase, groupJid, account.id);
+
+  if (!ctx || !ctx.campaigns?.length) {
+    // No context - fallback to default behavior (today's campaigns)
+    if (numbers.length === 1) {
+      const msg = await handleCampanhaDetail(account, numbers[0], supabase);
+      await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, groupJid, msg);
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+    const msg = `ℹ️ Nenhuma consulta de campanhas recente.\n\nUse *#campanhas* primeiro.`;
+    await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, groupJid, msg);
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  const accessToken = Deno.env.get('META_ACCESS_TOKEN');
+  if (!accessToken || !account.meta_account_id) {
+    await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, groupJid, `⚠️ Configuração Meta Ads incompleta.`);
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  // Re-fetch campaigns with the SAME period from context
+  const campaigns = await fetchMetaCampaignInsights(
+    account.meta_account_id,
+    accessToken,
+    ctx.since || undefined,
+    ctx.until || undefined,
+    ctx.status_filter || ["ACTIVE"]
+  );
+
+  // Filter same as before
+  const activeCampaigns = campaigns.filter((c: any) => {
+    const insights = c.insights?.data?.[0];
+    if (!insights) return false;
+    return parseFloat(insights.spend || '0') > 0 || parseInt(insights.impressions || '0') > 0;
+  });
+
+  activeCampaigns.sort((a: any, b: any) => {
+    const spendA = a.insights?.data?.[0] ? parseFloat(a.insights.data[0].spend || '0') : 0;
+    const spendB = b.insights?.data?.[0] ? parseFloat(b.insights.data[0].spend || '0') : 0;
+    return spendB - spendA;
+  });
+
+  // Validate requested numbers
+  const validNumbers = numbers.filter(n => n >= 1 && n <= activeCampaigns.length);
+  const invalidNumbers = numbers.filter(n => n < 1 || n > activeCampaigns.length);
+
+  if (validNumbers.length === 0) {
+    const msg = `⚠️ Nenhuma campanha encontrada com ${numbers.length === 1 ? 'o número' : 'os números'} informado(s).\n\nCampanhas disponíveis: 1 a ${activeCampaigns.length}`;
+    await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, groupJid, msg);
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  const periodLabel = ctx.period_label || 'Hoje';
+
+  // Header
+  if (validNumbers.length > 1) {
+    await sendEvolutionMessage(
+      evolutionUrl, evolutionKey, instanceName, groupJid,
+      `📊 *Relatório detalhado — ${account.nome_cliente}*\n📅 ${periodLabel}\n\n_Enviando ${validNumbers.length} relatório(s)..._`
+    );
+    await new Promise(r => setTimeout(r, 2000));
+  }
+
+  for (let i = 0; i < validNumbers.length; i++) {
+    if (i > 0) await new Promise(r => setTimeout(r, 2000));
+    const campaign = activeCampaigns[validNumbers[i] - 1];
+    const dateStr = periodLabel;
+    const report = buildCampaignReport(account.nome_cliente, campaign, dateStr);
+    await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, groupJid, report);
+  }
+
+  if (invalidNumbers.length > 0) {
+    await new Promise(r => setTimeout(r, 2000));
+    await sendEvolutionMessage(
+      evolutionUrl, evolutionKey, instanceName, groupJid,
+      `⚠️ Campanha(s) ${invalidNumbers.map(n => `#${n}`).join(', ')} não encontrada(s). Disponíveis: 1 a ${activeCampaigns.length}`
+    );
+  }
+
+  // Ask if they want more
+  await new Promise(r => setTimeout(r, 2000));
+  await sendEvolutionMessage(
+    evolutionUrl, evolutionKey, instanceName, groupJid,
+    `💡 Deseja ver outra campanha? Envie o número ou *#todas*.`
+  );
+
+  return new Response(JSON.stringify({ success: true }), {
+    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+  });
+}
+
+async function handleContextDetailAll(
+  account: any,
+  groupJid: string,
+  instanceName: string,
+  evolutionUrl: string,
+  evolutionKey: string,
+  supabase: any
+): Promise<Response> {
+  const ctx = await getActiveContext(supabase, groupJid, account.id);
+
+  if (!ctx || !ctx.campaigns?.length) {
+    // Fallback to #relatorio behavior
+    return await handleRelatorioAll(account, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
+  }
+
+  const allNumbers = ctx.campaigns.map((c: any) => c.index);
+  return await handleContextDetailMultiple(account, allNumbers, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
 }
 
 /**
@@ -848,11 +1045,15 @@ function getHelpText(clientName: string): string {
     `💸 *#gasto* — Investimento por período\n` +
     `   Ex: #gasto 7, #gasto 30, #gasto março\n\n` +
     `📊 *#campanhas* — Campanhas ativas com gasto hoje\n` +
-    `📊 *#campanhas 7* — Campanhas dos últimos 7 dias\n` +
-    `📊 *#campanhas março* — Campanhas de um mês\n` +
-    `📊 *#campanhas 01/03 a 15/03* — Período específico\n` +
-    `📋 *#campanha{N}* — Relatório da campanha N\n` +
-    `📑 *#relatorio* — Relatório de todas as campanhas\n\n` +
+    `📊 *#campanhas 7* — Últimos 7 dias\n` +
+    `📊 *#campanhas março* — Mês específico\n` +
+    `📊 *#campanhas 01/03 a 15/03* — Período específico\n\n` +
+    `📋 Após listar campanhas:\n` +
+    `   *#1*, *#2*... — Relatório da campanha N\n` +
+    `   *#1 #3* — Várias campanhas\n` +
+    `   *#todas* — Relatório de todas\n` +
+    `   *#sim* — Ver opções disponíveis\n\n` +
+    `📑 *#relatorio* — Relatório de todas as campanhas ativas\n\n` +
     `👥 *#leads* — Resumo de leads\n` +
     `👥 *#leads{N}* — Leads da campanha N\n\n` +
     `📊 *#resumo* — Resumo geral\n` +

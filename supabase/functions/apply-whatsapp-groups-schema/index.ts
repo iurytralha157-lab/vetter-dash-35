@@ -1,4 +1,4 @@
-import postgres from "https://esm.sh/postgres@3.4.5?target=deno";
+import postgres from "https://deno.land/x/postgresjs@v3.4.4/mod.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -71,9 +71,39 @@ Deno.serve(async (req) => {
             with check (public.is_admin(auth.uid()));
         end if;
       end $$;
+
+      -- Chat context table for conversational WhatsApp bot
+      create table if not exists public.whatsapp_chat_context (
+        id uuid primary key default gen_random_uuid(),
+        group_jid text not null,
+        account_id uuid not null references public.accounts(id) on delete cascade,
+        context_type text not null default 'campanhas',
+        context_data jsonb not null default '{}',
+        created_at timestamptz not null default now(),
+        expires_at timestamptz not null default (now() + interval '30 minutes'),
+        unique(group_jid, account_id, context_type)
+      );
+
+      alter table public.whatsapp_chat_context enable row level security;
+
+      do $$
+      begin
+        if not exists (
+          select 1 from pg_policies
+          where schemaname = 'public'
+            and tablename = 'whatsapp_chat_context'
+            and policyname = 'Service role full access chat context'
+        ) then
+          create policy "Service role full access chat context"
+            on public.whatsapp_chat_context
+            for all
+            using (true)
+            with check (true);
+        end if;
+      end $$;
     `);
 
-    return jsonResponse({ success: true, table: "whatsapp_groups" });
+    return jsonResponse({ success: true, tables: ["whatsapp_groups", "whatsapp_chat_context"] });
   } catch (err) {
     console.error("[apply-whatsapp-groups-schema]", err);
     return jsonResponse({ error: err instanceof Error ? err.message : "Internal error" }, 500);
