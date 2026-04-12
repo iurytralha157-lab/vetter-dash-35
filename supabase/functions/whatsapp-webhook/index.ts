@@ -584,6 +584,70 @@ async function handleFeedback(
       return `⚠️ Essa mensagem já foi processada anteriormente.`;
     }
 
+    // === Handle existing feedback for same day ===
+    if (feedbackResult.existing_feedback) {
+      // Store the original message in context so we can replay it with force_update
+      try {
+        await supabase.from('whatsapp_chat_context').upsert({
+          group_jid: groupJid,
+          account_id: account.id,
+          context_type: 'feedback_update',
+          context_data: {
+            original_message: text,
+            sender_name: senderName,
+            existing_data: feedbackResult.existing_data,
+            new_parsed: feedbackResult.new_parsed,
+            data_inicio: feedbackResult.data_inicio,
+            data_fim: feedbackResult.data_fim,
+          },
+          instance_name: null,
+          expiry_notified: false,
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        }, { onConflict: 'group_jid,account_id,context_type' });
+      } catch (ctxErr) {
+        console.warn('[whatsapp-webhook] Failed to save feedback update context:', ctxErr);
+      }
+
+      const periodLabel = feedbackResult.data_inicio === feedbackResult.data_fim
+        ? feedbackResult.data_inicio.split('-').reverse().join('/')
+        : `${feedbackResult.data_inicio.split('-').reverse().join('/')} a ${feedbackResult.data_fim.split('-').reverse().join('/')}`;
+
+      let existingMsg = `⚠️ *Já existe feedback para ${periodLabel}!*\n\n`;
+      existingMsg += `📊 *Dados atuais no funil:*\n`;
+
+      const etapaLabels: Record<string, string> = {
+        quantidade_recebida: "Recebidos",
+        quantidade_descartado: "Descartados",
+        quantidade_aguardando_retorno: "Aguardando Retorno",
+        quantidade_atendimento: "Atendimento SDR",
+        quantidade_passou_corretor: "Passou p/ Corretor",
+        quantidade_visita: "Visita",
+        quantidade_proposta: "Proposta",
+        quantidade_venda: "Venda",
+      };
+
+      // Aggregate existing data
+      const aggregated: Record<string, number> = {};
+      for (const row of feedbackResult.existing_data) {
+        existingMsg += `\n📌 *${row.campanha_nome}* (${row.data_referencia}):\n`;
+        for (const [field, label] of Object.entries(etapaLabels)) {
+          const val = row[field];
+          if (val != null && val > 0) {
+            existingMsg += `   • ${label}: *${val}*\n`;
+            aggregated[field] = (aggregated[field] || 0) + val;
+          }
+        }
+      }
+
+      existingMsg += `\n━━━━━━━━━━━━━━━━━━━━━━\n`;
+      existingMsg += `🔄 *Deseja substituir esses dados pelo novo feedback?*\n\n`;
+      existingMsg += `Envie *#atualizar* para confirmar a substituição.\n`;
+      existingMsg += `Ou envie outro comando para cancelar.`;
+
+      return existingMsg;
+    }
+
     // 2. Also process individual leads via process-followup (for feedback_funnel)
     let followupResult: any = null;
     try {
