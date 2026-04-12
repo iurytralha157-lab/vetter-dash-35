@@ -843,6 +843,96 @@ async function handleFeedback(
   }
 }
 
+// ─── Feedback Update Handler ───
+
+async function handleFeedbackUpdate(
+  account: any,
+  groupJid: string,
+  senderName: string,
+  supabase: any
+): Promise<string> {
+  try {
+    // Get the stored context
+    const { data: ctxData } = await supabase
+      .from('whatsapp_chat_context')
+      .select('context_data')
+      .eq('group_jid', groupJid)
+      .eq('account_id', account.id)
+      .eq('context_type', 'feedback_update')
+      .single();
+
+    if (!ctxData?.context_data) {
+      return `ℹ️ Nenhum feedback pendente de atualização.\n\nEnvie *#feedback* seguido do relatório para registrar.`;
+    }
+
+    const ctx = ctxData.context_data;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Re-send the original message with force_update = true
+    const feedbackResponse = await fetch(`${supabaseUrl}/functions/v1/process-feedback`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({
+        mensagem_original: ctx.original_message,
+        account_id: account.id,
+        id_grupo: groupJid,
+        numero_grupo: groupJid,
+        telefone_origem: null,
+        nome_origem: ctx.sender_name || senderName,
+        usuario_origem: ctx.sender_name || senderName,
+        force_update: true,
+      }),
+    });
+
+    const feedbackResult = await feedbackResponse.json();
+
+    // Clean up context
+    await supabase
+      .from('whatsapp_chat_context')
+      .delete()
+      .eq('group_jid', groupJid)
+      .eq('account_id', account.id)
+      .eq('context_type', 'feedback_update');
+
+    if (!feedbackResponse.ok || !feedbackResult.success) {
+      return `⚠️ Erro ao atualizar feedback: ${feedbackResult.error || "erro desconhecido"}`;
+    }
+
+    let msg = `✅ *Feedback atualizado com sucesso!*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `🏢 Conta: *${account.nome_cliente}*\n`;
+
+    const periodLabel = feedbackResult.data_inicio === feedbackResult.data_fim
+      ? feedbackResult.data_inicio?.split('-').reverse().join('/')
+      : `${feedbackResult.data_inicio?.split('-').reverse().join('/')} a ${feedbackResult.data_fim?.split('-').reverse().join('/')}`;
+
+    msg += `📅 Período: *${periodLabel}*\n`;
+
+    if (feedbackResult.campanhas_count > 0) {
+      msg += `\n📊 *${feedbackResult.campanhas_count} campanha(s) atualizada(s):*\n`;
+      if (feedbackResult.campanhas && Array.isArray(feedbackResult.campanhas)) {
+        for (const c of feedbackResult.campanhas) {
+          msg += `   • ${c.nome}${c.recebidos ? ` — ${c.recebidos} recebidos` : ""}\n`;
+        }
+      }
+    }
+
+    if (feedbackResult.meta_total_leads != null) {
+      msg += `\n📈 Total de Leads (Meta): *${feedbackResult.meta_total_leads}*\n`;
+    }
+
+    msg += `\n💡 Use *#funil* para ver o funil consolidado.`;
+    return msg;
+  } catch (err) {
+    console.error("[whatsapp-webhook] Feedback update error:", err);
+    return `⚠️ Erro ao atualizar feedback. Tente novamente.`;
+  }
+}
+
 async function handleFunil(account: any, supabase: any): Promise<string> {
   const thirtyDaysAgo = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
