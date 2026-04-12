@@ -74,9 +74,8 @@ export default function Dashboard() {
 
 /* ── Global aggregated view ── */
 
-function GlobalDashboardView({ period }: { period: string }) {
+function GlobalDashboardView({ period, refreshKey, onRefreshingChange }: { period: string; refreshKey: number; onRefreshingChange: (v: boolean) => void }) {
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [aggregatedMetrics, setAggregatedMetrics] = useState<MetaAccountMetrics | null>(null);
   const [allCampaigns, setAllCampaigns] = useState<MetaCampaign[]>([]);
   const [funnelData, setFunnelData] = useState<{
