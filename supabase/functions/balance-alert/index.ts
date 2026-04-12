@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
         try {
           const payload = {
             number: acc.id_grupo,
-            textMessage: { text: message },
+            text: message,
           };
           console.log(`[balance-alert] Sending to ${acc.nome_cliente}, group: ${acc.id_grupo}, payload keys:`, Object.keys(payload), 'text length:', message.length);
 
