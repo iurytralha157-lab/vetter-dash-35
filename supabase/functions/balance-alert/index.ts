@@ -121,8 +121,8 @@ Deno.serve(async (req) => {
           alerts.push({ account: acc.nome_cliente, type: alertType, message: `error: ${sendErr}` });
         }
 
-        // Small delay between messages to avoid rate limiting
-        await new Promise(r => setTimeout(r, 500));
+        // Delay entre mensagens para evitar bloqueio do WhatsApp
+        await new Promise(r => setTimeout(r, 2000));
       }
     }
 
