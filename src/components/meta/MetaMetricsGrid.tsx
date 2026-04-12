@@ -94,7 +94,11 @@ export function MetaMetricsGrid({ metrics, loading, balance }: MetaMetricsGridPr
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium text-muted-foreground">
-              {balance?.is_prepay_account ? 'Fundos Disponíveis' : 'Saldo Devedor'}
+              {balance?.funds_amount !== null && balance?.funds_amount !== undefined
+                ? 'Fundos'
+                : balance?.is_prepay_account
+                  ? 'Saldo Pré-pago'
+                  : 'Saldo Devedor'}
             </p>
             <div className={`p-2 rounded-lg ${hasPaymentIssue ? 'bg-red-500/10' : 'bg-emerald-500/10 dark:bg-emerald-500/20'}`}>
               {hasPaymentIssue 
@@ -112,6 +116,21 @@ export function MetaMetricsGrid({ metrics, loading, balance }: MetaMetricsGridPr
           }`}>
             {balance ? formatCurrency(balance.balance) : 'R$ —'}
           </p>
+          {/* Show raw balance (saldo devedor) when funds exist and there's also a debt */}
+          {balance?.funds_amount !== null && balance?.funds_amount !== undefined && balance?.balance_raw > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Saldo devedor: {formatCurrency(balance.balance_raw)}
+            </p>
+          )}
+          {balance?.funding_source_type && !hasPaymentIssue && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {balance.funding_source_type === 'credit_card' ? '💳 Cartão' 
+                : balance.funding_source_type === 'pix' ? '📱 PIX'
+                : balance.funding_source_type === 'boleto' ? '📄 Boleto'
+                : balance.funding_source_type === 'funds' ? '💰 Fundos'
+                : ''}
+            </p>
+          )}
           {hasPaymentIssue && (
             <Badge variant="destructive" className="mt-2 text-xs">Problema pagamento</Badge>
           )}
