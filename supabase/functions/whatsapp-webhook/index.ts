@@ -554,6 +554,8 @@ async function handleCampanhas(account: any, supabase: any, periodArg: string | 
             period_label: periodLabel,
             status_filter: statusFilter,
           },
+          instance_name: instanceName,
+          expiry_notified: false,
           created_at: new Date().toISOString(),
           expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         }, { onConflict: 'group_jid,account_id,context_type' });
