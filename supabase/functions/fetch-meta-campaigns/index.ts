@@ -340,6 +340,13 @@ Deno.serve(async (req) => {
       account_id: formattedAccountId,
       campaigns: campaignsWithInsights,
       account_metrics: accountMetrics,
+      account_balance: accountInfo ? {
+        balance: parseFloat(accountInfo.balance || '0') / 100, // Meta returns in cents
+        amount_spent: parseFloat(accountInfo.amount_spent || '0') / 100,
+        spend_cap: accountInfo.spend_cap ? parseFloat(accountInfo.spend_cap) / 100 : null,
+        currency: accountInfo.currency || 'BRL',
+        account_name: accountInfo.name || null,
+      } : null,
       fetched_at: new Date().toISOString()
     };
 
