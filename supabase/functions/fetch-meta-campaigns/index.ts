@@ -146,6 +146,11 @@ Deno.serve(async (req) => {
     
     console.log('Date config:', { since, until, period, datePreset });
 
+    // Fetch account info (balance, amount_spent, spend_cap)
+    const accountInfoUrl = `${META_BASE_URL}/${formattedAccountId}?fields=balance,amount_spent,spend_cap,currency,name&access_token=${accessToken}`;
+    console.log('Fetching account info from Meta API...');
+    const accountInfoPromise = fetch(accountInfoUrl);
+
     // Fetch campaigns
     const campaignsUrl = `${META_BASE_URL}/${formattedAccountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget&access_token=${accessToken}`;
     
@@ -160,6 +165,20 @@ Deno.serve(async (req) => {
 
     const campaignsData = await campaignsResponse.json();
     console.log('Campaigns fetched:', campaignsData.data?.length || 0);
+
+    // Process account info (balance)
+    let accountInfo: any = null;
+    try {
+      const accountInfoResponse = await accountInfoPromise;
+      if (accountInfoResponse.ok) {
+        accountInfo = await accountInfoResponse.json();
+        console.log('Account info:', JSON.stringify({ balance: accountInfo.balance, amount_spent: accountInfo.amount_spent, spend_cap: accountInfo.spend_cap, currency: accountInfo.currency }));
+      } else {
+        console.warn('Failed to fetch account info:', await accountInfoResponse.text());
+      }
+    } catch (e) {
+      console.warn('Error fetching account info:', e);
+    }
 
     // Fetch account-level insights
     // Use date_preset for supported periods, otherwise use time_range
@@ -321,6 +340,13 @@ Deno.serve(async (req) => {
       account_id: formattedAccountId,
       campaigns: campaignsWithInsights,
       account_metrics: accountMetrics,
+      account_balance: accountInfo ? {
+        balance: parseFloat(accountInfo.balance || '0') / 100, // Meta returns in cents
+        amount_spent: parseFloat(accountInfo.amount_spent || '0') / 100,
+        spend_cap: accountInfo.spend_cap ? parseFloat(accountInfo.spend_cap) / 100 : null,
+        currency: accountInfo.currency || 'BRL',
+        account_name: accountInfo.name || null,
+      } : null,
       fetched_at: new Date().toISOString()
     };
 

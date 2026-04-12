@@ -18,7 +18,7 @@ import { MetaCampaignDetailDialog } from "@/components/meta/MetaCampaignDetailDi
 import { MetaStatusBadge } from "@/components/meta/MetaStatusBadge";
 import { ModernAccountForm } from "@/components/forms/ModernAccountForm";
 import { metaAdsService } from "@/services/metaAdsService";
-import type { MetaAdsResponse, MetaCampaign, MetaAccountMetrics } from "@/types/meta";
+import type { MetaAdsResponse, MetaCampaign, MetaAccountMetrics, MetaAccountBalance } from "@/types/meta";
 import {
   ArrowLeft, ExternalLink, RefreshCw, FolderOpen, Building2, Mail, Phone,
   User, Check, X, BarChart3, Link2, TrendingUp, AlertCircle, Instagram,
@@ -54,7 +54,7 @@ export default function ClientDetailPage() {
   const [resp, setResp] = useState<MetaAdsResponse | null>(null);
   const [metrics, setMetrics] = useState<MetaAccountMetrics | null>(null);
   const [campaigns, setCampaigns] = useState<MetaCampaign[]>([]);
-
+  const [accountBalance, setAccountBalance] = useState<MetaAccountBalance | null>(null);
   const [clientDriveUrl, setClientDriveUrl] = useState<string | null>(null);
   const [metaAccountId, setMetaAccountId] = useState<string | null>(null);
   const [accountData, setAccountData] = useState<any>(null);
@@ -92,6 +92,7 @@ export default function ClientDetailPage() {
       setResp(data);
       setMetrics(data.account_metrics || null);
       setCampaigns(Array.isArray(data.campaigns) ? data.campaigns : []);
+      setAccountBalance(data.account_balance || null);
       setLastFetchTime(Date.now());
     } catch (error: any) {
       toast({ title: "Erro ao buscar Meta Ads", description: error.message, variant: "destructive" });
@@ -221,7 +222,43 @@ export default function ClientDetailPage() {
           </div>
         </div>
 
-        {/* KPIs Cards */}
+        {/* Saldo em Tempo Real + KPIs */}
+        {accountBalance && (
+          <Card className="border-emerald-200 dark:border-emerald-800 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
+                    <DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">Saldo da Conta Meta (tempo real)</p>
+                    <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+                      {currency(accountBalance.balance)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-6 text-sm">
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Total Gasto</p>
+                    <p className="font-semibold">{currency(accountBalance.amount_spent)}</p>
+                  </div>
+                  {accountBalance.spend_cap !== null && accountBalance.spend_cap > 0 && (
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">Limite</p>
+                      <p className="font-semibold">{currency(accountBalance.spend_cap)}</p>
+                    </div>
+                  )}
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Moeda</p>
+                    <p className="font-semibold">{accountBalance.currency}</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardContent className="p-6">
             <MetaMetricsGrid metrics={metrics} loading={loading} />
