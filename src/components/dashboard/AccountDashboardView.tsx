@@ -37,9 +37,10 @@ const mapPeriod = (p: string): MetaPeriod => {
 interface AccountDashboardViewProps {
   accountId: string;
   period: string;
+  customRange?: { from: Date; to: Date };
 }
 
-export function AccountDashboardView({ accountId, period }: AccountDashboardViewProps) {
+export function AccountDashboardView({ accountId, period, customRange }: AccountDashboardViewProps) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [metrics, setMetrics] = useState<MetaAccountMetrics | null>(null);
@@ -79,7 +80,7 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
       metaAdsService.clearCache(`${metaAccountId}_${metaPeriod}`);
     }
     try {
-      const data = await metaAdsService.fetchMetaCampaigns(metaAccountId, metaPeriod);
+      const data = await metaAdsService.fetchMetaCampaigns(metaAccountId, metaPeriod, metaPeriod === 'custom' ? customRange : undefined);
       if (data?.success) {
         setMetrics(data.account_metrics || null);
         setCampaigns(Array.isArray(data.campaigns) ? data.campaigns : []);
@@ -95,7 +96,7 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
 
   useEffect(() => {
     if (metaAccountId) fetchMeta();
-  }, [metaAccountId, metaPeriod]);
+  }, [metaAccountId, metaPeriod, customRange]);
 
   useEffect(() => {
     const loadFunnel = async () => {

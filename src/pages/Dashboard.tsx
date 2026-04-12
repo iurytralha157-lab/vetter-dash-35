@@ -35,6 +35,7 @@ const formatNumber = (value: number) => {
 export default function Dashboard() {
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [period, setPeriod] = useState<UnifiedPeriod>("last_7d");
+  const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | undefined>();
   const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -48,7 +49,7 @@ export default function Dashboard() {
             <AccountSelector value={selectedAccount} onValueChange={setSelectedAccount} />
           </div>
           <div className="flex items-center gap-2">
-            <UnifiedPeriodFilter value={period} onChange={(v) => setPeriod(v)} />
+            <UnifiedPeriodFilter value={period} customRange={customRange} onChange={(v, cr) => { setPeriod(v); setCustomRange(cr); }} />
             <Button
               variant="outline"
               size="sm"
@@ -63,9 +64,9 @@ export default function Dashboard() {
         </div>
 
         {selectedAccount ? (
-          <AccountDashboardView accountId={selectedAccount} period={period} />
+          <AccountDashboardView accountId={selectedAccount} period={period} customRange={customRange} />
         ) : (
-          <GlobalDashboardView period={period} refreshKey={refreshKey} onRefreshingChange={setRefreshing} />
+          <GlobalDashboardView period={period} customRange={customRange} refreshKey={refreshKey} onRefreshingChange={setRefreshing} />
         )}
       </div>
     </AppLayout>
@@ -74,7 +75,7 @@ export default function Dashboard() {
 
 /* ── Global aggregated view ── */
 
-function GlobalDashboardView({ period, refreshKey, onRefreshingChange }: { period: string; refreshKey: number; onRefreshingChange: (v: boolean) => void }) {
+function GlobalDashboardView({ period, customRange, refreshKey, onRefreshingChange }: { period: string; customRange?: { from: Date; to: Date }; refreshKey: number; onRefreshingChange: (v: boolean) => void }) {
   const [loading, setLoading] = useState(true);
   const [aggregatedMetrics, setAggregatedMetrics] = useState<MetaAccountMetrics | null>(null);
   const [allCampaigns, setAllCampaigns] = useState<MetaCampaign[]>([]);
@@ -115,7 +116,7 @@ function GlobalDashboardView({ period, refreshKey, onRefreshingChange }: { perio
             if (forceRefresh) {
               metaAdsService.clearCache(`${acc.meta_account_id}_${metaPeriod}`);
             }
-            const data = await metaAdsService.fetchMetaCampaigns(acc.meta_account_id!, metaPeriod);
+            const data = await metaAdsService.fetchMetaCampaigns(acc.meta_account_id!, metaPeriod, metaPeriod === 'custom' ? customRange : undefined);
             if (data?.success) {
               return {
                 accountId: acc.id,
@@ -219,7 +220,7 @@ function GlobalDashboardView({ period, refreshKey, onRefreshingChange }: { perio
 
   useEffect(() => {
     fetchAll(refreshKey > 0);
-  }, [metaPeriod, refreshKey]);
+  }, [metaPeriod, refreshKey, customRange]);
 
   const orderedCampaigns = useMemo(() => {
     return [...allCampaigns].sort((a, b) => {
