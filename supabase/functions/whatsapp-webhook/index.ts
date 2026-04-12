@@ -131,6 +131,9 @@ async function processCommand(
       responseText = await handleFunil(account, supabase);
     } else if (cmd === "#campanhas") {
       responseText = await handleCampanhas(account, supabase);
+    } else if (cmd === "#relatorio") {
+      // Send individual reports for each active campaign with delay
+      return await handleRelatorioAll(account, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
     } else if (cmd.startsWith("#campanha")) {
       const num = parseInt(cmd.replace("#campanha", "").trim());
       responseText = await handleCampanhaDetail(account, num, supabase);
