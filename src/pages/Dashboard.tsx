@@ -35,6 +35,8 @@ const formatNumber = (value: number) => {
 export default function Dashboard() {
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [period, setPeriod] = useState<UnifiedPeriod>("last_7d");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   return (
     <AppLayout>
@@ -47,13 +49,23 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
             <UnifiedPeriodFilter value={period} onChange={(v) => setPeriod(v)} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setRefreshKey((k) => k + 1); }}
+              disabled={refreshing}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              Atualizar
+            </Button>
           </div>
         </div>
 
         {selectedAccount ? (
           <AccountDashboardView accountId={selectedAccount} period={period} />
         ) : (
-          <GlobalDashboardView period={period} />
+          <GlobalDashboardView period={period} refreshKey={refreshKey} onRefreshingChange={setRefreshing} />
         )}
       </div>
     </AppLayout>
@@ -62,9 +74,8 @@ export default function Dashboard() {
 
 /* ── Global aggregated view ── */
 
-function GlobalDashboardView({ period }: { period: string }) {
+function GlobalDashboardView({ period, refreshKey, onRefreshingChange }: { period: string; refreshKey: number; onRefreshingChange: (v: boolean) => void }) {
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [aggregatedMetrics, setAggregatedMetrics] = useState<MetaAccountMetrics | null>(null);
   const [allCampaigns, setAllCampaigns] = useState<MetaCampaign[]>([]);
   const [funnelData, setFunnelData] = useState<{
@@ -78,7 +89,7 @@ function GlobalDashboardView({ period }: { period: string }) {
 
   const fetchAll = async (forceRefresh = false) => {
     setLoading(true);
-    if (forceRefresh) setRefreshing(true);
+    if (forceRefresh) onRefreshingChange(true);
 
     try {
       // 1. Get all active accounts with Meta
@@ -93,7 +104,7 @@ function GlobalDashboardView({ period }: { period: string }) {
         setAggregatedMetrics(null);
         setAllCampaigns([]);
         setLoading(false);
-        setRefreshing(false);
+        onRefreshingChange(false);
         return;
       }
 
@@ -202,13 +213,13 @@ function GlobalDashboardView({ period }: { period: string }) {
       console.error("Failed to load global dashboard:", err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
+      onRefreshingChange(false);
     }
   };
 
   useEffect(() => {
-    fetchAll();
-  }, [metaPeriod]);
+    fetchAll(refreshKey > 0);
+  }, [metaPeriod, refreshKey]);
 
   const orderedCampaigns = useMemo(() => {
     return [...allCampaigns].sort((a, b) => {
@@ -285,19 +296,6 @@ function GlobalDashboardView({ period }: { period: string }) {
 
   return (
     <div className="space-y-6">
-      {/* Refresh */}
-      <div className="flex justify-end">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => fetchAll(true)}
-          disabled={refreshing}
-          className="gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          Atualizar
-        </Button>
-      </div>
 
       {/* Aggregated KPIs */}
       <Card>
