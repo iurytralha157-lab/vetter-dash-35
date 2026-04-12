@@ -342,17 +342,35 @@ Deno.serve(async (req) => {
       account_metrics: accountMetrics,
       account_balance: accountInfo ? (() => {
         // Parse available balance from funding_source_details.display_string
-        // e.g. "Saldo disponível (R$752,95 BRL)"
-        let availableBalance: number | null = null;
+        // e.g. "Saldo disponível (R$752,95 BRL)" or "Fundos (R$1.880,41 BRL)"
+        let fundsAmount: number | null = null;
         const displayString = accountInfo.funding_source_details?.display_string || '';
         const balanceMatch = displayString.match(/R\$\s?([\d.,]+)/);
         if (balanceMatch) {
-          // Convert "752,95" → 752.95
-          availableBalance = parseFloat(balanceMatch[1].replace(/\./g, '').replace(',', '.'));
+          fundsAmount = parseFloat(balanceMatch[1].replace(/\./g, '').replace(',', '.'));
         }
 
+        // balance_raw = Meta's raw balance field (saldo devedor for post-pay, remaining for pre-pay)
+        const balanceRaw = parseFloat(accountInfo.balance || '0') / 100;
+        
+        // Determine funding source type from details
+        const fundingType = accountInfo.funding_source_details?.type;
+        let fundingSourceType: string | null = null;
+        if (fundingType === 1) fundingSourceType = 'credit_card';
+        else if (fundingType === 2) fundingSourceType = 'debit_card';
+        else if (fundingType === 4) fundingSourceType = 'funds'; // prepaid funds
+        else if (fundingType === 7) fundingSourceType = 'boleto';
+        else if (fundingType === 12) fundingSourceType = 'pix';
+        else if (displayString.toLowerCase().includes('fundo')) fundingSourceType = 'funds';
+        else if (displayString.toLowerCase().includes('mastercard') || displayString.toLowerCase().includes('visa')) fundingSourceType = 'credit_card';
+
+        // For display: if funds exist, show funds. Otherwise show raw balance.
+        const displayBalance = fundsAmount ?? balanceRaw;
+
         return {
-          balance: availableBalance ?? (parseFloat(accountInfo.balance || '0') / 100),
+          balance: displayBalance,
+          balance_raw: balanceRaw,
+          funds_amount: fundsAmount,
           amount_spent: parseFloat(accountInfo.amount_spent || '0') / 100,
           spend_cap: accountInfo.spend_cap ? parseFloat(accountInfo.spend_cap) / 100 : null,
           currency: accountInfo.currency || 'BRL',
@@ -361,6 +379,7 @@ Deno.serve(async (req) => {
           disable_reason: accountInfo.disable_reason || null,
           is_prepay_account: accountInfo.is_prepay_account || false,
           funding_source_details: accountInfo.funding_source_details || null,
+          funding_source_type: fundingSourceType,
         };
       })() : null,
       fetched_at: new Date().toISOString()
