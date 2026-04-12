@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { UnifiedPeriodFilter, type UnifiedPeriod } from "@/components/ui/unified-period-filter";
 import { AccountSelector } from "@/components/dashboard/AccountSelector";
 import { AccountDashboardView } from "@/components/dashboard/AccountDashboardView";
@@ -40,13 +39,16 @@ export default function Dashboard() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <PageHeader
-          title="Dashboard"
-          breadcrumb="Visão Geral"
-          subtitle="Desempenho de campanhas"
-          filters={<AccountSelector value={selectedAccount} onValueChange={setSelectedAccount} />}
-          actions={<UnifiedPeriodFilter value={period} onChange={(v) => setPeriod(v)} />}
-        />
+        {/* Compact header: Title + Account + Period on one line */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+            <AccountSelector value={selectedAccount} onValueChange={setSelectedAccount} />
+          </div>
+          <div className="flex items-center gap-2">
+            <UnifiedPeriodFilter value={period} onChange={(v) => setPeriod(v)} />
+          </div>
+        </div>
 
         {selectedAccount ? (
           <AccountDashboardView accountId={selectedAccount} period={period} />
