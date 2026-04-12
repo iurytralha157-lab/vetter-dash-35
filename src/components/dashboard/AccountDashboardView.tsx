@@ -25,7 +25,7 @@ const formatNumber = (value: number) => new Intl.NumberFormat('pt-BR').format(Ma
 
 const mapPeriod = (p: string): MetaPeriod => {
   // If already a MetaPeriod value, return as-is
-  const validPeriods: MetaPeriod[] = ['today', 'yesterday', 'last_7d', 'last_15d', 'last_30d', 'this_month', 'last_month', 'this_quarter', 'this_year'];
+  const validPeriods: MetaPeriod[] = ['today', 'yesterday', 'last_7d', 'last_15d', 'last_30d', 'this_month', 'last_month', 'this_quarter', 'this_year', 'custom' as MetaPeriod];
   if (validPeriods.includes(p as MetaPeriod)) return p as MetaPeriod;
   // Legacy mapping
   if (p === "7d") return "last_7d";
