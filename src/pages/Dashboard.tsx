@@ -15,7 +15,7 @@ import { metaAdsService } from "@/services/metaAdsService";
 import { fetchCampanhaFunnel, type FunnelTotals } from "@/services/feedbackCampanhaService";
 import { supabase } from "@/integrations/supabase/client";
 import type { MetaCampaign, MetaAccountMetrics } from "@/types/meta";
-import type { MetaPeriod } from "@/components/meta/MetaPeriodFilter";
+import { type MetaPeriod } from "@/components/meta/MetaPeriodFilter";
 import {
   Activity, Target, Eye, AlertCircle, RefreshCw,
 } from "lucide-react";
