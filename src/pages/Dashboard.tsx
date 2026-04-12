@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { PeriodSelector, Period } from "@/components/dashboard/PeriodSelector";
+import { UnifiedPeriodFilter, type UnifiedPeriod } from "@/components/ui/unified-period-filter";
 import { AccountSelector } from "@/components/dashboard/AccountSelector";
 import { AccountDashboardView } from "@/components/dashboard/AccountDashboardView";
 import { MetaMetricsGrid } from "@/components/meta/MetaMetricsGrid";
@@ -33,18 +33,9 @@ const formatNumber = (value: number) => {
   return Math.round(value).toString();
 };
 
-const mapPeriod = (p: string): MetaPeriod => {
-  if (p === "today") return "today";
-  if (p === "yesterday") return "yesterday";
-  if (p === "7d") return "last_7d";
-  if (p === "15d") return "last_15d";
-  if (p === "30d") return "this_month";
-  return "last_7d";
-};
-
 export default function Dashboard() {
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
-  const [period, setPeriod] = useState<Period>("30d");
+  const [period, setPeriod] = useState<UnifiedPeriod>("last_7d");
 
   return (
     <AppLayout>
@@ -54,7 +45,7 @@ export default function Dashboard() {
           breadcrumb="Visão Geral"
           subtitle="Desempenho de campanhas"
           filters={<AccountSelector value={selectedAccount} onValueChange={setSelectedAccount} />}
-          actions={<PeriodSelector value={period} onValueChange={setPeriod} />}
+          actions={<UnifiedPeriodFilter value={period} onChange={(v) => setPeriod(v)} />}
         />
 
         {selectedAccount ? (
@@ -81,7 +72,7 @@ function GlobalDashboardView({ period }: { period: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<MetaCampaign | null>(null);
 
-  const metaPeriod = mapPeriod(period);
+  const metaPeriod = period as MetaPeriod;
 
   const fetchAll = async (forceRefresh = false) => {
     setLoading(true);
