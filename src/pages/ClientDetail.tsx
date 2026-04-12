@@ -54,7 +54,7 @@ export default function ClientDetailPage() {
   const [resp, setResp] = useState<MetaAdsResponse | null>(null);
   const [metrics, setMetrics] = useState<MetaAccountMetrics | null>(null);
   const [campaigns, setCampaigns] = useState<MetaCampaign[]>([]);
-
+  const [accountBalance, setAccountBalance] = useState<MetaAccountBalance | null>(null);
   const [clientDriveUrl, setClientDriveUrl] = useState<string | null>(null);
   const [metaAccountId, setMetaAccountId] = useState<string | null>(null);
   const [accountData, setAccountData] = useState<any>(null);
