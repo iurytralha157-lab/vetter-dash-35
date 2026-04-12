@@ -17,6 +17,7 @@ import { MetaCampaignTable } from "@/components/meta/MetaCampaignTable";
 import { MetaCampaignDetailDialog } from "@/components/meta/MetaCampaignDetailDialog";
 import { MetaStatusBadge } from "@/components/meta/MetaStatusBadge";
 import { ModernAccountForm } from "@/components/forms/ModernAccountForm";
+import { buildManagedAccountUpdate, updateAccount } from "@/services/accountsService";
 import { metaAdsService } from "@/services/metaAdsService";
 import type { MetaAdsResponse, MetaCampaign, MetaAccountMetrics, MetaAccountBalance } from "@/types/meta";
 import {
@@ -568,38 +569,7 @@ export default function ClientDetailPage() {
             onOpenChange={setEditModalOpen}
             onSubmit={async (data) => {
               try {
-                // Helper para converter strings vazias em null para campos de data
-                const toDateOrNull = (val: any) => (val && val !== "" ? val : null);
-                const toStringOrNull = (val: any) => (val && val !== "" ? val : null);
-                
-                const { error } = await supabase
-                  .from("accounts")
-                  .update({
-                    nome_cliente: data.nome_cliente,
-                    telefone: data.telefone || '',
-                    email: toStringOrNull(data.email),
-                    link_drive: toStringOrNull(data.link_drive),
-                    id_grupo: toStringOrNull(data.id_grupo),
-                    canais: data.canais,
-                    canal_relatorio: 'WhatsApp',
-                    horario_relatorio: toStringOrNull(data.horario_relatorio),
-                    notificacao_saldo_baixo: data.notificacao_saldo_baixo,
-                    notificacao_erro_sync: data.notificacao_erro_sync,
-                    usa_meta_ads: data.usa_meta_ads,
-                    meta_account_id: toStringOrNull(data.meta_account_id),
-                    meta_business_id: toStringOrNull(data.meta_business_id),
-                    meta_page_id: toStringOrNull(data.meta_page_id),
-                    modo_saldo_meta: data.modo_saldo_meta,
-                    saldo_meta: data.saldo_meta,
-                    alerta_saldo_baixo: data.alerta_saldo_baixo,
-                    budget_mensal_meta: data.budget_mensal_meta,
-                    usa_google_ads: data.usa_google_ads,
-                    google_ads_id: toStringOrNull(data.google_ads_id),
-                    budget_mensal_google: data.budget_mensal_google,
-                  })
-                  .eq("id", id);
-
-                if (error) throw error;
+                await updateAccount(id!, buildManagedAccountUpdate(data));
 
                 toast({
                   title: "Sucesso",
