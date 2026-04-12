@@ -30,11 +30,20 @@ export interface MetaAccountMetrics {
   total_conversions: number;
 }
 
+export interface MetaAccountBalance {
+  balance: number;
+  amount_spent: number;
+  spend_cap: number | null;
+  currency: string;
+  account_name: string | null;
+}
+
 export interface MetaAdsResponse {
   success: boolean;
   account_id: string;
   campaigns: MetaCampaign[];
   account_metrics: MetaAccountMetrics | null;
+  account_balance: MetaAccountBalance | null;
   fetched_at: string;
   error?: string;
   error_code?: string;
