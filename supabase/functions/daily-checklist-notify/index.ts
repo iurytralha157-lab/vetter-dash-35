@@ -27,7 +27,9 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { type = 'morning_reminder' } = await req.json().catch(() => ({}));
-    const today = new Date().toISOString().split('T')[0];
+    // Usar horário de Brasília (UTC-3)
+    const nowBRT = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const today = `${nowBRT.getFullYear()}-${String(nowBRT.getMonth() + 1).padStart(2, '0')}-${String(nowBRT.getDate()).padStart(2, '0')}`;
 
     console.log(`Processando notificação: ${type} para data ${today}`);
 
