@@ -222,95 +222,19 @@ export default function ClientDetailPage() {
           </div>
         </div>
 
-        {/* Saldo em Tempo Real + Status de Pagamento */}
-        {accountBalance && (() => {
-          const statusMap: Record<number, { label: string; color: string }> = {
-            1: { label: 'Ativa', color: 'text-emerald-600' },
-            2: { label: 'Desativada', color: 'text-destructive' },
-            3: { label: 'Inadimplente', color: 'text-destructive' },
-            7: { label: 'Revisão de Risco', color: 'text-amber-600' },
-            9: { label: 'Período de Carência', color: 'text-amber-600' },
-            100: { label: 'Fechamento Pendente', color: 'text-destructive' },
-            101: { label: 'Fechada', color: 'text-muted-foreground' },
-          };
-          const disableReasonMap: Record<number, string> = {
-            0: 'Nenhum',
-            1: 'Política de Integridade',
-            2: 'Revisão de IP',
-            3: 'Problema de Pagamento',
-            4: 'Conta Encerrada',
-            5: 'Revisão AFC',
-            6: 'Integridade do Negócio',
-            7: 'Fechamento Permanente',
-          };
-          const st = statusMap[accountBalance.account_status || 1] || { label: 'Desconhecido', color: 'text-muted-foreground' };
-          const hasPaymentIssue = accountBalance.account_status === 3 || accountBalance.account_status === 9 || accountBalance.disable_reason === 3;
-          const isPrepay = accountBalance.is_prepay_account;
-          const fundingType = accountBalance.funding_source_details?.display_string || (isPrepay ? 'Pré-pago' : 'Cartão/Pós-pago');
-
-          const borderClass = hasPaymentIssue
-            ? 'border-destructive/50 bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30'
-            : 'border-emerald-200 dark:border-emerald-800 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30';
-
-          return (
-            <Card className={borderClass}>
-              <CardContent className="p-4">
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${hasPaymentIssue ? 'bg-red-100 dark:bg-red-900' : 'bg-emerald-100 dark:bg-emerald-900'}`}>
-                        {hasPaymentIssue ? <ShieldAlert className="h-5 w-5 text-destructive" /> : <DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground font-medium">Saldo Disponível (tempo real)</p>
-                        <p className={`text-2xl font-bold ${hasPaymentIssue ? 'text-destructive' : 'text-emerald-700 dark:text-emerald-400'}`}>
-                          {currency(accountBalance.balance)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-6 text-sm">
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Total Gasto</p>
-                        <p className="font-semibold">{currency(accountBalance.amount_spent)}</p>
-                      </div>
-                      {accountBalance.spend_cap !== null && accountBalance.spend_cap > 0 && (
-                        <div className="text-right">
-                          <p className="text-xs text-muted-foreground">Limite</p>
-                          <p className="font-semibold">{currency(accountBalance.spend_cap)}</p>
-                        </div>
-                      )}
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Status</p>
-                        <div className="flex items-center gap-1">
-                          {hasPaymentIssue ? (
-                            <AlertTriangle className="h-3 w-3 text-destructive" />
-                          ) : (
-                            <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                          )}
-                          <p className={`font-semibold text-xs ${st.color}`}>{st.label}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Alerta de problema de pagamento */}
-                  {hasPaymentIssue && (
-                    <div className="flex items-center gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
-                      <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
-                      <p className="text-sm text-destructive font-medium">
-                        ⚠️ Problema de pagamento detectado: {disableReasonMap[accountBalance.disable_reason || 0] || 'Verificar no Gerenciador de Anúncios'}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })()}
+        {/* Payment issue alert - only shown when there's a problem */}
+        {accountBalance && (accountBalance.account_status === 3 || accountBalance.account_status === 9 || accountBalance.disable_reason === 3) && (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+            <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+            <p className="text-sm text-destructive font-medium">
+              ⚠️ Problema de pagamento detectado — verificar no Gerenciador de Anúncios
+            </p>
+          </div>
+        )}
 
         <Card>
           <CardContent className="p-6">
-            <MetaMetricsGrid metrics={metrics} loading={loading} />
+            <MetaMetricsGrid metrics={metrics} loading={loading} balance={accountBalance} />
           </CardContent>
         </Card>
 
