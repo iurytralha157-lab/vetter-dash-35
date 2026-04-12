@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
 
       if (message && acc.id_grupo) {
         try {
-          const groupJid = acc.id_grupo!.includes('@') ? acc.id_grupo! : `${acc.id_grupo}@g.us`;
+          const groupJid = acc.id_grupo!.includes('@') ? acc.id_grupo! : acc.id_grupo!.replace('-group', '@g.us');
           const payload = {
             number: groupJid,
             text: message,
