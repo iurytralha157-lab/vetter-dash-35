@@ -749,7 +749,8 @@ function getHelpText(clientName: string): string {
     `💸 *#gasto* — Investimento por período\n` +
     `   Ex: #gasto 7, #gasto 30, #gasto março\n\n` +
     `📊 *#campanhas* — Lista campanhas\n` +
-    `📋 *#campanha{N}* — Detalhes da campanha N\n\n` +
+    `📋 *#campanha{N}* — Relatório da campanha N\n` +
+    `📑 *#relatorio* — Relatório de todas as campanhas\n\n` +
     `👥 *#leads* — Resumo de leads\n` +
     `👥 *#leads{N}* — Leads da campanha N\n\n` +
     `📊 *#resumo* — Resumo geral\n` +
