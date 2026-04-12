@@ -43,38 +43,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Generate hash
+    // Generate base hash
     const encoder = new TextEncoder();
     const data = encoder.encode(mensagem_original.trim().toLowerCase());
     const hashBuffer = await crypto.subtle.digest("SHA-256", data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const mensagem_hash = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+    const baseHash = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
 
-    // Check for duplicates
+    // Check for duplicates using base hash prefix
     const { data: existing } = await supabase
       .from("feedback_funnel")
       .select("id")
-      .eq("mensagem_hash", mensagem_hash)
+      .like("mensagem_hash", `${baseHash}%`)
+      .limit(1)
       .maybeSingle();
 
     if (existing) {
-      await supabase.from("feedback_funnel").insert({
-        mensagem_original: mensagem_original.trim(),
-        mensagem_hash,
-        duplicado: true,
-        processamento_status: "duplicado",
-        account_id: account_id || null,
-        cliente_id: cliente_id || null,
-        id_grupo: id_grupo || null,
-        numero_grupo: numero_grupo || null,
-        telefone_origem: telefone_origem || null,
-        nome_origem: nome_origem || null,
-        usuario_origem: usuario_origem || null,
-        hashtag: "followup",
-        origem: "whatsapp_grupo",
-      });
-
-      return new Response(JSON.stringify({ success: true, duplicado: true }), {
+      return new Response(JSON.stringify({ success: true, duplicado: true, leads_count: 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -82,7 +67,6 @@ Deno.serve(async (req) => {
     // Shared metadata for all records
     const sharedFields = {
       mensagem_original: mensagem_original.trim(),
-      mensagem_hash,
       duplicado: false,
       account_id: account_id || null,
       cliente_id: cliente_id || null,
@@ -98,7 +82,7 @@ Deno.serve(async (req) => {
     // Call AI to interpret the message - try multi-lead first
     let aiResults: any[] = [];
     let aiModel = "google/gemini-3-flash-preview";
-    let promptVersion = "v2";
+    let promptVersion = "v3";
     let processamentoStatus = "pendente";
     let processamentoErro: string | null = null;
 
@@ -120,6 +104,7 @@ Deno.serve(async (req) => {
     if (aiResults.length === 0) {
       const { error: insertError } = await supabase.from("feedback_funnel").insert({
         ...sharedFields,
+        mensagem_hash: baseHash,
         processamento_status: processamentoStatus,
         processamento_erro: processamentoErro,
         ai_modelo: aiModel,
@@ -144,12 +129,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Insert one record per lead
+    // Insert one record per lead - each with a unique hash (baseHash_0, baseHash_1, etc.)
     const insertedLeads: any[] = [];
-    for (const leadResult of aiResults) {
+    for (let i = 0; i < aiResults.length; i++) {
+      const leadResult = aiResults[i];
       const sanitized = sanitizeAIResult(leadResult);
+      // Generate unique hash per lead by appending index
+      const uniqueHash = aiResults.length === 1 ? baseHash : `${baseHash}_${i}`;
+      
       const { error: insertError } = await supabase.from("feedback_funnel").insert({
         ...sharedFields,
+        mensagem_hash: uniqueHash,
         processamento_status: processamentoStatus,
         processamento_erro: processamentoErro,
         ai_modelo: aiModel,
@@ -185,15 +175,18 @@ Deno.serve(async (req) => {
 async function callAIMultiLead(mensagem: string, apiKey: string, model: string): Promise<any[]> {
   const systemPrompt = `Você é um assistente especializado em interpretar mensagens de follow-up de vendas imobiliárias enviadas via WhatsApp.
 
-IMPORTANTE: Uma mensagem pode conter informações sobre MÚLTIPLOS leads. Você DEVE identificar CADA lead mencionado separadamente.
+REGRA MAIS IMPORTANTE — QUANTIDADE DE LEADS:
+- Se a mensagem diz "2 leads", "3 leads", "dois leads", "três leads" etc., você DEVE retornar EXATAMENTE essa quantidade de objetos no array.
+- "2 leads qualificados" = retorne 2 objetos, cada um com etapa_funil e temperatura adequados.
+- "5 leads recebidos, 3 em atendimento" = retorne 5 objetos (3 em atendimento + 2 como lead_novo).
+- Quando os leads não são nomeados individualmente, use "Lead 1", "Lead 2", "Lead 3", etc.
+- NUNCA retorne 1 lead quando a mensagem menciona múltiplos.
 
 REGRA CRÍTICA:
 - Extraia SOMENTE informações explicitamente presentes na mensagem.
 - Se um campo NÃO foi mencionado, retorne null. NÃO invente valores.
 - NÃO assuma, estime ou complete informações ausentes.
 - Prefira dados incompletos a dados incorretos.
-
-Analise a mensagem e extraia informações estruturadas para CADA lead identificado. Retorne um ARRAY JSON com um objeto por lead.
 
 Campos de cada objeto (retorne null se não mencionado):
 - mensagem_normalizada: resumo específico deste lead
@@ -211,10 +204,12 @@ Campos de cada objeto (retorne null se não mencionado):
 - confianca: nível de confiança da interpretação (0.0 a 1.0)
 - score_intencao: score de intenção de compra (0 a 100), null se não inferível
 
-Se a mensagem fala de apenas 1 lead, retorne um array com 1 objeto.
-Se fala de 3 leads, retorne um array com 3 objetos.
+Exemplos:
+- "2 leads qualificados" → array com 2 objetos (Lead 1 e Lead 2), ambos com temperatura_lead "morno" ou "quente"
+- "recebemos 4 leads, 2 em atendimento, 1 agendou visita, 1 não respondeu" → array com 4 objetos
+- "João está interessado e Maria agendou visita" → array com 2 objetos (João e Maria)
 
-Responda SOMENTE com o JSON array, sem markdown, sem explicações.`;
+Responda usando a tool extract_multiple_leads.`;
 
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -233,13 +228,13 @@ Responda SOMENTE com o JSON array, sem markdown, sem explicações.`;
           type: "function",
           function: {
             name: "extract_multiple_leads",
-            description: "Extract structured follow-up data for each lead mentioned in a WhatsApp message. Returns an array of leads.",
+            description: "Extract structured follow-up data for each lead mentioned in a WhatsApp message. MUST return exactly the number of leads mentioned (e.g. '2 leads' = 2 items in array).",
             parameters: {
               type: "object",
               properties: {
                 leads: {
                   type: "array",
-                  description: "Array of leads extracted from the message. One object per lead.",
+                  description: "Array of leads extracted from the message. One object per lead. If message says '2 leads', this array MUST have 2 items.",
                   items: {
                     type: "object",
                     properties: {
@@ -281,11 +276,9 @@ Responda SOMENTE com o JSON array, sem markdown, sem explicações.`;
 
   if (toolCall?.function?.arguments) {
     const parsed = JSON.parse(toolCall.function.arguments);
-    // The tool returns { leads: [...] }
     if (parsed.leads && Array.isArray(parsed.leads)) {
       return parsed.leads;
     }
-    // Fallback: if it returned a single object, wrap it
     if (parsed.etapa_funil) {
       return [parsed];
     }
