@@ -149,6 +149,8 @@ export function ModernAccountForm({
     if (open) {
       form.reset(defaults);
       setStep(1);
+      // Refresh groups when opening the form
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-saved-groups"] });
     }
   }, [open, defaults]);
 
