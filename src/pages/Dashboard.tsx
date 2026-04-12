@@ -48,6 +48,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <UnifiedPeriodFilter value={period} onChange={(v) => setPeriod(v)} />
           </div>
+
         </div>
 
         {selectedAccount ? (
