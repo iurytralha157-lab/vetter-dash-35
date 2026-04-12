@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { CalendarDays } from "lucide-react";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, startOfQuarter, startOfYear, subDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import {
   Popover,
@@ -53,6 +53,39 @@ const getLabel = (value: UnifiedPeriod, customRange?: CustomDateRange) => {
   return presetOptions.find((o) => o.value === value)?.label ?? "Período";
 };
 
+/** Compute the actual date range for a preset period */
+const getPresetDateRange = (period: UnifiedPeriod): { from: Date; to: Date } | undefined => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  switch (period) {
+    case "today":
+      return { from: today, to: today };
+    case "yesterday": {
+      const y = subDays(today, 1);
+      return { from: y, to: y };
+    }
+    case "last_7d":
+      return { from: subDays(today, 6), to: today };
+    case "last_15d":
+      return { from: subDays(today, 14), to: today };
+    case "last_30d":
+      return { from: subDays(today, 29), to: today };
+    case "this_month":
+      return { from: startOfMonth(today), to: today };
+    case "last_month": {
+      const prev = subMonths(today, 1);
+      return { from: startOfMonth(prev), to: endOfMonth(prev) };
+    }
+    case "this_quarter":
+      return { from: startOfQuarter(today), to: today };
+    case "this_year":
+      return { from: startOfYear(today), to: today };
+    default:
+      return undefined;
+  }
+};
+
 export function UnifiedPeriodFilter({
   value,
   customRange,
@@ -64,7 +97,23 @@ export function UnifiedPeriodFilter({
     { from?: Date; to?: Date } | undefined
   >(customRange ? { from: customRange.from, to: customRange.to } : undefined);
 
+  // Compute the displayed calendar range based on preset or custom
+  const calendarRange = useMemo(() => {
+    if (value === "custom" && customRange) {
+      return { from: customRange.from, to: customRange.to };
+    }
+    return getPresetDateRange(value);
+  }, [value, customRange]);
+
+  // The calendar month to display — show the "from" date's month
+  const defaultMonth = useMemo(() => {
+    if (pendingRange?.from) return pendingRange.from;
+    if (calendarRange?.from) return calendarRange.from;
+    return new Date();
+  }, [pendingRange, calendarRange]);
+
   const handlePreset = (preset: UnifiedPeriod) => {
+    setPendingRange(undefined);
     onChange(preset);
     setOpen(false);
   };
@@ -76,8 +125,26 @@ export function UnifiedPeriodFilter({
     }
   };
 
+  // When the popover opens, sync pendingRange with the current preset range
+  const handleOpenChange = (isOpen: boolean) => {
+    if (isOpen) {
+      setPendingRange(value === "custom" && customRange
+        ? { from: customRange.from, to: customRange.to }
+        : undefined
+      );
+    }
+    setOpen(isOpen);
+  };
+
+  // Displayed range: pending manual selection takes priority, otherwise show preset
+  const displayedRange = pendingRange?.from
+    ? { from: pendingRange.from, to: pendingRange.to }
+    : calendarRange
+      ? { from: calendarRange.from, to: calendarRange.to }
+      : undefined;
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -120,17 +187,14 @@ export function UnifiedPeriodFilter({
           Ou selecione um período:
         </div>
 
-        {/* Calendar */}
+        {/* Calendar with preset range highlighted */}
         <Calendar
           mode="range"
-          selected={
-            pendingRange?.from
-              ? { from: pendingRange.from, to: pendingRange.to }
-              : undefined
-          }
+          selected={displayedRange}
           onSelect={(range) =>
             setPendingRange(range ? { from: range.from, to: range.to } : undefined)
           }
+          defaultMonth={defaultMonth}
           locale={pt}
           className="rounded-md border p-2 pointer-events-auto"
         />
