@@ -16,8 +16,8 @@ interface SalesFunnelCardProps {
 }
 
 export function SalesFunnelCard({ title, subtitle, totalLeads, leadsRecebidos, steps }: SalesFunnelCardProps) {
-  // Filter out steps where value is null (not informed)
-  const visibleSteps = steps.filter(s => s.value !== null && s.value !== undefined);
+  // Show all steps - only hide if value is null (not informed) when no data at all
+  const visibleSteps = steps;
   const recebidos = leadsRecebidos ?? 0;
   const total = totalLeads ?? recebidos;
 
@@ -74,7 +74,7 @@ export function SalesFunnelCard({ title, subtitle, totalLeads, leadsRecebidos, s
 
           {/* Steps - only show steps that have data */}
           {visibleSteps.map((step, idx) => {
-            const val = step.value!;
+            const val = step.value ?? 0;
             const pct = recebidos > 0 ? Math.round((val / recebidos) * 100) : 0;
             const barWidth = recebidos > 0
               ? Math.max((val / recebidos) * 100, val > 0 ? 12 : 4)
@@ -95,13 +95,6 @@ export function SalesFunnelCard({ title, subtitle, totalLeads, leadsRecebidos, s
               </div>
             );
           })}
-
-          {/* No data message */}
-          {leadsRecebidos === null && visibleSteps.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-4">
-              Nenhum dado informado ainda
-            </p>
-          )}
         </div>
       </CardContent>
     </Card>
