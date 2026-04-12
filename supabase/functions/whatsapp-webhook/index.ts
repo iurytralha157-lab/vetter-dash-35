@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const text = (
+    let text = (
       message.conversation ||
       message.extendedTextMessage?.text ||
       ""
@@ -235,6 +235,7 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
     const possibleFormats = [groupNumber, `${groupNumber}-group`, remoteJid];
 
     let account: any = null;
+    let isTeamGroup = false;
     for (const fmt of possibleFormats) {
       const { data } = await supabase
         .from("accounts")
@@ -247,11 +248,130 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
       }
     }
 
+    // If no account found, check if this is the team group
     if (!account) {
-      console.log("[whatsapp-webhook] No account linked to group:", groupNumber);
-      return new Response(JSON.stringify({ ignored: true, reason: "no linked account" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Check system_settings for team group JID, with hardcoded fallback
+      const HARDCODED_TEAM_GROUPS = ["120363419496533710@g.us"];
+      
+      const { data: teamSetting } = await supabase
+        .from("system_settings")
+        .select("value, enabled")
+        .eq("key", "team_group_jid")
+        .single();
+
+      let teamGroupJids = [...HARDCODED_TEAM_GROUPS];
+      if (teamSetting?.enabled && teamSetting.value) {
+        const fromDb = teamSetting.value.split(",").map((s: string) => s.trim()).filter(Boolean);
+        teamGroupJids = [...new Set([...teamGroupJids, ...fromDb])];
+      }
+
+      if (teamGroupJids.includes(remoteJid) || teamGroupJids.includes(groupNumber)) {
+        isTeamGroup = true;
+        console.log("[whatsapp-webhook] Team group detected:", remoteJid);
+
+        // For team group, extract account name from message lines
+        const lines = text.split("\n").map((l: string) => l.trim()).filter(Boolean);
+        // First line is the command (e.g., #feedback), second line should be account name
+        let accountName: string | null = null;
+        
+        if (lines.length >= 2) {
+          const firstLine = lines[0].toLowerCase();
+          // For commands that need an account name on the next line
+          const commandsNeedingAccount = ["#feedback", "#followup", "#campanhas", "#saldo", "#gasto", "#leads", "#resumo", "#funil", "#comandos", "#ajuda", "#help"];
+          const cmdMatch = commandsNeedingAccount.find(c => firstLine.startsWith(c));
+          
+          if (cmdMatch) {
+            // Check if second line looks like an account name (not a funnel type or data)
+            const secondLine = lines[1].trim();
+            const funnelTypes = ["lancamento", "lançamento", "terceiros"];
+            if (!secondLine.startsWith("#") && !funnelTypes.includes(secondLine.toLowerCase())) {
+              accountName = secondLine;
+            } else if (funnelTypes.includes(secondLine.toLowerCase()) && lines.length >= 3) {
+              // For #feedback with funnel type, account name might be on line 3
+              // Actually for #feedback format: #feedback\nACCOUNT\nterceiros\n...
+              // Let's check line 1 (after #feedback) as the account name
+              // Re-check: the user said "#feedback\nPRIMUS\n..." so PRIMUS is the account
+              // But "terceiros" is also valid as second line for funnel type
+              // So if second line is a funnel type, the format is the client-group format
+              // For team group, account name MUST be the second line
+              accountName = null; // Can't determine, will fail gracefully
+            }
+          } else {
+            // Simple commands like #saldo - second line is account name
+            accountName = lines[1].trim();
+          }
+        }
+
+        if (!accountName) {
+          // For simple single-word commands from team group, check if command has account inline
+          const cmdParts = text.split(/\s+/);
+          if (cmdParts.length >= 2 && ["#saldo", "#funil", "#resumo", "#leads"].includes(cmdParts[0].toLowerCase())) {
+            accountName = cmdParts.slice(1).join(" ").trim();
+          }
+        }
+
+        if (accountName) {
+          // Look up account by name (case-insensitive)
+          const { data: accByName } = await supabase
+            .from("accounts")
+            .select("id, nome_cliente, meta_account_id, cliente_id")
+            .ilike("nome_cliente", accountName)
+            .single();
+
+          if (accByName) {
+            account = accByName;
+            console.log("[whatsapp-webhook] Team group resolved account:", accByName.nome_cliente);
+          } else {
+            // Try partial match
+            const { data: accPartial } = await supabase
+              .from("accounts")
+              .select("id, nome_cliente, meta_account_id, cliente_id")
+              .ilike("nome_cliente", `%${accountName}%`)
+              .limit(1)
+              .single();
+            
+            if (accPartial) {
+              account = accPartial;
+              console.log("[whatsapp-webhook] Team group resolved account (partial):", accPartial.nome_cliente);
+            }
+          }
+        }
+
+        if (!account) {
+          // List available accounts for the user
+          const { data: allAccounts } = await supabase
+            .from("accounts")
+            .select("nome_cliente")
+            .eq("status", "Ativo")
+            .order("nome_cliente")
+            .limit(20);
+
+          const accountList = (allAccounts || []).map((a: any, i: number) => `${i + 1}. ${a.nome_cliente}`).join("\n");
+          
+          const errorMsg = accountName
+            ? `❌ *Conta "${accountName}" não encontrada!*\n\nContas disponíveis:\n${accountList}\n\n📝 Envie o comando assim:\n*#feedback*\n*NOME_DA_CONTA*\nterceiros\nreferente à campanha...\n`
+            : `❌ *Nome da conta não informado!*\n\nNo grupo da equipe, informe o nome da conta na segunda linha:\n*#feedback*\n*NOME_DA_CONTA*\nterceiros\nreferente à campanha...\n\nContas disponíveis:\n${accountList}`;
+
+          await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, remoteJid, errorMsg);
+          return new Response(JSON.stringify({ success: true, team_group: true, error: "account not found" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // For team group, remove the account name line from the text before processing
+        const lines2 = text.split("\n");
+        const firstLine2 = lines2[0];
+        const restLines = lines2.slice(1);
+        // Remove the account name line (it's the first non-command line)
+        const accountNameLower = accountName!.toLowerCase();
+        const filteredLines = restLines.filter((l: string) => l.trim().toLowerCase() !== accountNameLower);
+        text = [firstLine2, ...filteredLines].join("\n");
+      } else {
+        console.log("[whatsapp-webhook] No account linked to group:", groupNumber);
+        return new Response(JSON.stringify({ ignored: true, reason: "no linked account" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const senderName = data.pushName || key.participant || "Desconhecido";
