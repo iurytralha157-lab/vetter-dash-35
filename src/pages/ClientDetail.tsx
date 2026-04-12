@@ -92,6 +92,7 @@ export default function ClientDetailPage() {
       setResp(data);
       setMetrics(data.account_metrics || null);
       setCampaigns(Array.isArray(data.campaigns) ? data.campaigns : []);
+      setAccountBalance(data.account_balance || null);
       setLastFetchTime(Date.now());
     } catch (error: any) {
       toast({ title: "Erro ao buscar Meta Ads", description: error.message, variant: "destructive" });
