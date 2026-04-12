@@ -222,7 +222,43 @@ export default function ClientDetailPage() {
           </div>
         </div>
 
-        {/* KPIs Cards */}
+        {/* Saldo em Tempo Real + KPIs */}
+        {accountBalance && (
+          <Card className="border-emerald-200 dark:border-emerald-800 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
+                    <DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">Saldo da Conta Meta (tempo real)</p>
+                    <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+                      {currency(accountBalance.balance)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-6 text-sm">
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Total Gasto</p>
+                    <p className="font-semibold">{currency(accountBalance.amount_spent)}</p>
+                  </div>
+                  {accountBalance.spend_cap !== null && accountBalance.spend_cap > 0 && (
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">Limite</p>
+                      <p className="font-semibold">{currency(accountBalance.spend_cap)}</p>
+                    </div>
+                  )}
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Moeda</p>
+                    <p className="font-semibold">{accountBalance.currency}</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardContent className="p-6">
             <MetaMetricsGrid metrics={metrics} loading={loading} />
