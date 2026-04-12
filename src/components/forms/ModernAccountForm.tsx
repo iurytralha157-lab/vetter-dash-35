@@ -231,7 +231,19 @@ export function ModernAccountForm({
                 if (canProceed()) nextStep();
                 return;
               }
-              form.handleSubmit(handleSubmit)(e);
+              form.handleSubmit(handleSubmit, (errors) => {
+                console.error("Validation errors:", errors);
+                // Navigate to the step with errors
+                if (errors.nome_cliente || errors.id_grupo || errors.telefone || errors.email || errors.link_drive) {
+                  setStep(1);
+                  toast({ title: "Erro de validação", description: "Verifique os campos obrigatórios na etapa 1", variant: "destructive" });
+                } else if (errors.canais) {
+                  setStep(2);
+                  toast({ title: "Erro de validação", description: "Selecione pelo menos um canal na etapa 2", variant: "destructive" });
+                } else {
+                  toast({ title: "Erro de validação", description: "Verifique os campos do formulário", variant: "destructive" });
+                }
+              })(e);
             }}
             className="space-y-6"
           >
