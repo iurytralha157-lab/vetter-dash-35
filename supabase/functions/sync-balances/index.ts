@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
 
     console.log(`[sync-balances] Sincronizando saldo de ${accounts?.length || 0} contas...`);
 
-    const results: { account: string; old_balance: number; new_balance: number | null; status: string }[] = [];
+    const results: { account: string; old_balance: number; new_balance: number | null; status: string; balance_type: string }[] = [];
 
     // Process in batches of 5 to avoid rate limits
     const batchSize = 5;
@@ -55,22 +55,52 @@ Deno.serve(async (req) => {
           if (!res.ok) {
             const errText = await res.text();
             console.warn(`[sync-balances] ❌ ${acc.nome_cliente}: ${errText.slice(0, 200)}`);
-            results.push({ account: acc.nome_cliente, old_balance: acc.saldo_meta ?? 0, new_balance: null, status: 'error' });
+            results.push({ account: acc.nome_cliente, old_balance: acc.saldo_meta ?? 0, new_balance: null, status: 'error', balance_type: 'unknown' });
             return;
           }
 
           const data = await res.json();
 
-          // Parse available balance from funding_source_details.display_string
-          let availableBalance: number | null = null;
+          // Determine account type and extract the correct balance
+          const isPrepay = data.is_prepay_account === true;
+          const fundingType = data.funding_source_details?.type; // 1=credit_card, 2=debit_card, 4=funds
           const displayString = data.funding_source_details?.display_string || '';
+          const isCardAccount = fundingType === 1 || fundingType === 2;
+
+          // Try to parse funds amount from display_string (e.g. "Saldo disponível (R$752,95 BRL)")
+          let fundsAmount: number | null = null;
           const balanceMatch = displayString.match(/R\$\s?([\d.,]+)/);
           if (balanceMatch) {
-            availableBalance = parseFloat(balanceMatch[1].replace(/\./g, '').replace(',', '.'));
+            fundsAmount = parseFloat(balanceMatch[1].replace(/\./g, '').replace(',', '.'));
           }
 
-          // Fallback to balance field (in cents)
-          const finalBalance = availableBalance ?? (parseFloat(data.balance || '0') / 100);
+          // Raw balance from Meta (in cents) - this is "saldo devedor" for card accounts
+          const balanceRaw = parseFloat(data.balance || '0') / 100;
+
+          let finalBalance: number;
+          let balanceType: string;
+
+          if (fundsAmount !== null) {
+            // Has funds (pre-paid deposit) - use funds amount regardless of card
+            finalBalance = fundsAmount;
+            balanceType = 'funds';
+          } else if (isPrepay) {
+            // Pre-pay account without parsed funds - use raw balance
+            finalBalance = balanceRaw;
+            balanceType = 'prepay';
+          } else if (isCardAccount) {
+            // Card-only account - balance is "saldo devedor" (amount to be charged)
+            // We store it but mark it so alerts know not to trigger
+            // Store as negative to indicate it's debt, or store 0 to skip alerts
+            // Better: store null/0 for saldo_meta since it's not a spendable balance
+            finalBalance = 0; // Card accounts don't have a "spendable" balance to monitor
+            balanceType = 'card_only';
+            console.log(`[sync-balances] ℹ️ ${acc.nome_cliente}: Conta com cartão (saldo devedor: R$ ${balanceRaw.toFixed(2)}) - não monitorar saldo`);
+          } else {
+            // Unknown type, use raw balance as fallback
+            finalBalance = balanceRaw;
+            balanceType = 'unknown';
+          }
 
           // Update the account
           const { error: updateError } = await supabase
@@ -78,19 +108,21 @@ Deno.serve(async (req) => {
             .update({
               saldo_meta: finalBalance,
               last_balance_check_meta: new Date().toISOString(),
+              // Store the balance mode so alerts know how to handle
+              modo_saldo_meta: balanceType,
             })
             .eq('id', acc.id);
 
           if (updateError) {
             console.warn(`[sync-balances] ❌ Update failed for ${acc.nome_cliente}:`, updateError.message);
-            results.push({ account: acc.nome_cliente, old_balance: acc.saldo_meta ?? 0, new_balance: finalBalance, status: 'update_error' });
+            results.push({ account: acc.nome_cliente, old_balance: acc.saldo_meta ?? 0, new_balance: finalBalance, status: 'update_error', balance_type: balanceType });
           } else {
-            console.log(`[sync-balances] ✅ ${acc.nome_cliente}: R$ ${(acc.saldo_meta ?? 0).toFixed(2)} → R$ ${finalBalance.toFixed(2)}`);
-            results.push({ account: acc.nome_cliente, old_balance: acc.saldo_meta ?? 0, new_balance: finalBalance, status: 'synced' });
+            console.log(`[sync-balances] ✅ ${acc.nome_cliente}: R$ ${(acc.saldo_meta ?? 0).toFixed(2)} → R$ ${finalBalance.toFixed(2)} (${balanceType})`);
+            results.push({ account: acc.nome_cliente, old_balance: acc.saldo_meta ?? 0, new_balance: finalBalance, status: 'synced', balance_type: balanceType });
           }
         } catch (err) {
           console.warn(`[sync-balances] ❌ ${acc.nome_cliente}:`, err);
-          results.push({ account: acc.nome_cliente, old_balance: acc.saldo_meta ?? 0, new_balance: null, status: 'error' });
+          results.push({ account: acc.nome_cliente, old_balance: acc.saldo_meta ?? 0, new_balance: null, status: 'error', balance_type: 'unknown' });
         }
       });
 
@@ -104,13 +136,15 @@ Deno.serve(async (req) => {
 
     const synced = results.filter(r => r.status === 'synced').length;
     const errors = results.filter(r => r.status !== 'synced').length;
+    const cardOnly = results.filter(r => r.balance_type === 'card_only').length;
 
-    console.log(`[sync-balances] Concluído. ${synced} sincronizados, ${errors} erros.`);
+    console.log(`[sync-balances] Concluído. ${synced} sincronizados (${cardOnly} contas com cartão ignoradas), ${errors} erros.`);
 
     return new Response(JSON.stringify({
       success: true,
       total: accounts?.length || 0,
       synced,
+      card_only_skipped: cardOnly,
       errors,
       details: results,
     }), {

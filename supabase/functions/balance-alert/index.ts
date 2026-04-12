@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
     // Fetch all active accounts with Meta Ads and a group configured
     const { data: accounts, error } = await supabase
       .from('accounts')
-      .select('id, nome_cliente, saldo_meta, alerta_saldo_baixo, id_grupo, meta_account_id')
+      .select('id, nome_cliente, saldo_meta, alerta_saldo_baixo, id_grupo, meta_account_id, modo_saldo_meta')
       .eq('status', 'Ativo')
       .eq('usa_meta_ads', true)
       .not('id_grupo', 'is', null)
@@ -50,10 +50,22 @@ Deno.serve(async (req) => {
 
     const baseUrl = evolutionApiUrl.replace(/\/+$/, '');
     const alerts: { account: string; type: string; message: string }[] = [];
+    const skipped: string[] = [];
 
     for (const acc of accounts || []) {
       const saldo = acc.saldo_meta ?? 0;
       const limiteAlerta = acc.alerta_saldo_baixo ?? 200;
+      const modoSaldo = acc.modo_saldo_meta || 'unknown';
+
+      // CRITICAL: Skip card-only accounts - they don't have a real "balance" to monitor
+      // The "balance" field for card accounts is "saldo devedor" (amount to be charged),
+      // NOT available funds. We only alert for accounts with actual funds/prepaid balance.
+      if (modoSaldo === 'card_only') {
+        console.log(`[balance-alert] ⏭️ Pulando ${acc.nome_cliente} - conta com cartão (sem fundos para monitorar)`);
+        skipped.push(acc.nome_cliente);
+        continue;
+      }
+
       let message = '';
       let alertType = '';
 
@@ -83,7 +95,7 @@ Deno.serve(async (req) => {
             number: groupJid,
             text: message,
           };
-          console.log(`[balance-alert] Sending to ${acc.nome_cliente}, group: ${acc.id_grupo}, payload keys:`, Object.keys(payload), 'text length:', message.length);
+          console.log(`[balance-alert] Sending to ${acc.nome_cliente} (${modoSaldo}), group: ${acc.id_grupo}`);
 
           const sendRes = await fetch(`${baseUrl}/message/sendText/${instanceName}`, {
             method: 'POST',
@@ -116,7 +128,6 @@ Deno.serve(async (req) => {
 
     // Also send a summary to admins if there are alerts
     if (alerts.length > 0) {
-      // Create in-app notifications for admins
       const { data: admins } = await supabase
         .from('user_roles')
         .select('user_id')
@@ -146,12 +157,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[balance-alert] Concluído. ${alerts.length} alertas enviados.`);
+    console.log(`[balance-alert] Concluído. ${alerts.length} alertas enviados, ${skipped.length} contas com cartão puladas.`);
 
     return new Response(JSON.stringify({
       success: true,
       total_checked: accounts?.length || 0,
       alerts_sent: alerts.length,
+      card_accounts_skipped: skipped.length,
+      skipped_accounts: skipped,
       details: alerts,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
