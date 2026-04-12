@@ -123,6 +123,8 @@ async function processCommand(
       responseText = await handleFollowup(text, account, groupJid, senderName, supabase);
     } else if (cmd.startsWith("#feedback")) {
       responseText = await handleFeedback(text, account, groupJid, senderName, supabase);
+    } else if (cmd === "#saldo") {
+      responseText = await handleSaldo(account, supabase);
     } else if (cmd === "#funil") {
       responseText = await handleFunil(account, supabase);
     } else if (cmd === "#campanhas") {
@@ -578,6 +580,7 @@ async function handleResumo(account: any, supabase: any): Promise<string> {
 function getHelpText(clientName: string): string {
   return `🤖 *Comandos disponíveis - ${clientName}*\n` +
     `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `💰 *#saldo* — Consultar saldo em tempo real\n\n` +
     `📊 *#campanhas* — Lista todas as campanhas\n` +
     `📋 *#campanha{N}* — Detalhes da campanha N\n` +
     `   Ex: #campanha1, #campanha2\n\n` +
@@ -594,6 +597,106 @@ function getHelpText(clientName: string): string {
     `🔄 *#followup* — Registrar follow-up de lead\n` +
     `   Ex: #followup João ligou, quer visitar apt 3Q\n\n` +
     `❓ *#ajuda* — Mostra esta mensagem\n`;
+}
+
+// ─── Saldo Handler ───
+
+async function handleSaldo(
+  account: { id: string; nome_cliente: string; meta_account_id: string | null },
+  supabase: any
+): Promise<string> {
+  if (!account.meta_account_id) {
+    return `⚠️ *${account.nome_cliente}*\n\nConta sem Meta Ads configurado.`;
+  }
+
+  const accessToken = Deno.env.get('META_ACCESS_TOKEN');
+  if (!accessToken) {
+    return `⚠️ Token do Meta não configurado. Contate o administrador.`;
+  }
+
+  const formattedId = account.meta_account_id.startsWith('act_')
+    ? account.meta_account_id
+    : `act_${account.meta_account_id}`;
+
+  try {
+    const url = `https://graph.facebook.com/v21.0/${formattedId}?fields=balance,amount_spent,spend_cap,funding_source_details,is_prepay_account,account_status,currency&access_token=${accessToken}`;
+    const res = await fetch(url);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[whatsapp-webhook] #saldo Meta API error for ${account.nome_cliente}:`, errText.slice(0, 300));
+      return `⚠️ Erro ao consultar saldo no Meta. Tente novamente.`;
+    }
+
+    const data = await res.json();
+
+    const isPrepay = data.is_prepay_account === true;
+    const fundingType = data.funding_source_details?.type;
+    const displayString = data.funding_source_details?.display_string || '';
+    const isCardAccount = fundingType === 1 || fundingType === 2;
+
+    // Parse funds from display_string
+    let fundsAmount: number | null = null;
+    const balanceMatch = displayString.match(/R\$\s?([\d.,]+)/);
+    if (balanceMatch) {
+      fundsAmount = parseFloat(balanceMatch[1].replace(/\./g, '').replace(',', '.'));
+    }
+
+    const balanceRaw = parseFloat(data.balance || '0') / 100;
+    const amountSpent = parseFloat(data.amount_spent || '0') / 100;
+    const spendCap = data.spend_cap ? parseFloat(data.spend_cap) / 100 : null;
+
+    const fmtCurrency = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
+
+    let msg = `💰 *Saldo - ${account.nome_cliente}*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    if (fundsAmount !== null) {
+      // Has funds
+      msg += `💰 *Fundos Disponíveis:* ${fmtCurrency(fundsAmount)}\n`;
+      if (isCardAccount) {
+        msg += `💳 *Saldo Devedor:* ${fmtCurrency(balanceRaw)}\n`;
+        msg += `📋 Pagamento: ${displayString}\n`;
+      }
+    } else if (isPrepay) {
+      msg += `💰 *Saldo Pré-pago:* ${fmtCurrency(balanceRaw)}\n`;
+    } else if (isCardAccount) {
+      msg += `💳 *Saldo Devedor:* ${fmtCurrency(balanceRaw)}\n`;
+      msg += `📋 Pagamento: ${displayString}\n`;
+      msg += `\nℹ️ _Conta com cartão - saldo devedor será cobrado automaticamente._\n`;
+    } else {
+      msg += `💰 *Saldo:* ${fmtCurrency(balanceRaw)}\n`;
+    }
+
+    msg += `\n📊 *Total Gasto:* ${fmtCurrency(amountSpent)}\n`;
+    if (spendCap && spendCap > 0) {
+      msg += `🔒 *Limite:* ${fmtCurrency(spendCap)}\n`;
+      const remaining = spendCap - amountSpent;
+      msg += `📉 *Restante do Limite:* ${fmtCurrency(remaining)}\n`;
+    }
+
+    // Get alert threshold from account
+    const { data: accData } = await supabase
+      .from('accounts')
+      .select('alerta_saldo_baixo, media_gasto_diario')
+      .eq('id', account.id)
+      .single();
+
+    if (accData?.media_gasto_diario && accData.media_gasto_diario > 0) {
+      const saldoAtual = fundsAmount ?? (isPrepay ? balanceRaw : null);
+      if (saldoAtual !== null && saldoAtual > 0) {
+        const diasEstimados = Math.floor(saldoAtual / accData.media_gasto_diario);
+        msg += `\n⏳ *Estimativa:* ~${diasEstimados} dia(s) de saldo restante\n`;
+      }
+    }
+
+    msg += `\n🕐 _Consultado em tempo real_`;
+
+    return msg;
+  } catch (err) {
+    console.error(`[whatsapp-webhook] #saldo error:`, err);
+    return `⚠️ Erro ao consultar saldo. Tente novamente.`;
+  }
 }
 
 // ─── Helpers ───
