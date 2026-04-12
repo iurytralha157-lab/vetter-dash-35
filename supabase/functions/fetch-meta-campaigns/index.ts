@@ -166,6 +166,20 @@ Deno.serve(async (req) => {
     const campaignsData = await campaignsResponse.json();
     console.log('Campaigns fetched:', campaignsData.data?.length || 0);
 
+    // Process account info (balance)
+    let accountInfo: any = null;
+    try {
+      const accountInfoResponse = await accountInfoPromise;
+      if (accountInfoResponse.ok) {
+        accountInfo = await accountInfoResponse.json();
+        console.log('Account info:', JSON.stringify({ balance: accountInfo.balance, amount_spent: accountInfo.amount_spent, spend_cap: accountInfo.spend_cap, currency: accountInfo.currency }));
+      } else {
+        console.warn('Failed to fetch account info:', await accountInfoResponse.text());
+      }
+    } catch (e) {
+      console.warn('Error fetching account info:', e);
+    }
+
     // Fetch account-level insights
     // Use date_preset for supported periods, otherwise use time_range
     const insightsTimeParam = datePreset 
