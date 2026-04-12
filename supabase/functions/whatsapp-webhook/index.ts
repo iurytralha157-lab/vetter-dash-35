@@ -187,7 +187,8 @@ function parseFeedbackText(text: string): {
     const day = parseInt(dateMatch[1]);
     const month = parseInt(dateMatch[2]);
     const yearStr = dateMatch[3];
-    let year = new Date().getFullYear();
+    const nowBRT = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    let year = nowBRT.getFullYear();
     if (yearStr) {
       year = yearStr.length === 2 ? 2000 + parseInt(yearStr) : parseInt(yearStr);
     }
@@ -310,7 +311,7 @@ async function handleFeedback(
 
 async function handleFunil(account: any, supabase: any): Promise<string> {
   // Get last 30 days of feedback
-  const thirtyDaysAgo = new Date();
+  const thirtyDaysAgo = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
   const { data: feedbacks } = await supabase
@@ -713,8 +714,9 @@ async function handleGasto(
   let until: string;
   let periodLabel: string;
 
-  const today = new Date();
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  // Usar horário de Brasília
+  const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
   const monthNames: Record<string, number> = {
     janeiro: 0, fevereiro: 1, 'março': 2, marco: 2, abril: 3, maio: 4, junho: 5,
