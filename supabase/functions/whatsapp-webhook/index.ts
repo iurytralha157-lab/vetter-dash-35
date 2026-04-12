@@ -584,12 +584,70 @@ async function handleFeedback(
       }
     }
 
-    if (followupResult?.leads_count > 0) {
-      msg += `\n👥 *${followupResult.leads_count} lead(s) individual(is) registrado(s) no funil*\n`;
+    // Show individual leads registered in funnel
+    const leadsCount = followupResult?.leads_count || 0;
+    if (leadsCount > 0) {
+      msg += `\n👥 *${leadsCount} lead(s) registrado(s) no funil:*\n`;
+      if (followupResult?.dados && Array.isArray(followupResult.dados)) {
+        for (const lead of followupResult.dados) {
+          const tempIcon = lead.temperatura_lead === "quente" ? "🔴" : lead.temperatura_lead === "morno" ? "🟡" : "🔵";
+          const etapaLabel = {
+            lead_novo: "Novo",
+            contato_iniciado: "Contato iniciado",
+            sem_resposta: "Sem resposta",
+            atendimento: "Em atendimento",
+            visita_agendada: "Visita agendada",
+            visita_realizada: "Visita realizada",
+            proposta: "Proposta",
+            venda: "Venda",
+            perdido: "Perdido",
+          }[lead.etapa_funil] || lead.etapa_funil || "—";
+          msg += `   ${tempIcon} ${lead.lead_nome || "Lead"} — ${etapaLabel}\n`;
+        }
+      }
     }
 
     msg += periodMsg;
     msg += crossRefMsg;
+
+    // 6. Follow-up: check if there are more leads from campaigns not covered
+    try {
+      let totalCampaignLeads = 0;
+      if (crossRefMsg === "") {
+        // Cross-ref wasn't done above, try now
+        let query = supabase
+          .from("campaign_history")
+          .select("leads")
+          .eq("account_id", account.id);
+        if (dataInicio === dataFim) {
+          query = query.eq("date", dataInicio);
+        } else {
+          query = query.gte("date", dataInicio).lte("date", dataFim);
+        }
+        const { data: campData } = await query;
+        if (campData) {
+          totalCampaignLeads = campData.reduce((s: number, c: any) => s + (c.leads || 0), 0);
+        }
+      }
+
+      // Total reported across both systems
+      let totalReported = leadsCount;
+      if (feedbackResult.campanhas && Array.isArray(feedbackResult.campanhas)) {
+        const campReported = feedbackResult.campanhas.reduce((s: number, c: any) => s + (c.recebidos || 0), 0);
+        if (campReported > totalReported) totalReported = campReported;
+      }
+
+      if (totalCampaignLeads > 0 && totalReported > 0 && totalCampaignLeads > totalReported) {
+        const diff = totalCampaignLeads - totalReported;
+        msg += `\n💬 *E os outros ${diff} lead(s)?*\n`;
+        msg += `Registramos *${totalCampaignLeads} leads* nas campanhas desse período, mas o feedback cobriu apenas *${totalReported}*.\n`;
+        msg += `Como estão os outros *${diff}*? Responda com:\n`;
+        msg += `*#feedback* _status dos ${diff} leads restantes_\n`;
+      }
+    } catch (followUpErr) {
+      console.error("[whatsapp-webhook] Follow-up check error:", followUpErr);
+    }
+
     msg += `\n💡 Use *#funil* para ver o funil consolidado.`;
     return msg;
   } catch (err) {
@@ -599,36 +657,115 @@ async function handleFeedback(
 }
 
 async function handleFunil(account: any, supabase: any): Promise<string> {
-  // Get last 30 days of feedback
   const thirtyDaysAgo = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const { data: feedbacks } = await supabase
+  // Query feedback_funnel (individual leads) using created_at
+  const { data: funnelLeads } = await supabase
     .from("feedback_funnel")
-    .select("*")
+    .select("etapa_funil, temperatura_lead, lead_nome, resumo, created_at, nome_origem, duplicado")
     .eq("account_id", account.id)
+    .eq("duplicado", false)
+    .gte("created_at", thirtyDaysAgo.toISOString())
+    .order("created_at", { ascending: false });
+
+  // Also get aggregate feedback from feedback_campanha
+  const { data: campFeedbacks } = await supabase
+    .from("feedback_campanha")
+    .select("campanha_nome, quantidade_recebida, quantidade_descartado, quantidade_aguardando_retorno, quantidade_atendimento, quantidade_visita, quantidade_proposta, quantidade_venda, data_referencia, processamento_status")
+    .eq("account_id", account.id)
+    .eq("processamento_status", "processado")
     .gte("data_referencia", thirtyDaysAgo.toISOString().split("T")[0])
     .order("data_referencia", { ascending: false });
 
-  if (!feedbacks || feedbacks.length === 0) {
+  const hasLeads = funnelLeads && funnelLeads.length > 0;
+  const hasCampFeedback = campFeedbacks && campFeedbacks.length > 0;
+
+  if (!hasLeads && !hasCampFeedback) {
     return `📊 *Funil - ${account.nome_cliente}*\n\nNenhum feedback registrado nos últimos 30 dias.\n\nEnvie *#feedback* seguido do relatório para registrar.`;
   }
 
-  // Aggregate
-  const totals = feedbacks.reduce(
-    (acc: any, f: any) => ({
-      leads_gerados: acc.leads_gerados + (f.leads_gerados || 0),
-      conversa_iniciada: acc.conversa_iniciada + (f.conversa_iniciada || 0),
-      lead_qualificado: acc.lead_qualificado + (f.lead_qualificado || 0),
-      em_atendimento: acc.em_atendimento + (f.em_atendimento || 0),
-      perdido: acc.perdido + (f.perdido || 0),
-      visita: acc.visita + (f.visita || 0),
-      venda: acc.venda + (f.venda || 0),
-    }),
-    { leads_gerados: 0, conversa_iniciada: 0, lead_qualificado: 0, em_atendimento: 0, perdido: 0, visita: 0, venda: 0 }
-  );
+  let msg = `📊 *Funil de Vendas - ${account.nome_cliente}*\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
 
-  // Also get Meta leads for comparison
+  // Section 1: Individual leads from feedback_funnel
+  if (hasLeads) {
+    const etapaCounts: Record<string, number> = {};
+    const tempCounts: Record<string, number> = {};
+    for (const lead of funnelLeads) {
+      const etapa = lead.etapa_funil || "lead_novo";
+      etapaCounts[etapa] = (etapaCounts[etapa] || 0) + 1;
+      if (lead.temperatura_lead) {
+        tempCounts[lead.temperatura_lead] = (tempCounts[lead.temperatura_lead] || 0) + 1;
+      }
+    }
+
+    msg += `\n👥 *Leads Individuais* (${funnelLeads.length} registros)\n`;
+    msg += `┌─────────────────────────\n`;
+    const etapaLabels: Record<string, string> = {
+      lead_novo: "🆕 Novos",
+      contato_iniciado: "💬 Contato Iniciado",
+      sem_resposta: "📵 Sem Resposta",
+      atendimento: "🔄 Em Atendimento",
+      visita_agendada: "📅 Visita Agendada",
+      visita_realizada: "🏠 Visita Realizada",
+      proposta: "📝 Proposta",
+      venda: "🎉 Venda",
+      perdido: "❌ Perdido",
+    };
+    for (const [etapa, label] of Object.entries(etapaLabels)) {
+      if (etapaCounts[etapa]) {
+        msg += `│ ${label}: *${etapaCounts[etapa]}*\n`;
+      }
+    }
+    msg += `└─────────────────────────\n`;
+
+    if (Object.keys(tempCounts).length > 0) {
+      msg += `\n🌡️ *Temperatura:* `;
+      const parts: string[] = [];
+      if (tempCounts.quente) parts.push(`🔴 Quentes: ${tempCounts.quente}`);
+      if (tempCounts.morno) parts.push(`🟡 Mornos: ${tempCounts.morno}`);
+      if (tempCounts.frio) parts.push(`🔵 Frios: ${tempCounts.frio}`);
+      msg += parts.join("  |  ") + "\n";
+    }
+
+    // Last 5 leads
+    msg += `\n📋 *Últimos leads:*\n`;
+    funnelLeads.slice(0, 5).forEach((f: any) => {
+      const date = formatDateBR(f.created_at?.split("T")[0]);
+      const tempIcon = f.temperatura_lead === "quente" ? "🔴" : f.temperatura_lead === "morno" ? "🟡" : "🔵";
+      msg += `   ${date} ${tempIcon} ${f.lead_nome || "—"}: ${f.resumo?.slice(0, 50) || "—"}\n`;
+    });
+  }
+
+  // Section 2: Aggregate campaign feedback
+  if (hasCampFeedback) {
+    const totals = campFeedbacks.reduce((acc: any, f: any) => ({
+      recebidos: acc.recebidos + (f.quantidade_recebida || 0),
+      descartados: acc.descartados + (f.quantidade_descartado || 0),
+      atendimento: acc.atendimento + (f.quantidade_atendimento || 0),
+      visitas: acc.visitas + (f.quantidade_visita || 0),
+      propostas: acc.propostas + (f.quantidade_proposta || 0),
+      vendas: acc.vendas + (f.quantidade_venda || 0),
+    }), { recebidos: 0, descartados: 0, atendimento: 0, visitas: 0, propostas: 0, vendas: 0 });
+
+    msg += `\n📊 *Feedback de Campanhas* (${campFeedbacks.length} registros)\n`;
+    msg += `┌─────────────────────────\n`;
+    if (totals.recebidos) msg += `│ 👥 Recebidos: *${totals.recebidos}*\n`;
+    if (totals.atendimento) msg += `│ 🔄 Em Atendimento: *${totals.atendimento}*\n`;
+    if (totals.descartados) msg += `│ ❌ Descartados: *${totals.descartados}*\n`;
+    if (totals.visitas) msg += `│ 🏠 Visitas: *${totals.visitas}*\n`;
+    if (totals.propostas) msg += `│ 📝 Propostas: *${totals.propostas}*\n`;
+    if (totals.vendas) msg += `│ 🎉 Vendas: *${totals.vendas}*\n`;
+    msg += `└─────────────────────────\n`;
+
+    if (totals.recebidos > 0) {
+      const convRate = ((totals.vendas / totals.recebidos) * 100).toFixed(1);
+      msg += `📈 Taxa de conversão: *${convRate}%*\n`;
+    }
+  }
+
+  // Meta Ads comparison
   let metaLeads = 0;
   if (account.meta_account_id) {
     const { data: campaigns } = await supabase
@@ -639,34 +776,9 @@ async function handleFunil(account: any, supabase: any): Promise<string> {
       metaLeads = campaigns.reduce((s: number, c: any) => s + (c.leads || 0), 0);
     }
   }
-
-  const convRate = totals.leads_gerados > 0 ? ((totals.venda / totals.leads_gerados) * 100).toFixed(1) : "0";
-  const qualRate = totals.leads_gerados > 0 ? ((totals.lead_qualificado / totals.leads_gerados) * 100).toFixed(1) : "0";
-
-  let msg = `📊 *Funil de Vendas - ${account.nome_cliente}*\n`;
-  msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-  msg += `📅 Últimos 30 dias (${feedbacks.length} feedbacks)\n\n`;
-
-  msg += `🔽 *FUNIL*\n`;
-  msg += `┌─────────────────────────\n`;
   if (metaLeads > 0) {
-    msg += `│ 📢 Leads Meta Ads: *${metaLeads}*\n`;
+    msg += `\n📢 Leads Meta Ads (total): *${metaLeads}*\n`;
   }
-  msg += `│ 👥 Leads Gerados: *${totals.leads_gerados}*\n`;
-  msg += `│ 💬 Conversa Iniciada: *${totals.conversa_iniciada}*\n`;
-  msg += `│ ✅ Qualificados: *${totals.lead_qualificado}* (${qualRate}%)\n`;
-  msg += `│ 🔄 Em Atendimento: *${totals.em_atendimento}*\n`;
-  msg += `│ ❌ Perdidos: *${totals.perdido}*\n`;
-  msg += `│ 🏠 Visitas: *${totals.visita}*\n`;
-  msg += `│ 🎉 Vendas: *${totals.venda}* (${convRate}%)\n`;
-  msg += `└─────────────────────────\n`;
-
-  // Last 5 feedbacks
-  msg += `\n📋 *Últimos registros:*\n`;
-  feedbacks.slice(0, 5).forEach((f: any) => {
-    const date = formatDateBR(f.data_referencia);
-    msg += `   ${date} - ${f.enviado_por}: 👥${f.leads_gerados} ✅${f.lead_qualificado} 🎉${f.venda}\n`;
-  });
 
   return msg;
 }
