@@ -104,7 +104,7 @@ function GlobalDashboardView({ period, refreshKey, onRefreshingChange }: { perio
         setAggregatedMetrics(null);
         setAllCampaigns([]);
         setLoading(false);
-        setRefreshing(false);
+        onRefreshingChange(false);
         return;
       }
 
@@ -213,13 +213,13 @@ function GlobalDashboardView({ period, refreshKey, onRefreshingChange }: { perio
       console.error("Failed to load global dashboard:", err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
+      onRefreshingChange(false);
     }
   };
 
   useEffect(() => {
-    fetchAll();
-  }, [metaPeriod]);
+    fetchAll(refreshKey > 0);
+  }, [metaPeriod, refreshKey]);
 
   const orderedCampaigns = useMemo(() => {
     return [...allCampaigns].sort((a, b) => {
@@ -296,19 +296,6 @@ function GlobalDashboardView({ period, refreshKey, onRefreshingChange }: { perio
 
   return (
     <div className="space-y-6">
-      {/* Refresh */}
-      <div className="flex justify-end">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => fetchAll(true)}
-          disabled={refreshing}
-          className="gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          Atualizar
-        </Button>
-      </div>
 
       {/* Aggregated KPIs */}
       <Card>
