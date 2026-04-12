@@ -560,11 +560,16 @@ async function handleFeedback(
       console.error("[whatsapp-webhook] Cross-reference error:", crossRefErr);
     }
 
-    // 4. Build response message
+    // 5. Build response message
+    const periodLabel = dataInicio === dataFim
+      ? dataInicio.split('-').reverse().join('/')
+      : `${dataInicio.split('-').reverse().join('/')} a ${dataFim.split('-').reverse().join('/')}`;
+
     let msg = `✅ *Feedback registrado com sucesso!*\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
     msg += `👤 Enviado por: *${senderName}*\n`;
     msg += `🏢 Conta: *${account.nome_cliente}*\n`;
+    msg += `📅 Período: *${periodLabel}*${!periodoDetectado ? ' _(padrão)_' : ''}\n`;
 
     if (feedbackResult.tipo_funil) {
       msg += `📋 Tipo: *${feedbackResult.tipo_funil === "terceiros" ? "Terceiros" : "Lançamento"}*\n`;
@@ -583,6 +588,7 @@ async function handleFeedback(
       msg += `\n👥 *${followupResult.leads_count} lead(s) individual(is) registrado(s) no funil*\n`;
     }
 
+    msg += periodMsg;
     msg += crossRefMsg;
     msg += `\n💡 Use *#funil* para ver o funil consolidado.`;
     return msg;
