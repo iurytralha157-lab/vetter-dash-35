@@ -190,34 +190,52 @@ Deno.serve(async (req) => {
           const data = await response.json();
           const insights = data.data?.[0] || null;
           
-          // Extract conversions from actions array
+          // Extract conversions based on campaign objective
+          // Meta "Results" metric maps to specific action_type per objective
           let conversions = 0;
           let costPerConversion = null;
           
           if (insights?.actions) {
-            // Sum all lead/messaging-related actions — these are the "Results" Meta shows
-            const leadActions = insights.actions.filter((action: any) => 
-              action.action_type === 'lead' ||
-              action.action_type === 'offsite_conversion.fb_pixel_lead' ||
-              action.action_type === 'onsite_conversion.lead' ||
-              action.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
-              action.action_type === 'onsite_conversion.total_messaging_connection' ||
-              action.action_type === 'onsite_conversion.messaging_first_reply'
-            );
-            conversions = leadActions.reduce((sum: number, action: { value?: string }) => sum + parseInt(action.value || '0'), 0);
+            const objective = campaign.objective;
+            let resultActionType: string;
+            
+            // Pick the correct action type based on campaign objective
+            if (objective === 'OUTCOME_ENGAGEMENT' || objective === 'MESSAGES') {
+              // WhatsApp/Messaging campaigns → conversations started
+              resultActionType = 'onsite_conversion.messaging_conversation_started_7d';
+            } else if (objective === 'OUTCOME_LEADS' || objective === 'LEAD_GENERATION') {
+              // Lead gen campaigns → lead actions
+              resultActionType = 'lead';
+            } else {
+              // Fallback: try lead first, then messaging
+              resultActionType = 'lead';
+            }
+            
+            // Find the primary result action
+            const primaryAction = insights.actions.find((a: any) => a.action_type === resultActionType);
+            if (primaryAction) {
+              conversions = parseInt(primaryAction.value || '0');
+            } else {
+              // Fallback: try other lead-like actions in priority order
+              const fallbackTypes = [
+                'onsite_conversion.messaging_conversation_started_7d',
+                'lead',
+                'onsite_conversion.lead',
+                'offsite_conversion.fb_pixel_lead'
+              ];
+              for (const fallbackType of fallbackTypes) {
+                const fallbackAction = insights.actions.find((a: any) => a.action_type === fallbackType);
+                if (fallbackAction) {
+                  conversions = parseInt(fallbackAction.value || '0');
+                  break;
+                }
+              }
+            }
           }
 
           if (insights?.cost_per_action_type && conversions > 0) {
-            // Find the most relevant cost per action
-            const costActions = insights.cost_per_action_type.filter((action: any) => 
-              action.action_type === 'lead' ||
-              action.action_type === 'offsite_conversion.fb_pixel_lead' ||
-              action.action_type === 'onsite_conversion.lead'
-            );
-            if (costActions.length > 0) {
-              // Use the first lead cost action found
-              costPerConversion = parseFloat(costActions[0].value);
-            }
+            const spend = parseFloat(insights.spend || '0');
+            costPerConversion = conversions > 0 ? spend / conversions : null;
           }
 
           return {
