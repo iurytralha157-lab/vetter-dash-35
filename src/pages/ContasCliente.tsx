@@ -392,18 +392,35 @@ export default function ContasCliente() {
                         <span className="flex items-center gap-1"><User className="h-3 w-3" />{account.gestor_name}</span>
                       </div>
 
-                      {/* Real metrics only */}
+                      {/* Balance display */}
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                          <Wallet className="h-3 w-3" />
-                          Budget: <span className="text-foreground font-medium">{formatMoney(account.total_budget)}</span>
-                        </span>
-                        {!!account.saldo_meta && account.saldo_meta > 0 && (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-blue-500">
-                            <Wallet className="h-3 w-3" />
-                            Saldo Meta: <span className="font-medium">{formatMoney(account.saldo_meta / 100)}</span>
-                          </span>
-                        )}
+                        {(() => {
+                          const saldo = account.saldo_meta ?? 0;
+                          const limite = account.alerta_saldo_baixo ?? 200;
+                          const isZero = saldo <= 0;
+                          const isLow = !isZero && saldo < limite;
+
+                          return (
+                            <>
+                              <span className={`inline-flex items-center gap-1 text-[11px] ${
+                                isZero ? "text-red-500" : isLow ? "text-yellow-500" : "text-muted-foreground"
+                              }`}>
+                                <Wallet className="h-3 w-3" />
+                                Saldo Disponível: <span className="font-medium">{formatMoney(saldo)}</span>
+                              </span>
+                              {isZero && (
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-red-500/50 text-red-500 bg-red-500/10">
+                                  Sem saldo
+                                </Badge>
+                              )}
+                              {isLow && (
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-yellow-500/50 text-yellow-500 bg-yellow-500/10">
+                                  Saldo baixo
+                                </Badge>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
 
