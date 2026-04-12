@@ -280,6 +280,15 @@ Deno.serve(async (req) => {
             }
           }
 
+          // Extract followers (page_likes from actions)
+          let followers = 0;
+          if (insights?.actions) {
+            const followerAction = insights.actions.find((a: any) => a.action_type === 'like' || a.action_type === 'page_like');
+            if (followerAction) {
+              followers = parseInt(followerAction.value || '0');
+            }
+          }
+
           if (insights?.cost_per_action_type && conversions > 0) {
             const spend = parseFloat(insights.spend || '0');
             costPerConversion = conversions > 0 ? spend / conversions : null;
@@ -301,7 +310,8 @@ Deno.serve(async (req) => {
               cpc: parseFloat(insights.cpc || '0'),
               cpm: parseFloat(insights.cpm || '0'),
               conversions,
-              cost_per_conversion: costPerConversion
+              cost_per_conversion: costPerConversion,
+              followers
             } : null
           };
         } catch (error) {
@@ -321,8 +331,13 @@ Deno.serve(async (req) => {
       const totalConversions = campaignsWithInsights.reduce((sum: number, c: any) => {
         return sum + (c.insights?.conversions || 0);
       }, 0);
+
+      const totalFollowers = campaignsWithInsights.reduce((sum: number, c: any) => {
+        return sum + (c.insights?.followers || 0);
+      }, 0);
       
       console.log('Account-level total conversions (sum of campaigns):', totalConversions);
+      console.log('Account-level total followers (sum of campaigns):', totalFollowers);
 
       accountMetrics = {
         total_spend: parseFloat(accountInsights.spend || '0'),
@@ -331,7 +346,8 @@ Deno.serve(async (req) => {
         avg_ctr: parseFloat(accountInsights.ctr || '0'),
         avg_cpc: parseFloat(accountInsights.cpc || '0'),
         avg_cpm: parseFloat(accountInsights.cpm || '0'),
-        total_conversions: totalConversions
+        total_conversions: totalConversions,
+        total_followers: totalFollowers
       };
     }
 

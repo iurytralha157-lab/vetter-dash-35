@@ -8,6 +8,7 @@ export interface MetaInsights {
   cpm: number;
   conversions: number;
   cost_per_conversion?: number | null;
+  followers?: number;
 }
 
 export interface MetaCampaign {
@@ -28,6 +29,7 @@ export interface MetaAccountMetrics {
   avg_cpc: number;
   avg_cpm: number;
   total_conversions: number;
+  total_followers?: number;
 }
 
 export interface MetaAccountBalance {

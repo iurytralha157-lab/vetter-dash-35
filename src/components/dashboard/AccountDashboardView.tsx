@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { MetaAdsResponse, MetaCampaign, MetaAccountMetrics } from "@/types/meta";
 import type { MetaPeriod } from "@/components/meta/MetaPeriodFilter";
 import {
-  AlertCircle, RefreshCw, Eye, DollarSign, Target, TrendingUp,
+  AlertCircle, RefreshCw, Eye, DollarSign, Target, TrendingUp, Users, Wallet, BarChart3,
 } from "lucide-react";
 import {
   BarChart, Bar,
@@ -46,6 +46,7 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
   const [campaigns, setCampaigns] = useState<MetaCampaign[]>([]);
   const [metaAccountId, setMetaAccountId] = useState<string | null>(null);
   const [accountName, setAccountName] = useState("");
+  const [accountBalance, setAccountBalance] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<MetaCampaign | null>(null);
   const [funnelData, setFunnelData] = useState<{
@@ -82,6 +83,7 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
       if (data?.success) {
         setMetrics(data.account_metrics || null);
         setCampaigns(Array.isArray(data.campaigns) ? data.campaigns : []);
+        setAccountBalance(data.account_balance || null);
       }
     } catch (error) {
       console.error("Erro ao buscar Meta Ads:", error);
@@ -203,7 +205,11 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
 
   const totalLeads = (metrics?.total_conversions || 0);
   const totalSpend = (metrics?.total_spend || 0);
-  const totalCPL = totalLeads > 0 ? totalSpend / totalLeads : 0;
+  const totalFollowers = (metrics?.total_followers || 0);
+  const conversionRate = totalLeads > 0 && (metrics?.total_clicks || 0) > 0
+    ? ((totalLeads / (metrics?.total_clicks || 1)) * 100)
+    : 0;
+  const fundos = accountBalance?.balance ?? 0;
 
   return (
     <div className="space-y-6">
@@ -224,8 +230,8 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
       {/* ===== KPIs ===== */}
       {loading ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => <Skeleton key={i} className="h-24" />)}
+          <div className="grid grid-cols-5 gap-4">
+            {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-24" />)}
           </div>
           <div className="grid grid-cols-3 gap-4">
             {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-20" />)}
@@ -240,25 +246,37 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
         </Card>
       ) : (
         <>
-          {/* Row 1: Total */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Row 1: 5 KPIs */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <KPICard
-              title="Investimento Total"
-              value={currency(totalSpend)}
-              icon={<DollarSign className="h-5 w-5 text-orange-500" />}
-              bgIcon="bg-orange-500/10"
+              title="Fundos"
+              value={currency(fundos)}
+              icon={<Wallet className="h-5 w-5 text-emerald-500" />}
+              bgIcon="bg-emerald-500/10"
             />
             <KPICard
-              title="Leads Total"
+              title="Total de Leads"
               value={totalLeads.toString()}
               icon={<Target className="h-5 w-5 text-blue-500" />}
               bgIcon="bg-blue-500/10"
             />
             <KPICard
-              title="CPL Total"
-              value={currency(totalCPL)}
+              title="Seguidores"
+              value={formatNumber(totalFollowers)}
+              icon={<Users className="h-5 w-5 text-pink-500" />}
+              bgIcon="bg-pink-500/10"
+            />
+            <KPICard
+              title="Taxa de Conversão"
+              value={`${conversionRate.toFixed(2)}%`}
               icon={<TrendingUp className="h-5 w-5 text-purple-500" />}
               bgIcon="bg-purple-500/10"
+            />
+            <KPICard
+              title="Investimento Total"
+              value={currency(totalSpend)}
+              icon={<DollarSign className="h-5 w-5 text-orange-500" />}
+              bgIcon="bg-orange-500/10"
             />
           </div>
 
@@ -366,6 +384,7 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
                         <th className="text-right py-3 px-4 font-medium text-sm">Cliques</th>
                         <th className="text-right py-3 px-4 font-medium text-sm">Gasto</th>
                         <th className="text-right py-3 px-4 font-medium text-sm">Leads</th>
+                        <th className="text-right py-3 px-4 font-medium text-sm">Seguidores</th>
                         <th className="text-right py-3 px-4 font-medium text-sm">CPL</th>
                         <th className="text-right py-3 px-4 font-medium text-sm">Ações</th>
                       </tr>
@@ -374,6 +393,7 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
                       {activeCampaigns.map((campaign) => {
                         const spend = campaign.insights?.spend || 0;
                         const conversions = campaign.insights?.conversions || 0;
+                        const followers = campaign.insights?.followers || 0;
                         const cpl = conversions > 0 ? spend / conversions : 0;
                         return (
                           <tr
@@ -397,6 +417,9 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
                             <td className="py-4 px-4 text-right">{currency(spend)}</td>
                             <td className="py-4 px-4 text-right text-green-600 dark:text-green-400 font-bold">
                               {conversions}
+                            </td>
+                            <td className="py-4 px-4 text-right text-pink-600 dark:text-pink-400">
+                              {followers > 0 ? formatNumber(followers) : '—'}
                             </td>
                             <td className="py-4 px-4 text-right">{currency(cpl)}</td>
                             <td className="py-4 px-4 text-right">
