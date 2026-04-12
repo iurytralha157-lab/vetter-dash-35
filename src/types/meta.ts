@@ -32,6 +32,8 @@ export interface MetaAccountMetrics {
 
 export interface MetaAccountBalance {
   balance: number;
+  balance_raw: number;
+  funds_amount: number | null;
   amount_spent: number;
   spend_cap: number | null;
   currency: string;
@@ -40,6 +42,7 @@ export interface MetaAccountBalance {
   disable_reason: number | null;
   is_prepay_account: boolean;
   funding_source_details: any | null;
+  funding_source_type: string | null;
 }
 
 export interface MetaAdsResponse {
