@@ -89,7 +89,7 @@ function GlobalDashboardView({ period, refreshKey, onRefreshingChange }: { perio
 
   const fetchAll = async (forceRefresh = false) => {
     setLoading(true);
-    if (forceRefresh) setRefreshing(true);
+    if (forceRefresh) onRefreshingChange(true);
 
     try {
       // 1. Get all active accounts with Meta
