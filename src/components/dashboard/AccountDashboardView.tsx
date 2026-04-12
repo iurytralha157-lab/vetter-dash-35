@@ -418,6 +418,9 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
                             <td className="py-4 px-4 text-right text-green-600 dark:text-green-400 font-bold">
                               {conversions}
                             </td>
+                            <td className="py-4 px-4 text-right text-pink-600 dark:text-pink-400">
+                              {followers > 0 ? formatNumber(followers) : '—'}
+                            </td>
                             <td className="py-4 px-4 text-right">{currency(cpl)}</td>
                             <td className="py-4 px-4 text-right">
                               <Button
