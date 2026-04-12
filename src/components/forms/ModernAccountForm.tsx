@@ -42,6 +42,17 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { evolutionApiService } from "@/services/evolutionApiService";
 
 // Schema simplificado
+const normalizeModoSaldoMeta = (value: unknown): "Cartão" | "Pix" | "Pré-pago (crédito)" | undefined => {
+  if (value === undefined || value === null || value === "") return undefined;
+
+  const normalized = String(value).trim();
+  if (["Cartão", "card_ok", "card_failing"].includes(normalized)) return "Cartão";
+  if (normalized === "Pix") return "Pix";
+  if (["Pré-pago (crédito)", "funds"].includes(normalized)) return "Pré-pago (crédito)";
+
+  return undefined;
+};
+
 const contaSchema = z.object({
   nome_cliente: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
   telefone: z.string().optional().or(z.literal("")),
@@ -55,7 +66,10 @@ const contaSchema = z.object({
   meta_account_id: z.string().optional(),
   meta_business_id: z.string().optional(),
   meta_page_id: z.string().optional(),
-  modo_saldo_meta: z.enum(["Cartão", "Pix", "Pré-pago (crédito)"]).optional(),
+  modo_saldo_meta: z.preprocess(
+    normalizeModoSaldoMeta,
+    z.enum(["Cartão", "Pix", "Pré-pago (crédito)"]).optional()
+  ),
   saldo_meta: z.number().optional(),
   alerta_saldo_baixo: z.number().optional(),
   budget_mensal_meta: z.number().optional(),
@@ -102,7 +116,7 @@ const makeDefaults = (d?: Partial<ContaFormData>): ContaFormData => ({
   meta_account_id: d?.meta_account_id ?? "",
   meta_business_id: d?.meta_business_id ?? "",
   meta_page_id: d?.meta_page_id ?? "",
-  modo_saldo_meta: (d?.modo_saldo_meta as any) ?? "Pix",
+  modo_saldo_meta: normalizeModoSaldoMeta(d?.modo_saldo_meta) ?? "Pix",
   saldo_meta: num(d?.saldo_meta, 0),
   alerta_saldo_baixo: num(d?.alerta_saldo_baixo, 200),
   budget_mensal_meta: num(d?.budget_mensal_meta, 0),
