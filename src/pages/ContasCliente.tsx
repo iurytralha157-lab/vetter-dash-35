@@ -48,6 +48,7 @@ interface AccountData {
   usa_meta_ads?: boolean;
   meta_account_id?: string;
   saldo_meta?: number;
+  alerta_saldo_baixo?: number;
   budget_mensal_meta?: number;
   usa_google_ads?: boolean;
   google_ads_id?: string;
