@@ -441,6 +441,7 @@ function buildCampaignReport(
   // Extract leads from actions
   let leads = 0;
   let leadType = '';
+  let followers = 0;
   if (insights?.actions) {
     for (const action of insights.actions) {
       if (action.action_type === 'onsite_conversion.messaging_conversation_started_7d') {
@@ -449,6 +450,8 @@ function buildCampaignReport(
       } else if (action.action_type === 'lead') {
         leads += parseInt(action.value || '0');
         leadType = leadType || 'Formulário';
+      } else if (action.action_type === 'like' || action.action_type === 'page_like') {
+        followers += parseInt(action.value || '0');
       }
     }
   }
@@ -468,7 +471,8 @@ function buildCampaignReport(
   msg += `  · Alcance: ${reach.toLocaleString('pt-BR')}\n`;
   msg += `  · Cliques no link: ${clicks.toLocaleString('pt-BR')}\n`;
   msg += `  · CTR: ${ctr.toFixed(2)}%\n`;
-  msg += `  · CPM: ${fmtCurrency(cpm)}`;
+  msg += `  · CPM: ${fmtCurrency(cpm)}\n`;
+  msg += `  · Seguidores: ${followers > 0 ? followers.toLocaleString('pt-BR') : '0'}`;
 
   if (leads > 0) {
     msg += `\n\n📊 *DETALHES DE CONVERSÃO:*\n`;
