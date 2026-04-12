@@ -25,6 +25,7 @@ Deno.serve(async (req) => {
       telefone_origem,
       nome_origem,
       usuario_origem,
+      force_update,
     } = body;
 
     if (!mensagem_original || mensagem_original.trim().length < 5) {
@@ -48,17 +49,19 @@ Deno.serve(async (req) => {
     const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(msg.toLowerCase()));
     const mensagem_hash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
 
-    // Check duplicate
-    const { data: existing } = await supabase
-      .from("feedback_campanha")
-      .select("id")
-      .eq("mensagem_hash", mensagem_hash)
-      .maybeSingle();
+    // Check duplicate (exact message)
+    if (!force_update) {
+      const { data: existing } = await supabase
+        .from("feedback_campanha")
+        .select("id")
+        .eq("mensagem_hash", mensagem_hash)
+        .maybeSingle();
 
-    if (existing) {
-      return new Response(JSON.stringify({ success: true, duplicado: true, message: "Mensagem já processada" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      if (existing) {
+        return new Response(JSON.stringify({ success: true, duplicado: true, message: "Mensagem já processada" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const sharedFields = {
@@ -115,6 +118,118 @@ Deno.serve(async (req) => {
       dataFim = dataInicio;
     }
 
+    // === RULE 3: Check existing feedback for same account + date ===
+    if (!force_update) {
+      const { data: existingFeedback } = await supabase
+        .from("feedback_campanha")
+        .select("id, campanha_nome, quantidade_recebida, quantidade_descartado, quantidade_aguardando_retorno, quantidade_atendimento, quantidade_passou_corretor, quantidade_visita, quantidade_proposta, quantidade_venda, tipo_funil, data_referencia")
+        .eq("account_id", account_id)
+        .gte("data_referencia", dataInicio)
+        .lte("data_referencia", dataFim)
+        .neq("campanha_nome", "desconhecida");
+
+      if (existingFeedback && existingFeedback.length > 0) {
+        // There's already feedback for this day — return existing data and ask for confirmation
+        return new Response(JSON.stringify({
+          success: true,
+          existing_feedback: true,
+          message: "Já existe feedback registrado para esse período. Deseja atualizar?",
+          existing_data: existingFeedback,
+          data_inicio: dataInicio,
+          data_fim: dataFim,
+          periodo_detectado: periodoDetectado,
+          new_parsed: {
+            tipo_funil: tipoFunil,
+            campanhas: campaigns,
+          },
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // === If force_update, delete old feedback for this account+date range first ===
+    if (force_update) {
+      const { error: deleteError } = await supabase
+        .from("feedback_campanha")
+        .delete()
+        .eq("account_id", account_id)
+        .gte("data_referencia", dataInicio)
+        .lte("data_referencia", dataFim);
+
+      if (deleteError) {
+        console.error("[process-feedback] Delete old feedback error:", deleteError);
+      } else {
+        console.log("[process-feedback] Deleted old feedback for update");
+      }
+    }
+
+    // === RULE 1: Cap leads_recebidos to Meta total leads ===
+    let metaTotalLeads: number | null = null;
+    try {
+      let query = supabase
+        .from("campaign_history")
+        .select("leads")
+        .eq("account_id", account_id);
+
+      if (dataInicio === dataFim) {
+        query = query.eq("date", dataInicio);
+      } else {
+        query = query.gte("date", dataInicio).lte("date", dataFim);
+      }
+
+      const { data: campData } = await query;
+      if (campData && campData.length > 0) {
+        metaTotalLeads = campData.reduce((s: number, c: any) => s + (c.leads || 0), 0);
+      }
+    } catch (e) {
+      console.error("[process-feedback] Meta leads query error:", e);
+    }
+
+    // Apply cap: total quantidade_recebida across all campaigns cannot exceed metaTotalLeads
+    if (metaTotalLeads !== null && metaTotalLeads > 0 && campaigns.length > 0) {
+      const totalRecebida = campaigns.reduce((s, c) => s + (c.quantidade_recebida || 0), 0);
+      if (totalRecebida > metaTotalLeads) {
+        // Proportionally cap each campaign's quantidade_recebida
+        const ratio = metaTotalLeads / totalRecebida;
+        let remaining = metaTotalLeads;
+        for (let i = 0; i < campaigns.length; i++) {
+          if (campaigns[i].quantidade_recebida != null) {
+            if (i === campaigns.length - 1) {
+              campaigns[i].quantidade_recebida = remaining;
+            } else {
+              const capped = Math.round((campaigns[i].quantidade_recebida || 0) * ratio);
+              campaigns[i].quantidade_recebida = capped;
+              remaining -= capped;
+            }
+          }
+        }
+        console.log(`[process-feedback] Capped leads_recebidos from ${totalRecebida} to ${metaTotalLeads} (Meta total)`);
+      }
+    }
+
+    // === RULE 2: Validate sub-stages sum per campaign ===
+    // The sum of sub-stages should not exceed quantidade_recebida
+    for (const camp of campaigns) {
+      if (camp.quantidade_recebida != null && camp.quantidade_recebida > 0) {
+        const subStagesSum =
+          (camp.quantidade_descartado || 0) +
+          (camp.quantidade_aguardando_retorno || 0) +
+          (camp.quantidade_atendimento || 0) +
+          (camp.quantidade_passou_corretor || 0) +
+          (camp.quantidade_visita || 0) +
+          (camp.quantidade_proposta || 0) +
+          (camp.quantidade_venda || 0);
+
+        // If sub-stages don't add up and there's a gap, add the difference to aguardando_retorno
+        if (subStagesSum < camp.quantidade_recebida) {
+          const gap = camp.quantidade_recebida - subStagesSum;
+          camp.quantidade_aguardando_retorno = (camp.quantidade_aguardando_retorno || 0) + gap;
+          console.log(`[process-feedback] Campaign "${camp.campanha_nome}": added ${gap} to aguardando_retorno to match leads_recebidos`);
+        }
+      }
+    }
+
     // If AI failed, save a raw record
     if (campaigns.length === 0) {
       const { error: insertError } = await supabase.from("feedback_campanha").insert({
@@ -150,7 +265,6 @@ Deno.serve(async (req) => {
     // Insert one record per campaign
     const inserted: any[] = [];
     for (const camp of campaigns) {
-      // Use campaign-level date if provided, otherwise use global date
       const campDataRef = camp.data_referencia || dataInicio;
 
       const record = {
@@ -190,6 +304,7 @@ Deno.serve(async (req) => {
       periodo_detectado: periodoDetectado,
       data_inicio: dataInicio,
       data_fim: dataFim,
+      meta_total_leads: metaTotalLeads,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -259,6 +374,11 @@ REGRA CRÍTICA de valores:
 - NÃO invente, assuma ou estime valores.
 - Somente retorne um número quando ele estiver explícito na mensagem.
 
+REGRA IMPORTANTE sobre coerência:
+- Se o usuário informou "X leads recebidos" e depois deu o status de cada um, a SOMA dos status deve bater com X.
+- Se a soma dos status informados for MENOR que os leads recebidos, os restantes devem ficar como "aguardando retorno" (quantidade_aguardando_retorno).
+- Se nenhum campo "leads recebidos" for informado explicitamente, NÃO invente — retorne null.
+
 PERÍODO/DATA:
 - Extraia datas ou períodos mencionados na mensagem.
 - Formatos aceitos: "ontem", "hoje", "dd/mm", "dd/mm/yyyy", "dia tal ao dia tal", "últimos 7 dias", "semana passada", "mês passado", etc.
@@ -279,7 +399,9 @@ Mensagem: "47: 2 lead recebido, aguardando retorno / ap0145: 3 lead recebido, 2 
 Resultado esperado:
 - tipo_funil: "terceiros" (mencionou corretor)
 - campanha "47": quantidade_recebida=2, quantidade_aguardando_retorno=2
-- campanha "ap0145": quantidade_recebida=3, quantidade_passou_corretor=2
+- campanha "ap0145": quantidade_recebida=3, quantidade_passou_corretor=2, quantidade_aguardando_retorno=1
+
+Note no exemplo acima: campanha ap0145 tem 3 recebidos, 2 com corretor. O 1 restante vai para aguardando_retorno automaticamente.
 
 Retorne usando a tool extract_feedback_campaigns.`;
 
