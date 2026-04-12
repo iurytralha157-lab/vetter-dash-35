@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { UnifiedPeriodFilter, type UnifiedPeriod } from "@/components/ui/unified-period-filter";
 import { AccountSelector } from "@/components/dashboard/AccountSelector";
 import { AccountDashboardView } from "@/components/dashboard/AccountDashboardView";
