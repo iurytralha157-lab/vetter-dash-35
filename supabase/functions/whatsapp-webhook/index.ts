@@ -154,7 +154,7 @@ async function processCommand(
       responseText = await handleLeadsCampaign(account, campaignRef, supabase);
     } else if (cmd === "#resumo") {
       responseText = await handleResumo(account, supabase);
-    } else if (cmd === "#ajuda" || cmd === "#help") {
+    } else if (cmd === "#ajuda" || cmd === "#help" || cmd === "#comandos") {
       responseText = getHelpText(account.nome_cliente);
     } else {
       responseText = `❓ Comando não reconhecido.\n\nDigite *#ajuda* para ver os comandos disponíveis.`;
@@ -1040,27 +1040,44 @@ async function handleResumo(account: any, supabase: any): Promise<string> {
 }
 
 function getHelpText(clientName: string): string {
-  return `🤖 *Comandos - ${clientName}*\n\n` +
-    `💰 *#saldo* — Saldo em tempo real\n` +
-    `💸 *#gasto* — Investimento por período\n` +
-    `   Ex: #gasto 7, #gasto 30, #gasto março\n\n` +
-    `📊 *#campanhas* — Campanhas ativas com gasto hoje\n` +
-    `📊 *#campanhas 7* — Últimos 7 dias\n` +
-    `📊 *#campanhas março* — Mês específico\n` +
-    `📊 *#campanhas 01/03 a 15/03* — Período específico\n\n` +
-    `📋 Após listar campanhas:\n` +
-    `   *#1*, *#2*... — Relatório da campanha N\n` +
-    `   *#1 #3* — Várias campanhas\n` +
-    `   *#todas* — Relatório de todas\n` +
-    `   *#sim* — Ver opções disponíveis\n\n` +
-    `📑 *#relatorio* — Relatório de todas as campanhas ativas\n\n` +
-    `👥 *#leads* — Resumo de leads\n` +
-    `👥 *#leads{N}* — Leads da campanha N\n\n` +
-    `📊 *#resumo* — Resumo geral\n` +
-    `📝 *#feedback* — Registrar feedback\n` +
-    `📊 *#funil* — Funil consolidado\n` +
-    `🔄 *#followup* — Registrar follow-up\n\n` +
-    `❓ *#ajuda* — Esta mensagem`;
+  return `🤖 *Central de Comandos*\n` +
+    `📌 *${clientName}*\n\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `💰 *FINANCEIRO*\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `▸ *#saldo* → Saldo em tempo real\n` +
+    `▸ *#gasto* → Investimento de hoje\n` +
+    `▸ *#gasto 7* → Últimos 7 dias\n` +
+    `▸ *#gasto 30* → Últimos 30 dias\n` +
+    `▸ *#gasto março* → Mês específico\n` +
+    `▸ *#gasto 01/03 a 15/03* → Período\n\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `📊 *CAMPANHAS*\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `▸ *#campanhas* → Ativas com gasto hoje\n` +
+    `▸ *#campanhas 7* → Últimos 7 dias\n` +
+    `▸ *#campanhas março* → Mês específico\n` +
+    `▸ *#campanhas 01/03 a 15/03* → Período\n` +
+    `▸ *#relatorio* → Relatório completo\n\n` +
+    `📋 _Após listar campanhas:_\n` +
+    `▸ *#1*, *#2* → Detalhe da campanha\n` +
+    `▸ *#1 #3* → Várias de uma vez\n` +
+    `▸ *#todas* → Detalhe de todas\n\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `👥 *LEADS*\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `▸ *#leads* → Resumo de leads\n` +
+    `▸ *#leads 5* → Leads da campanha 5\n` +
+    `▸ *#resumo* → Visão geral completa\n\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `📝 *OPERACIONAL*\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `▸ *#feedback* → Registrar feedback\n` +
+    `▸ *#followup* → Registrar follow-up\n` +
+    `▸ *#funil* → Funil consolidado\n\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `❓ *#comandos* → Esta mensagem\n` +
+    `❓ *#ajuda* → Esta mensagem`;
 }
 
 // ─── Saldo Handler ───
