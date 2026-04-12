@@ -46,6 +46,7 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
   const [campaigns, setCampaigns] = useState<MetaCampaign[]>([]);
   const [metaAccountId, setMetaAccountId] = useState<string | null>(null);
   const [accountName, setAccountName] = useState("");
+  const [accountBalance, setAccountBalance] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<MetaCampaign | null>(null);
   const [funnelData, setFunnelData] = useState<{
@@ -82,6 +83,7 @@ export function AccountDashboardView({ accountId, period }: AccountDashboardView
       if (data?.success) {
         setMetrics(data.account_metrics || null);
         setCampaigns(Array.isArray(data.campaigns) ? data.campaigns : []);
+        setAccountBalance(data.account_balance || null);
       }
     } catch (error) {
       console.error("Erro ao buscar Meta Ads:", error);
