@@ -247,15 +247,19 @@ export function ModernAccountForm({
               }
               form.handleSubmit(handleSubmit, (errors) => {
                 console.error("Validation errors:", errors);
-                // Navigate to the step with errors
+                const firstError = Object.values(errors)[0];
+                const firstMessage = firstError && typeof firstError === "object" && "message" in firstError
+                  ? String(firstError.message)
+                  : "Verifique os campos do formulário";
+
                 if (errors.nome_cliente || errors.id_grupo || errors.telefone || errors.email || errors.link_drive) {
                   setStep(1);
-                  toast({ title: "Erro de validação", description: "Verifique os campos obrigatórios na etapa 1", variant: "destructive" });
-                } else if (errors.canais) {
+                  toast({ title: "Erro de validação", description: firstMessage, variant: "destructive" });
+                } else if (errors.canais || errors.usa_meta_ads || errors.meta_account_id || errors.meta_business_id || errors.meta_page_id || errors.modo_saldo_meta || errors.saldo_meta || errors.alerta_saldo_baixo || errors.budget_mensal_meta || errors.usa_google_ads || errors.google_ads_id || errors.budget_mensal_google) {
                   setStep(2);
-                  toast({ title: "Erro de validação", description: "Selecione pelo menos um canal na etapa 2", variant: "destructive" });
+                  toast({ title: "Erro de validação", description: firstMessage, variant: "destructive" });
                 } else {
-                  toast({ title: "Erro de validação", description: "Verifique os campos do formulário", variant: "destructive" });
+                  toast({ title: "Erro de validação", description: firstMessage, variant: "destructive" });
                 }
               })(e);
             }}
