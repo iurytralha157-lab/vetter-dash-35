@@ -79,12 +79,18 @@ Deno.serve(async (req) => {
     let processamentoStatus = "pendente";
     let processamentoErro: string | null = null;
     let aiJson: any = null;
+    let dataInicio: string | null = null;
+    let dataFim: string | null = null;
+    let periodoDetectado = false;
 
     if (lovableApiKey) {
       try {
         const result = await callAI(msg, lovableApiKey, aiModel);
         tipoFunil = result.tipo_funil;
         campaigns = result.campanhas;
+        dataInicio = result.data_inicio || null;
+        dataFim = result.data_fim || null;
+        periodoDetectado = !!(dataInicio);
         aiJson = result;
         processamentoStatus = "processado";
       } catch (err) {
@@ -97,13 +103,25 @@ Deno.serve(async (req) => {
       processamentoErro = "LOVABLE_API_KEY not configured";
     }
 
+    // If no date detected, default to yesterday
+    if (!dataInicio) {
+      const nowBRT = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+      const yesterday = new Date(nowBRT);
+      yesterday.setDate(yesterday.getDate() - 1);
+      dataInicio = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+      dataFim = dataInicio;
+    }
+    if (!dataFim) {
+      dataFim = dataInicio;
+    }
+
     // If AI failed, save a raw record
     if (campaigns.length === 0) {
       const { error: insertError } = await supabase.from("feedback_campanha").insert({
         ...sharedFields,
         tipo_funil: tipoFunil || "lancamento",
         campanha_nome: "desconhecida",
-        data_referencia: new Date().toISOString().split("T")[0],
+        data_referencia: dataInicio,
         processamento_status: processamentoStatus,
         processamento_erro: processamentoErro,
         ai_modelo: aiModel,
@@ -116,6 +134,9 @@ Deno.serve(async (req) => {
         success: true,
         processamento_status: processamentoStatus,
         campanhas_count: 0,
+        periodo_detectado: periodoDetectado,
+        data_inicio: dataInicio,
+        data_fim: dataFim,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -129,12 +150,15 @@ Deno.serve(async (req) => {
     // Insert one record per campaign
     const inserted: any[] = [];
     for (const camp of campaigns) {
+      // Use campaign-level date if provided, otherwise use global date
+      const campDataRef = camp.data_referencia || dataInicio;
+
       const record = {
         ...sharedFields,
         tipo_funil: tipoFunil,
         campanha_nome: camp.campanha_nome || "desconhecida",
         campanha_codigo_curto: camp.campanha_codigo_curto ?? null,
-        data_referencia: camp.data_referencia || new Date().toISOString().split("T")[0],
+        data_referencia: campDataRef,
         quantidade_recebida: camp.quantidade_recebida ?? null,
         quantidade_descartado: camp.quantidade_descartado ?? null,
         quantidade_aguardando_retorno: camp.quantidade_aguardando_retorno ?? null,
@@ -163,6 +187,9 @@ Deno.serve(async (req) => {
       tipo_funil: tipoFunil,
       campanhas_count: inserted.length,
       campanhas: inserted.map(c => ({ nome: c.campanha_nome, recebidos: c.quantidade_recebida })),
+      periodo_detectado: periodoDetectado,
+      data_inicio: dataInicio,
+      data_fim: dataFim,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -189,7 +216,14 @@ interface CampaignData {
   quantidade_venda: number | null;
 }
 
-async function callAI(mensagem: string, apiKey: string, model: string): Promise<{ tipo_funil: string; campanhas: CampaignData[] }> {
+interface AIResult {
+  tipo_funil: string;
+  campanhas: CampaignData[];
+  data_inicio: string | null;
+  data_fim: string | null;
+}
+
+async function callAI(mensagem: string, apiKey: string, model: string): Promise<AIResult> {
   const systemPrompt = `Você é um assistente que interpreta mensagens de feedback de vendas imobiliárias enviadas via WhatsApp.
 
 A mensagem segue o formato:
@@ -215,9 +249,20 @@ REGRA CRÍTICA:
 - NÃO preencha campos ausentes com 0 ou qualquer outro valor.
 - Somente retorne um número quando ele estiver explícito na mensagem.
 
+PERÍODO/DATA:
+- Extraia datas ou períodos mencionados na mensagem.
+- Formatos aceitos: "ontem", "hoje", "dd/mm", "dd/mm/yyyy", "dia tal ao dia tal", "últimos 7 dias", "semana passada", "mês passado", etc.
+- Se for um intervalo (ex: "01/07 a 10/07"), extraia data_inicio e data_fim.
+- Se for uma data única (ex: "ontem", "10/07"), use a mesma data para data_inicio e data_fim.
+- Se NENHUMA data ou período for mencionado, retorne null para ambos.
+- Use formato YYYY-MM-DD. Considere o ano atual (${new Date().getFullYear()}) se não especificado.
+- "ontem" = dia anterior à data atual.
+- "hoje" = data atual.
+
 Extraia:
 1. tipo_funil: "lancamento" ou "terceiros" (da linha logo após #feedback)
-2. Para cada campanha mencionada, extraia APENAS as quantidades explicitamente informadas
+2. data_inicio e data_fim: o período do feedback (null se não mencionado)
+3. Para cada campanha mencionada, extraia APENAS as quantidades explicitamente informadas
 
 Retorne usando a tool extract_feedback_campaigns.`;
 
@@ -238,7 +283,7 @@ Retorne usando a tool extract_feedback_campaigns.`;
           type: "function",
           function: {
             name: "extract_feedback_campaigns",
-            description: "Extract campaign-level feedback data from a WhatsApp message",
+            description: "Extract campaign-level feedback data from a WhatsApp message, including date/period",
             parameters: {
               type: "object",
               properties: {
@@ -246,6 +291,14 @@ Retorne usando a tool extract_feedback_campaigns.`;
                   type: "string",
                   enum: ["lancamento", "terceiros"],
                   description: "Tipo do funil, extraído da linha após #feedback",
+                },
+                data_inicio: {
+                  type: ["string", "null"],
+                  description: "Data início do período do feedback no formato YYYY-MM-DD. null se não mencionado.",
+                },
+                data_fim: {
+                  type: ["string", "null"],
+                  description: "Data fim do período do feedback no formato YYYY-MM-DD. null se não mencionado.",
                 },
                 campanhas: {
                   type: "array",
@@ -289,6 +342,8 @@ Retorne usando a tool extract_feedback_campaigns.`;
     return {
       tipo_funil: parsed.tipo_funil || "lancamento",
       campanhas: Array.isArray(parsed.campanhas) ? parsed.campanhas : [],
+      data_inicio: parsed.data_inicio || null,
+      data_fim: parsed.data_fim || null,
     };
   }
 
@@ -299,6 +354,8 @@ Retorne usando a tool extract_feedback_campaigns.`;
     return {
       tipo_funil: parsed.tipo_funil || "lancamento",
       campanhas: Array.isArray(parsed.campanhas) ? parsed.campanhas : [],
+      data_inicio: parsed.data_inicio || null,
+      data_fim: parsed.data_fim || null,
     };
   }
 

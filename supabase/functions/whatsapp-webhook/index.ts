@@ -486,20 +486,37 @@ async function handleFeedback(
       console.error("[whatsapp-webhook] followup from feedback error:", e);
     }
 
-    // 3. Cross-reference with campaign data — check yesterday's leads
+    // 3. Check if period was detected
+    const periodoDetectado = feedbackResult.periodo_detectado === true;
+    const dataInicio = feedbackResult.data_inicio;
+    const dataFim = feedbackResult.data_fim;
+    let periodMsg = "";
+
+    if (!periodoDetectado) {
+      // No date was mentioned - ask for it
+      periodMsg = `\n⚠️ *Período não informado!*\n`;
+      periodMsg += `Registramos como *ontem* por padrão.\n`;
+      periodMsg += `\nSe o período for diferente, envie:\n`;
+      periodMsg += `*#feedback* _do dia 01/07 ao dia 10/07_\n`;
+      periodMsg += `_[cole o feedback novamente com a data]_\n`;
+    }
+
+    // 4. Cross-reference with campaign data for the detected period
     let crossRefMsg = "";
     try {
-      const nowBRT = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-      const yesterday = new Date(nowBRT);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
-
-      // Get leads from campaign_history for yesterday
-      const { data: campData } = await supabase
+      // Use detected dates for cross-reference
+      let query = supabase
         .from("campaign_history")
         .select("campaign_name, leads, spend")
-        .eq("account_id", account.id)
-        .eq("date", yesterdayStr);
+        .eq("account_id", account.id);
+
+      if (dataInicio === dataFim) {
+        query = query.eq("date", dataInicio);
+      } else {
+        query = query.gte("date", dataInicio).lte("date", dataFim);
+      }
+
+      const { data: campData } = await query;
 
       if (campData && campData.length > 0) {
         const totalCampaignLeads = campData.reduce((s: number, c: any) => s + (c.leads || 0), 0);
@@ -510,23 +527,32 @@ async function handleFeedback(
           totalReported = feedbackResult.campanhas.reduce((s: number, c: any) => s + (c.recebidos || 0), 0);
         }
 
+        const periodLabel = dataInicio === dataFim
+          ? dataInicio.split('-').reverse().join('/')
+          : `${dataInicio.split('-').reverse().join('/')} a ${dataFim.split('-').reverse().join('/')}`;
+
         if (totalCampaignLeads > 0 && totalReported > 0) {
           const diff = totalCampaignLeads - totalReported;
           if (diff > 0) {
-            crossRefMsg = `\n⚠️ *Atenção:* Nas campanhas registramos *${totalCampaignLeads} leads* ontem, mas o feedback reportou apenas *${totalReported}*.\n`;
+            crossRefMsg = `\n⚠️ *Atenção:* Nas campanhas registramos *${totalCampaignLeads} leads* no período, mas o feedback reportou apenas *${totalReported}*.\n`;
             crossRefMsg += `📌 Faltam *${diff} lead(s)* sem feedback. Qual foi o status deles?\n`;
             crossRefMsg += `\n_Responda com #feedback informando o status dos ${diff} leads restantes._\n`;
           } else if (diff < 0) {
-            crossRefMsg += `\nℹ️ O feedback reportou *${totalReported} leads*, acima dos *${totalCampaignLeads}* registrados nas campanhas ontem. Pode incluir leads de outros dias.\n`;
+            crossRefMsg += `\nℹ️ O feedback reportou *${totalReported} leads*, acima dos *${totalCampaignLeads}* registrados nas campanhas. Pode incluir leads de outros períodos.\n`;
           }
         }
 
         // Show campaign breakdown
-        const activeCamps = campData.filter((c: any) => (c.leads || 0) > 0);
+        // Aggregate by campaign_name across date range
+        const campAgg = new Map<string, number>();
+        campData.forEach((c: any) => {
+          campAgg.set(c.campaign_name, (campAgg.get(c.campaign_name) || 0) + (c.leads || 0));
+        });
+        const activeCamps = Array.from(campAgg.entries()).filter(([_, leads]) => leads > 0);
         if (activeCamps.length > 0) {
-          crossRefMsg += `\n📊 *Campanhas ontem (${yesterdayStr.split('-').reverse().join('/')}):*\n`;
-          for (const c of activeCamps) {
-            crossRefMsg += `   • ${c.campaign_name}: *${c.leads || 0}* leads\n`;
+          crossRefMsg += `\n📊 *Campanhas no período (${periodLabel}):*\n`;
+          for (const [name, leads] of activeCamps) {
+            crossRefMsg += `   • ${name}: *${leads}* leads\n`;
           }
         }
       }
@@ -534,11 +560,16 @@ async function handleFeedback(
       console.error("[whatsapp-webhook] Cross-reference error:", crossRefErr);
     }
 
-    // 4. Build response message
+    // 5. Build response message
+    const periodLabel = dataInicio === dataFim
+      ? dataInicio.split('-').reverse().join('/')
+      : `${dataInicio.split('-').reverse().join('/')} a ${dataFim.split('-').reverse().join('/')}`;
+
     let msg = `✅ *Feedback registrado com sucesso!*\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
     msg += `👤 Enviado por: *${senderName}*\n`;
     msg += `🏢 Conta: *${account.nome_cliente}*\n`;
+    msg += `📅 Período: *${periodLabel}*${!periodoDetectado ? ' _(padrão)_' : ''}\n`;
 
     if (feedbackResult.tipo_funil) {
       msg += `📋 Tipo: *${feedbackResult.tipo_funil === "terceiros" ? "Terceiros" : "Lançamento"}*\n`;
@@ -557,6 +588,7 @@ async function handleFeedback(
       msg += `\n👥 *${followupResult.leads_count} lead(s) individual(is) registrado(s) no funil*\n`;
     }
 
+    msg += periodMsg;
     msg += crossRefMsg;
     msg += `\n💡 Use *#funil* para ver o funil consolidado.`;
     return msg;
