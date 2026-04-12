@@ -35,6 +35,8 @@ const formatNumber = (value: number) => {
 export default function Dashboard() {
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [period, setPeriod] = useState<UnifiedPeriod>("last_7d");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   return (
     <AppLayout>
@@ -47,14 +49,23 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
             <UnifiedPeriodFilter value={period} onChange={(v) => setPeriod(v)} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setRefreshKey((k) => k + 1); }}
+              disabled={refreshing}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              Atualizar
+            </Button>
           </div>
-
         </div>
 
         {selectedAccount ? (
           <AccountDashboardView accountId={selectedAccount} period={period} />
         ) : (
-          <GlobalDashboardView period={period} />
+          <GlobalDashboardView period={period} refreshKey={refreshKey} onRefreshingChange={setRefreshing} />
         )}
       </div>
     </AppLayout>
