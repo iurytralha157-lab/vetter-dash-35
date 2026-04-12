@@ -48,6 +48,7 @@ interface AccountData {
   usa_meta_ads?: boolean;
   meta_account_id?: string;
   saldo_meta?: number;
+  alerta_saldo_baixo?: number;
   budget_mensal_meta?: number;
   usa_google_ads?: boolean;
   google_ads_id?: string;
@@ -348,10 +349,21 @@ export default function ContasCliente() {
               : account.status === "Pausado" ? "bg-yellow-500"
               : "bg-muted-foreground";
 
+            // Balance-based card styling
+            const saldo = account.saldo_meta ?? 0;
+            const limite = account.alerta_saldo_baixo ?? 200;
+            const isZeroBalance = account.usa_meta_ads && saldo <= 0;
+            const isLowBalance = account.usa_meta_ads && !isZeroBalance && saldo < limite;
+            const cardBorderClass = isZeroBalance
+              ? "border-red-500/50 hover:border-red-500/70"
+              : isLowBalance
+              ? "border-yellow-500/50 hover:border-yellow-500/70"
+              : "border-border hover:border-primary/25";
+
             return (
               <Card
                 key={account.id}
-                className="relative overflow-hidden transition-colors cursor-pointer border-border hover:border-primary/25"
+                className={`relative overflow-hidden transition-colors cursor-pointer ${cardBorderClass}`}
                 onClick={() => handleViewAccount(account.id)}
               >
                 <div className={`absolute left-0 top-0 h-full w-1 ${statusColor}`} />
@@ -391,18 +403,35 @@ export default function ContasCliente() {
                         <span className="flex items-center gap-1"><User className="h-3 w-3" />{account.gestor_name}</span>
                       </div>
 
-                      {/* Real metrics only */}
+                      {/* Balance display */}
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                          <Wallet className="h-3 w-3" />
-                          Budget: <span className="text-foreground font-medium">{formatMoney(account.total_budget)}</span>
-                        </span>
-                        {!!account.saldo_meta && account.saldo_meta > 0 && (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-blue-500">
-                            <Wallet className="h-3 w-3" />
-                            Saldo Meta: <span className="font-medium">{formatMoney(account.saldo_meta / 100)}</span>
-                          </span>
-                        )}
+                        {(() => {
+                          const saldo = account.saldo_meta ?? 0;
+                          const limite = account.alerta_saldo_baixo ?? 200;
+                          const isZero = saldo <= 0;
+                          const isLow = !isZero && saldo < limite;
+
+                          return (
+                            <>
+                              <span className={`inline-flex items-center gap-1 text-[11px] ${
+                                isZero ? "text-red-500" : isLow ? "text-yellow-500" : "text-muted-foreground"
+                              }`}>
+                                <Wallet className="h-3 w-3" />
+                                Saldo Disponível: <span className="font-medium">{formatMoney(saldo)}</span>
+                              </span>
+                              {isZero && (
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-red-500/50 text-red-500 bg-red-500/10">
+                                  Sem saldo
+                                </Badge>
+                              )}
+                              {isLow && (
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-yellow-500/50 text-yellow-500 bg-yellow-500/10">
+                                  Saldo baixo
+                                </Badge>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
 
