@@ -146,6 +146,11 @@ Deno.serve(async (req) => {
     
     console.log('Date config:', { since, until, period, datePreset });
 
+    // Fetch account info (balance, amount_spent, spend_cap)
+    const accountInfoUrl = `${META_BASE_URL}/${formattedAccountId}?fields=balance,amount_spent,spend_cap,currency,name&access_token=${accessToken}`;
+    console.log('Fetching account info from Meta API...');
+    const accountInfoPromise = fetch(accountInfoUrl);
+
     // Fetch campaigns
     const campaignsUrl = `${META_BASE_URL}/${formattedAccountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget&access_token=${accessToken}`;
     
