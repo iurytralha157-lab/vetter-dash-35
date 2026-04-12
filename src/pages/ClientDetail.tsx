@@ -23,7 +23,7 @@ import {
   ArrowLeft, ExternalLink, RefreshCw, FolderOpen, Building2, Mail, Phone,
   User, Check, X, BarChart3, Link2, TrendingUp, AlertCircle, Instagram,
   Globe, Calendar, DollarSign, Target, Activity, Pencil, Eye, MousePointer,
-  TrendingDown, Zap, PieChart as PieChartIcon
+  TrendingDown, Zap, PieChart as PieChartIcon, CreditCard, AlertTriangle, CheckCircle2, ShieldAlert
 } from "lucide-react";
 import { 
   LineChart, Line, BarChart, Bar, PieChart as RePieChart, Pie, Cell,
