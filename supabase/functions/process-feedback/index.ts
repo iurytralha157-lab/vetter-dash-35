@@ -26,6 +26,7 @@ Deno.serve(async (req) => {
       nome_origem,
       usuario_origem,
       force_update,
+      dry_run,
     } = body;
 
     if (!mensagem_original || mensagem_original.trim().length < 5) {
