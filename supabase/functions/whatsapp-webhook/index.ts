@@ -767,33 +767,30 @@ async function handleFeedback(
       msg += `\n📊 *${feedbackResult.campanhas_count} campanha(s) registrada(s):*\n`;
       if (feedbackResult.campanhas && Array.isArray(feedbackResult.campanhas)) {
         for (const c of feedbackResult.campanhas) {
-          msg += `   • ${c.nome}${c.recebidos ? ` — ${c.recebidos} recebidos` : ""}\n`;
+          // Build stage breakdown
+          const stages: string[] = [];
+          if (c.descartado) stages.push(`${c.descartado} descartado(s)`);
+          if (c.aguardando_retorno) stages.push(`${c.aguardando_retorno} aguardando retorno`);
+          if (c.atendimento) stages.push(`${c.atendimento} em atendimento SDR`);
+          if (c.passou_corretor) stages.push(`${c.passou_corretor} passou para corretor`);
+          if (c.visita) stages.push(`${c.visita} visita(s)`);
+          if (c.proposta) stages.push(`${c.proposta} proposta(s)`);
+          if (c.venda) stages.push(`${c.venda} venda(s)`);
+
+          msg += `   • ${c.nome} — ${c.recebidos || 0} recebidos`;
+          if (stages.length > 0) {
+            msg += ` sendo:\n`;
+            for (const s of stages) {
+              msg += `${s}\n`;
+            }
+          } else {
+            msg += `\n`;
+          }
         }
       }
     }
 
-    // Show individual leads registered in funnel
-    const leadsCount = followupResult?.leads_count || 0;
-    if (leadsCount > 0) {
-      msg += `\n👥 *${leadsCount} lead(s) registrado(s) no funil:*\n`;
-      if (followupResult?.dados && Array.isArray(followupResult.dados)) {
-        for (const lead of followupResult.dados) {
-          const tempIcon = lead.temperatura_lead === "quente" ? "🔴" : lead.temperatura_lead === "morno" ? "🟡" : "🔵";
-          const etapaLabel = {
-            lead_novo: "Novo",
-            contato_iniciado: "Contato iniciado",
-            sem_resposta: "Sem resposta",
-            atendimento: "Em atendimento",
-            visita_agendada: "Visita agendada",
-            visita_realizada: "Visita realizada",
-            proposta: "Proposta",
-            venda: "Venda",
-            perdido: "Perdido",
-          }[lead.etapa_funil] || lead.etapa_funil || "—";
-          msg += `   ${tempIcon} ${lead.lead_nome || "Lead"} — ${etapaLabel}\n`;
-        }
-      }
-    }
+    msg += `\n*Confere para registrar o Feedback?*\n`;
 
     msg += periodMsg;
     msg += crossRefMsg;
