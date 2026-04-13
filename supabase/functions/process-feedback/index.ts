@@ -50,8 +50,8 @@ Deno.serve(async (req) => {
     const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(msg.toLowerCase()));
     const mensagem_hash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
 
-    // Check duplicate (exact message)
-    if (!force_update) {
+    // Check duplicate (exact message) — skip in dry_run mode
+    if (!force_update && !dry_run) {
       const { data: existing } = await supabase
         .from("feedback_campanha")
         .select("id")
