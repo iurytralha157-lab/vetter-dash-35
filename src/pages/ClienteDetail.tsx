@@ -43,7 +43,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-type ClienteStatus = "Ativo" | "Pausado" | "Aguardando confirmação";
+type ClienteStatus = "Ativo" | "Pausado" | "Aguardando confirmação" | "Aprovado";
 
 interface Cliente {
   id: string;
@@ -139,6 +139,11 @@ const STATUS_CONFIG = {
     color: "bg-blue-500/20 text-blue-400 border-blue-500/30",
     icon: Clock,
     label: "Aguardando Confirmação",
+  },
+  Aprovado: {
+    color: "bg-green-500/20 text-green-400 border-green-500/30",
+    icon: Shield,
+    label: "Aprovado",
   },
 };
 
