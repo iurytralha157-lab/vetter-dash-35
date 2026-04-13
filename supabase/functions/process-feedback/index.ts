@@ -259,26 +259,105 @@ Deno.serve(async (req) => {
       }
     }
 
-    // === RULE 2: Validate sub-stages sum per campaign ===
-    // The sum of sub-stages should not exceed quantidade_recebida
+    // === RULE 2: Normalize + validate funnel totals ===
+    const buildCampaignSummary = (camp: CampaignData) => ({
+      nome: camp.campanha_nome,
+      recebidos: camp.quantidade_recebida,
+      descartado: camp.quantidade_descartado,
+      aguardando_retorno: camp.quantidade_aguardando_retorno,
+      atendimento: camp.quantidade_atendimento,
+      passou_corretor: camp.quantidade_passou_corretor,
+      visita: camp.quantidade_visita,
+      proposta: camp.quantidade_proposta,
+      venda: camp.quantidade_venda,
+    });
+
+    const totais = {
+      recebidos: 0,
+      descartado: 0,
+      atendimento: 0,
+      passou_corretor: 0,
+      visita: 0,
+      proposta: 0,
+      venda: 0,
+    };
+
+    const invalidCampaigns: Array<{
+      campanha_nome: string;
+      recebidos: number;
+      no_funil: number;
+    }> = [];
+
     for (const camp of campaigns) {
+      if ((camp.quantidade_aguardando_retorno || 0) > 0) {
+        const migrated = camp.quantidade_aguardando_retorno || 0;
+        camp.quantidade_atendimento = (camp.quantidade_atendimento || 0) + migrated;
+        camp.quantidade_aguardando_retorno = null;
+        console.log(`[process-feedback] Campaign "${camp.campanha_nome}": converted ${migrated} from aguardando_retorno to atendimento SDR`);
+      }
+
       if (camp.quantidade_recebida != null && camp.quantidade_recebida > 0) {
-        const subStagesSum =
+        let subStagesSum =
           (camp.quantidade_descartado || 0) +
-          (camp.quantidade_aguardando_retorno || 0) +
           (camp.quantidade_atendimento || 0) +
           (camp.quantidade_passou_corretor || 0) +
           (camp.quantidade_visita || 0) +
           (camp.quantidade_proposta || 0) +
           (camp.quantidade_venda || 0);
 
-        // If sub-stages don't add up and there's a gap, add the difference to atendimento SDR
         if (subStagesSum < camp.quantidade_recebida) {
           const gap = camp.quantidade_recebida - subStagesSum;
           camp.quantidade_atendimento = (camp.quantidade_atendimento || 0) + gap;
+          subStagesSum += gap;
           console.log(`[process-feedback] Campaign "${camp.campanha_nome}": added ${gap} to atendimento SDR to match leads_recebidos`);
         }
+
+        if (subStagesSum !== camp.quantidade_recebida) {
+          invalidCampaigns.push({
+            campanha_nome: camp.campanha_nome,
+            recebidos: camp.quantidade_recebida,
+            no_funil: subStagesSum,
+          });
+        }
       }
+
+      totais.recebidos += camp.quantidade_recebida || 0;
+      totais.descartado += camp.quantidade_descartado || 0;
+      totais.atendimento += camp.quantidade_atendimento || 0;
+      totais.passou_corretor += camp.quantidade_passou_corretor || 0;
+      totais.visita += camp.quantidade_visita || 0;
+      totais.proposta += camp.quantidade_proposta || 0;
+      totais.venda += camp.quantidade_venda || 0;
+    }
+
+    const totalNoFunil =
+      totais.descartado +
+      totais.atendimento +
+      totais.passou_corretor +
+      totais.visita +
+      totais.proposta +
+      totais.venda;
+
+    if (invalidCampaigns.length > 0 || (totais.recebidos > 0 && totalNoFunil !== totais.recebidos)) {
+      return new Response(JSON.stringify({
+        success: true,
+        invalid_funnel: true,
+        processamento_status: processamentoStatus,
+        tipo_funil: tipoFunil,
+        campanhas_count: campaigns.length,
+        campanhas: campaigns.map(buildCampaignSummary),
+        totals: {
+          ...totais,
+          no_funil: totalNoFunil,
+        },
+        validation_errors: invalidCampaigns,
+        periodo_detectado: periodoDetectado,
+        data_inicio: dataInicio,
+        data_fim: dataFim,
+        meta_total_leads: metaTotalLeads,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // If AI failed, save a raw record
@@ -326,7 +405,7 @@ Deno.serve(async (req) => {
         data_referencia: campDataRef,
         quantidade_recebida: camp.quantidade_recebida ?? null,
         quantidade_descartado: camp.quantidade_descartado ?? null,
-        quantidade_aguardando_retorno: camp.quantidade_aguardando_retorno ?? null,
+        quantidade_aguardando_retorno: null,
         quantidade_atendimento: camp.quantidade_atendimento ?? null,
         quantidade_passou_corretor: camp.quantidade_passou_corretor ?? null,
         quantidade_visita: camp.quantidade_visita ?? null,
@@ -351,17 +430,11 @@ Deno.serve(async (req) => {
       processamento_status: processamentoStatus,
       tipo_funil: tipoFunil,
       campanhas_count: inserted.length,
-      campanhas: inserted.map(c => ({
-        nome: c.campanha_nome,
-        recebidos: c.quantidade_recebida,
-        descartado: c.quantidade_descartado,
-        aguardando_retorno: c.quantidade_aguardando_retorno,
-        atendimento: c.quantidade_atendimento,
-        passou_corretor: c.quantidade_passou_corretor,
-        visita: c.quantidade_visita,
-        proposta: c.quantidade_proposta,
-        venda: c.quantidade_venda,
-      })),
+      campanhas: inserted.map(buildCampaignSummary),
+      totals: {
+        ...totais,
+        no_funil: totalNoFunil,
+      },
       periodo_detectado: periodoDetectado,
       data_inicio: dataInicio,
       data_fim: dataFim,
@@ -414,8 +487,7 @@ MAPEAMENTO DE ETAPAS (CRÍTICO — leia com atenção):
 |---|---|
 | "lead recebido", "recebidos", "chegou" | quantidade_recebida |
 | "descartado", "descarte", "lixo" | quantidade_descartado |
-| "aguardando retorno", "sem resposta", "não respondeu" | quantidade_aguardando_retorno |
-| "atendimento SDR", "em atendimento" (sem mencionar corretor) | quantidade_atendimento |
+| "aguardando retorno", "sem resposta", "não respondeu", "atendimento SDR", "em atendimento" (sem mencionar corretor) | quantidade_atendimento |
 | "passou para corretor", "com o corretor", "em atendimento com o corretor", "corretor atendendo", "atendimento corretor" | quantidade_passou_corretor |
 | "visita", "visitou" | quantidade_visita |
 | "proposta", "enviou proposta" | quantidade_proposta |
@@ -424,7 +496,8 @@ MAPEAMENTO DE ETAPAS (CRÍTICO — leia com atenção):
 REGRA CRÍTICA sobre "corretor":
 - Qualquer menção a CORRETOR indica "quantidade_passou_corretor", NUNCA "quantidade_atendimento".
 - "em atendimento com o corretor" = quantidade_passou_corretor
-- "atendimento SDR" ou apenas "em atendimento" (SEM mencionar corretor) = quantidade_atendimento
+- "atendimento SDR", "aguardando retorno", "sem resposta", "não respondeu" ou apenas "em atendimento" (SEM mencionar corretor) = quantidade_atendimento
+- NUNCA use quantidade_aguardando_retorno. Esse status não existe no funil atual e esse campo deve voltar sempre como null.
 
 REGRA sobre leads recebidos:
 - "quantidade_recebida" é o total de leads que chegaram naquela campanha, independente do status posterior.
@@ -437,9 +510,9 @@ REGRA CRÍTICA de valores:
 
 REGRA IMPORTANTE sobre coerência:
 - Se o usuário informou "X leads recebidos" e depois deu o status de cada um, a SOMA dos status deve bater com X.
-- Se a soma dos status informados for MENOR que os leads recebidos, os restantes que NÃO foram identificados devem ser colocados como "Atendimento SDR" (quantidade_atendimento). NUNCA em aguardando_retorno automaticamente.
+- Se a soma dos status informados for MENOR que os leads recebidos, os restantes que NÃO foram identificados devem ser colocados como "Atendimento SDR" (quantidade_atendimento).
 - REGRA DE OURO: tudo que não for explicitamente identificado com uma etapa específica, coloca como Atendimento SDR (quantidade_atendimento).
-- "aguardando retorno" (quantidade_aguardando_retorno) só deve ser preenchido se o usuário EXPLICITAMENTE mencionar "aguardando retorno", "sem resposta", "não respondeu".
+- Se a soma do funil ficar MAIOR que os leads recebidos, isso é inválido e deve ser corrigido.
 - Se nenhum campo "leads recebidos" for informado explicitamente, NÃO invente — retorne null.
 
 PERÍODO/DATA:
@@ -461,10 +534,10 @@ EXEMPLO:
 Mensagem: "47: 2 lead recebido, aguardando retorno / ap0145: 3 lead recebido, 2 em atendimento com o corretor"
 Resultado esperado:
 - tipo_funil: "terceiros" (mencionou corretor)
-- campanha "47": quantidade_recebida=2, quantidade_aguardando_retorno=2 (usuário disse explicitamente "aguardando retorno")
-- campanha "ap0145": quantidade_recebida=3, quantidade_passou_corretor=2, quantidade_atendimento=1 (1 restante sem status → atendimento SDR)
+- campanha "47": quantidade_recebida=2, quantidade_atendimento=2
+- campanha "ap0145": quantidade_recebida=3, quantidade_passou_corretor=2, quantidade_atendimento=1
 
-Note no exemplo acima: campanha ap0145 tem 3 recebidos, 2 com corretor. O 1 restante vai para quantidade_atendimento (atendimento SDR) porque o usuário NÃO especificou o status desse lead.
+Note no exemplo acima: "aguardando retorno" entra como Atendimento SDR. E na campanha ap0145 o 1 restante sem status explícito também vai para Atendimento SDR para fechar o total recebido.
 
 Retorne usando a tool extract_feedback_campaigns.`;
 
