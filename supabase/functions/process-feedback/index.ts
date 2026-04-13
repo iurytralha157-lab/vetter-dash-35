@@ -119,8 +119,8 @@ Deno.serve(async (req) => {
       dataFim = dataInicio;
     }
 
-    // === RULE 3: Check existing feedback for same account + date ===
-    if (!force_update) {
+    // === RULE 3: Check existing feedback for same account + date (skip in dry_run) ===
+    if (!force_update && !dry_run) {
       const { data: existingFeedback } = await supabase
         .from("feedback_campanha")
         .select("id, campanha_nome, quantidade_recebida, quantidade_descartado, quantidade_aguardando_retorno, quantidade_atendimento, quantidade_passou_corretor, quantidade_visita, quantidade_proposta, quantidade_venda, tipo_funil, data_referencia")
