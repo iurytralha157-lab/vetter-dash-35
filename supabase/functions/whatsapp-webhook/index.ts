@@ -402,6 +402,10 @@ async function processCommand(
   try {
     if (cmd.startsWith("#followup")) {
       responseText = await handleFollowup(text, account, groupJid, senderName, supabase);
+    } else if (cmd === "#feedback sim" || cmd === "#feedback\nsim") {
+      responseText = await handleFeedbackConfirm(account, groupJid, senderName, supabase);
+    } else if (cmd === "#feedback não" || cmd === "#feedback nao" || cmd === "#feedback\nnão" || cmd === "#feedback\nnao") {
+      responseText = await handleFeedbackReject(account, groupJid, supabase);
     } else if (cmd.startsWith("#feedback")) {
       responseText = await handleFeedback(text, account, groupJid, senderName, supabase);
     } else if (cmd === "#saldo") {
