@@ -87,6 +87,12 @@ const STATUS_CONFIG: Record<ClienteStatus, { pill: string; dot: string; icon: an
     icon: Clock,
     label: "Aguardando",
   },
+  Aprovado: {
+    pill: "bg-green-500/15 text-green-300 border-green-500/25",
+    dot: "bg-green-400",
+    icon: ShieldCheck,
+    label: "Aprovado",
+  },
 };
 
 const FILTER_PILLS = [
