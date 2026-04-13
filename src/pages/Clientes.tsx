@@ -46,7 +46,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
-type ClienteStatus = "Ativo" | "Pausado" | "Aguardando confirmação";
+type ClienteStatus = "Ativo" | "Pausado" | "Aguardando confirmação" | "Aprovado";
 
 interface Cliente {
   id: string;
@@ -86,6 +86,12 @@ const STATUS_CONFIG: Record<ClienteStatus, { pill: string; dot: string; icon: an
     dot: "bg-sky-400",
     icon: Clock,
     label: "Aguardando",
+  },
+  Aprovado: {
+    pill: "bg-green-500/15 text-green-300 border-green-500/25",
+    dot: "bg-green-400",
+    icon: ShieldCheck,
+    label: "Aprovado",
   },
 };
 
