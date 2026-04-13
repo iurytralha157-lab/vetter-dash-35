@@ -26,6 +26,7 @@ Deno.serve(async (req) => {
       nome_origem,
       usuario_origem,
       force_update,
+      dry_run,
     } = body;
 
     if (!mensagem_original || mensagem_original.trim().length < 5) {
@@ -49,8 +50,8 @@ Deno.serve(async (req) => {
     const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(msg.toLowerCase()));
     const mensagem_hash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
 
-    // Check duplicate (exact message)
-    if (!force_update) {
+    // Check duplicate (exact message) — skip in dry_run mode
+    if (!force_update && !dry_run) {
       const { data: existing } = await supabase
         .from("feedback_campanha")
         .select("id")
@@ -118,8 +119,8 @@ Deno.serve(async (req) => {
       dataFim = dataInicio;
     }
 
-    // === RULE 3: Check existing feedback for same account + date ===
-    if (!force_update) {
+    // === RULE 3: Check existing feedback for same account + date (skip in dry_run) ===
+    if (!force_update && !dry_run) {
       const { data: existingFeedback } = await supabase
         .from("feedback_campanha")
         .select("id, campanha_nome, quantidade_recebida, quantidade_descartado, quantidade_aguardando_retorno, quantidade_atendimento, quantidade_passou_corretor, quantidade_visita, quantidade_proposta, quantidade_venda, tipo_funil, data_referencia")
@@ -351,6 +352,28 @@ Deno.serve(async (req) => {
           no_funil: totalNoFunil,
         },
         validation_errors: invalidCampaigns,
+        periodo_detectado: periodoDetectado,
+        data_inicio: dataInicio,
+        data_fim: dataFim,
+        meta_total_leads: metaTotalLeads,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // === DRY RUN: return parsed data without saving ===
+    if (dry_run) {
+      return new Response(JSON.stringify({
+        success: true,
+        dry_run: true,
+        processamento_status: processamentoStatus,
+        tipo_funil: tipoFunil,
+        campanhas_count: campaigns.length,
+        campanhas: campaigns.map(buildCampaignSummary),
+        totals: {
+          ...totais,
+          no_funil: totalNoFunil,
+        },
         periodo_detectado: periodoDetectado,
         data_inicio: dataInicio,
         data_fim: dataFim,

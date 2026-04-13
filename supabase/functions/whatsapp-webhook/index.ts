@@ -402,6 +402,10 @@ async function processCommand(
   try {
     if (cmd.startsWith("#followup")) {
       responseText = await handleFollowup(text, account, groupJid, senderName, supabase);
+    } else if (cmd === "#feedback sim" || cmd === "#feedback\nsim") {
+      responseText = await handleFeedbackConfirm(account, groupJid, senderName, supabase);
+    } else if (cmd === "#feedback não" || cmd === "#feedback nao" || cmd === "#feedback\nnão" || cmd === "#feedback\nnao") {
+      responseText = await handleFeedbackReject(account, groupJid, supabase);
     } else if (cmd.startsWith("#feedback")) {
       responseText = await handleFeedback(text, account, groupJid, senderName, supabase);
     } else if (cmd === "#saldo") {
@@ -555,7 +559,7 @@ async function handleFeedback(
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
   try {
-    // 1. Process aggregate campaign feedback via process-feedback
+    // 1. Parse feedback in dry_run mode (no saving)
     const feedbackResponse = await fetch(`${supabaseUrl}/functions/v1/process-feedback`, {
       method: "POST",
       headers: {
@@ -570,6 +574,7 @@ async function handleFeedback(
         telefone_origem: null,
         nome_origem: senderName,
         usuario_origem: senderName,
+        dry_run: true,
       }),
     });
 
@@ -623,7 +628,7 @@ async function handleFeedback(
 
     // === Handle existing feedback for same day ===
     if (feedbackResult.existing_feedback) {
-      // Store the original message in context so we can replay it with force_update
+      // Store context for update flow
       try {
         await supabase.from('whatsapp_chat_context').upsert({
           group_jid: groupJid,
@@ -664,15 +669,12 @@ async function handleFeedback(
         quantidade_venda: "Venda",
       };
 
-      // Aggregate existing data
-      const aggregated: Record<string, number> = {};
       for (const row of feedbackResult.existing_data) {
         existingMsg += `\n📌 *${row.campanha_nome}* (${row.data_referencia}):\n`;
         for (const [field, label] of Object.entries(etapaLabels)) {
           const val = row[field];
           if (val != null && val > 0) {
             existingMsg += `   • ${label}: *${val}*\n`;
-            aggregated[field] = (aggregated[field] || 0) + val;
           }
         }
       }
@@ -686,111 +688,16 @@ async function handleFeedback(
       return existingMsg;
     }
 
-    // 2. Also process individual leads via process-followup (for feedback_funnel)
-    let followupResult: any = null;
-    try {
-      const followupResponse = await fetch(`${supabaseUrl}/functions/v1/process-followup`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${serviceRoleKey}`,
-        },
-        body: JSON.stringify({
-          mensagem_original: text,
-          account_id: account.id,
-          cliente_id: account.cliente_id || null,
-          id_grupo: groupJid,
-          numero_grupo: groupJid,
-          telefone_origem: null,
-          nome_origem: senderName,
-          usuario_origem: senderName,
-        }),
-      });
-      followupResult = await followupResponse.json();
-    } catch (e) {
-      console.error("[whatsapp-webhook] followup from feedback error:", e);
-    }
-
-    // 3. Check if period was detected
+    // 2. Build preview message
     const periodoDetectado = feedbackResult.periodo_detectado === true;
     const dataInicio = feedbackResult.data_inicio;
     const dataFim = feedbackResult.data_fim;
-    let periodMsg = "";
 
-    if (!periodoDetectado) {
-      // No date was mentioned - ask for it
-      periodMsg = `\n⚠️ *Período não informado!*\n`;
-      periodMsg += `Registramos como *ontem* por padrão.\n`;
-      periodMsg += `\nSe o período for diferente, envie:\n`;
-      periodMsg += `*#feedback* _do dia 01/07 ao dia 10/07_\n`;
-      periodMsg += `_[cole o feedback novamente com a data]_\n`;
-    }
-
-    // 4. Cross-reference with campaign data for the detected period
-    let crossRefMsg = "";
-    try {
-      // Use detected dates for cross-reference
-      let query = supabase
-        .from("campaign_history")
-        .select("campaign_name, leads, spend")
-        .eq("account_id", account.id);
-
-      if (dataInicio === dataFim) {
-        query = query.eq("date", dataInicio);
-      } else {
-        query = query.gte("date", dataInicio).lte("date", dataFim);
-      }
-
-      const { data: campData } = await query;
-
-      if (campData && campData.length > 0) {
-        const totalCampaignLeads = campData.reduce((s: number, c: any) => s + (c.leads || 0), 0);
-
-        // Extract total reported from feedback
-        let totalReported = 0;
-        if (feedbackResult.campanhas && Array.isArray(feedbackResult.campanhas)) {
-          totalReported = feedbackResult.campanhas.reduce((s: number, c: any) => s + (c.recebidos || 0), 0);
-        }
-
-        const periodLabel = dataInicio === dataFim
-          ? dataInicio.split('-').reverse().join('/')
-          : `${dataInicio.split('-').reverse().join('/')} a ${dataFim.split('-').reverse().join('/')}`;
-
-        if (totalCampaignLeads > 0 && totalReported > 0) {
-          const diff = totalCampaignLeads - totalReported;
-          if (diff > 0) {
-            crossRefMsg = `\n⚠️ *Atenção:* Nas campanhas registramos *${totalCampaignLeads} leads* no período, mas o feedback reportou apenas *${totalReported}*.\n`;
-            crossRefMsg += `📌 Faltam *${diff} lead(s)* sem feedback. Qual foi o status deles?\n`;
-            crossRefMsg += `\n_Responda com #feedback informando o status dos ${diff} leads restantes._\n`;
-          } else if (diff < 0) {
-            crossRefMsg += `\nℹ️ O feedback reportou *${totalReported} leads*, acima dos *${totalCampaignLeads}* registrados nas campanhas. Pode incluir leads de outros períodos.\n`;
-          }
-        }
-
-        // Show campaign breakdown
-        // Aggregate by campaign_name across date range
-        const campAgg = new Map<string, number>();
-        campData.forEach((c: any) => {
-          campAgg.set(c.campaign_name, (campAgg.get(c.campaign_name) || 0) + (c.leads || 0));
-        });
-        const activeCamps = Array.from(campAgg.entries()).filter(([_, leads]) => leads > 0);
-        if (activeCamps.length > 0) {
-          crossRefMsg += `\n📊 *Campanhas no período (${periodLabel}):*\n`;
-          for (const [name, leads] of activeCamps) {
-            crossRefMsg += `   • ${name}: *${leads}* leads\n`;
-          }
-        }
-      }
-    } catch (crossRefErr) {
-      console.error("[whatsapp-webhook] Cross-reference error:", crossRefErr);
-    }
-
-    // 5. Build response message
     const periodLabel = dataInicio === dataFim
       ? dataInicio.split('-').reverse().join('/')
       : `${dataInicio.split('-').reverse().join('/')} a ${dataFim.split('-').reverse().join('/')}`;
 
-    let msg = `✅ *Feedback registrado com sucesso!*\n`;
+    let msg = `📋 *Resumo do Feedback (aguardando confirmação)*\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
     msg += `👤 Enviado por: *${senderName}*\n`;
     msg += `🏢 Conta: *${account.nome_cliente}*\n`;
@@ -801,13 +708,11 @@ async function handleFeedback(
     }
 
     if (feedbackResult.campanhas_count > 0) {
-      msg += `\n📊 *${feedbackResult.campanhas_count} campanha(s) registrada(s):*\n`;
+      msg += `\n📊 *${feedbackResult.campanhas_count} campanha(s):*\n`;
       if (feedbackResult.campanhas && Array.isArray(feedbackResult.campanhas)) {
         for (const c of feedbackResult.campanhas) {
-          // Build stage breakdown
           const stages: string[] = [];
           if (c.descartado) stages.push(`${c.descartado} descartado(s)`);
-          if (c.aguardando_retorno) stages.push(`${c.aguardando_retorno} em atendimento SDR`);
           if (c.atendimento) stages.push(`${c.atendimento} em atendimento SDR`);
           if (c.passou_corretor) stages.push(`${c.passou_corretor} passou para corretor`);
           if (c.visita) stages.push(`${c.visita} visita(s)`);
@@ -827,55 +732,186 @@ async function handleFeedback(
       }
     }
 
-    msg += `\n*Confere para registrar o Feedback?*\n`;
-
-    msg += periodMsg;
-    msg += crossRefMsg;
-
-    // 6. Follow-up: check if there are more leads from campaigns not covered
-    try {
-      let totalCampaignLeads = 0;
-      if (crossRefMsg === "") {
-        // Cross-ref wasn't done above, try now
-        let query = supabase
-          .from("campaign_history")
-          .select("leads")
-          .eq("account_id", account.id);
-        if (dataInicio === dataFim) {
-          query = query.eq("date", dataInicio);
-        } else {
-          query = query.gte("date", dataInicio).lte("date", dataFim);
-        }
-        const { data: campData } = await query;
-        if (campData) {
-          totalCampaignLeads = campData.reduce((s: number, c: any) => s + (c.leads || 0), 0);
-        }
-      }
-
-      // Total reported across both systems
-      let totalReported = leadsCount;
-      if (feedbackResult.campanhas && Array.isArray(feedbackResult.campanhas)) {
-        const campReported = feedbackResult.campanhas.reduce((s: number, c: any) => s + (c.recebidos || 0), 0);
-        if (campReported > totalReported) totalReported = campReported;
-      }
-
-      if (totalCampaignLeads > 0 && totalReported > 0 && totalCampaignLeads > totalReported) {
-        const diff = totalCampaignLeads - totalReported;
-        msg += `\n💬 *E os outros ${diff} lead(s)?*\n`;
-        msg += `Registramos *${totalCampaignLeads} leads* nas campanhas desse período, mas o feedback cobriu apenas *${totalReported}*.\n`;
-        msg += `Como estão os outros *${diff}*? Responda com:\n`;
-        msg += `*#feedback* _status dos ${diff} leads restantes_\n`;
-      }
-    } catch (followUpErr) {
-      console.error("[whatsapp-webhook] Follow-up check error:", followUpErr);
+    if (!periodoDetectado) {
+      msg += `\n⚠️ *Período não informado!* Registraremos como *ontem* por padrão.\n`;
     }
 
+    msg += `\n*Confere para registrar o Feedback?*\n`;
+    msg += `Envie *#feedback sim* para confirmar\n`;
+    msg += `Envie *#feedback não* para cancelar e corrigir\n`;
+
     msg += `\n💡 Use *#funil* para ver o funil consolidado.`;
+
+    // 3. Store context for confirmation
+    try {
+      await supabase.from('whatsapp_chat_context').upsert({
+        group_jid: groupJid,
+        account_id: account.id,
+        context_type: 'feedback_confirm',
+        context_data: {
+          original_message: text,
+          sender_name: senderName,
+          parsed_result: feedbackResult,
+        },
+        instance_name: null,
+        expiry_notified: false,
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      }, { onConflict: 'group_jid,account_id,context_type' });
+    } catch (ctxErr) {
+      console.warn('[whatsapp-webhook] Failed to save feedback confirm context:', ctxErr);
+    }
+
     return msg;
   } catch (err) {
     console.error("[whatsapp-webhook] Feedback processing error:", err);
     return `⚠️ Erro ao processar feedback. Tente novamente.`;
   }
+}
+
+// ─── Feedback Confirm Handler ───
+
+async function handleFeedbackConfirm(
+  account: any,
+  groupJid: string,
+  senderName: string,
+  supabase: any
+): Promise<string> {
+  try {
+    // Get stored context
+    const { data: ctxData } = await supabase
+      .from('whatsapp_chat_context')
+      .select('context_data')
+      .eq('group_jid', groupJid)
+      .eq('account_id', account.id)
+      .eq('context_type', 'feedback_confirm')
+      .maybeSingle();
+
+    if (!ctxData?.context_data?.original_message) {
+      return `⚠️ Nenhum feedback pendente de confirmação. Envie *#feedback* com os dados primeiro.`;
+    }
+
+    const ctx = ctxData.context_data;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Call process-feedback for real (without dry_run)
+    const feedbackResponse = await fetch(`${supabaseUrl}/functions/v1/process-feedback`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({
+        mensagem_original: ctx.original_message,
+        account_id: account.id,
+        id_grupo: groupJid,
+        numero_grupo: groupJid,
+        telefone_origem: null,
+        nome_origem: ctx.sender_name || senderName,
+        usuario_origem: ctx.sender_name || senderName,
+      }),
+    });
+
+    const feedbackResult = await feedbackResponse.json();
+
+    // Clean up context
+    await supabase.from('whatsapp_chat_context')
+      .delete()
+      .eq('group_jid', groupJid)
+      .eq('account_id', account.id)
+      .eq('context_type', 'feedback_confirm');
+
+    if (!feedbackResponse.ok || !feedbackResult.success) {
+      return `⚠️ Erro ao salvar feedback: ${feedbackResult.error || "erro desconhecido"}`;
+    }
+
+    // Also process individual leads via process-followup
+    try {
+      await fetch(`${supabaseUrl}/functions/v1/process-followup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          mensagem_original: ctx.original_message,
+          account_id: account.id,
+          cliente_id: account.cliente_id || null,
+          id_grupo: groupJid,
+          numero_grupo: groupJid,
+          telefone_origem: null,
+          nome_origem: ctx.sender_name || senderName,
+          usuario_origem: ctx.sender_name || senderName,
+        }),
+      });
+    } catch (e) {
+      console.error("[whatsapp-webhook] followup from confirmed feedback error:", e);
+    }
+
+    // Build success message
+    const dataInicio = feedbackResult.data_inicio;
+    const dataFim = feedbackResult.data_fim;
+    const periodLabel = dataInicio === dataFim
+      ? dataInicio.split('-').reverse().join('/')
+      : `${dataInicio.split('-').reverse().join('/')} a ${dataFim.split('-').reverse().join('/')}`;
+
+    let msg = `✅ *Feedback registrado com sucesso!*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `👤 Enviado por: *${ctx.sender_name || senderName}*\n`;
+    msg += `🏢 Conta: *${account.nome_cliente}*\n`;
+    msg += `📅 Período: *${periodLabel}*\n`;
+
+    if (feedbackResult.tipo_funil) {
+      msg += `📋 Tipo: *${feedbackResult.tipo_funil === "terceiros" ? "Terceiros" : "Lançamento"}*\n`;
+    }
+
+    if (feedbackResult.campanhas && Array.isArray(feedbackResult.campanhas)) {
+      msg += `\n📊 *${feedbackResult.campanhas_count} campanha(s) registrada(s):*\n`;
+      for (const c of feedbackResult.campanhas) {
+        const stages: string[] = [];
+        if (c.descartado) stages.push(`${c.descartado} descartado(s)`);
+        if (c.atendimento) stages.push(`${c.atendimento} em atendimento SDR`);
+        if (c.passou_corretor) stages.push(`${c.passou_corretor} passou para corretor`);
+        if (c.visita) stages.push(`${c.visita} visita(s)`);
+        if (c.proposta) stages.push(`${c.proposta} proposta(s)`);
+        if (c.venda) stages.push(`${c.venda} venda(s)`);
+
+        msg += `   • ${c.nome} — ${c.recebidos || 0} recebidos`;
+        if (stages.length > 0) {
+          msg += ` sendo:\n`;
+          for (const s of stages) {
+            msg += `${s}\n`;
+          }
+        } else {
+          msg += `\n`;
+        }
+      }
+    }
+
+    msg += `\n💡 Use *#funil* para ver o funil consolidado.`;
+    return msg;
+  } catch (err) {
+    console.error("[whatsapp-webhook] Feedback confirm error:", err);
+    return `⚠️ Erro ao confirmar feedback. Tente novamente.`;
+  }
+}
+
+// ─── Feedback Reject Handler ───
+
+async function handleFeedbackReject(
+  account: any,
+  groupJid: string,
+  supabase: any
+): Promise<string> {
+  // Clean up context
+  await supabase.from('whatsapp_chat_context')
+    .delete()
+    .eq('group_jid', groupJid)
+    .eq('account_id', account.id)
+    .eq('context_type', 'feedback_confirm');
+
+  return `❌ *Feedback cancelado.*\n\nEnvie novamente *#feedback* com os dados corretos.`;
 }
 
 // ─── Feedback Update Handler ───
