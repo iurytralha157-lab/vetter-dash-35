@@ -361,6 +361,28 @@ Deno.serve(async (req) => {
       });
     }
 
+    // === DRY RUN: return parsed data without saving ===
+    if (dry_run) {
+      return new Response(JSON.stringify({
+        success: true,
+        dry_run: true,
+        processamento_status: processamentoStatus,
+        tipo_funil: tipoFunil,
+        campanhas_count: campaigns.length,
+        campanhas: campaigns.map(buildCampaignSummary),
+        totals: {
+          ...totais,
+          no_funil: totalNoFunil,
+        },
+        periodo_detectado: periodoDetectado,
+        data_inicio: dataInicio,
+        data_fim: dataFim,
+        meta_total_leads: metaTotalLeads,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // If AI failed, save a raw record
     if (campaigns.length === 0) {
       const { error: insertError } = await supabase.from("feedback_campanha").insert({
