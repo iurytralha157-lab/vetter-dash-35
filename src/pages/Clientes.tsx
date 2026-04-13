@@ -46,7 +46,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
-type ClienteStatus = "Ativo" | "Pausado" | "Aguardando confirmação";
+type ClienteStatus = "Ativo" | "Pausado" | "Aguardando confirmação" | "Aprovado";
 
 interface Cliente {
   id: string;
