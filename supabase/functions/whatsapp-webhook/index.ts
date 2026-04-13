@@ -584,6 +584,43 @@ async function handleFeedback(
       return `⚠️ Essa mensagem já foi processada anteriormente.`;
     }
 
+    if (feedbackResult.invalid_funnel) {
+      const totals = feedbackResult.totals || {};
+      let invalidMsg = `⚠️ *O feedback não foi salvo porque o funil não bate com os recebidos.*\n`;
+      invalidMsg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+      invalidMsg += `👤 Enviado por: *${senderName}*\n`;
+      invalidMsg += `🏢 Conta: *${account.nome_cliente}*\n`;
+
+      if (feedbackResult.data_inicio && feedbackResult.data_fim) {
+        const invalidPeriodLabel = feedbackResult.data_inicio === feedbackResult.data_fim
+          ? feedbackResult.data_inicio.split('-').reverse().join('/')
+          : `${feedbackResult.data_inicio.split('-').reverse().join('/')} a ${feedbackResult.data_fim.split('-').reverse().join('/')}`;
+        invalidMsg += `📅 Período: *${invalidPeriodLabel}*\n`;
+      }
+
+      invalidMsg += `\n📊 *Resumo informado:*\n`;
+      invalidMsg += `• Recebidos: *${totals.recebidos || 0}*\n`;
+      invalidMsg += `• No funil: *${totals.no_funil || 0}*\n`;
+      invalidMsg += `• Atendimento SDR: *${totals.atendimento || 0}*\n`;
+      invalidMsg += `• Passou para corretor: *${totals.passou_corretor || 0}*\n`;
+      invalidMsg += `• Visita: *${totals.visita || 0}*\n`;
+      invalidMsg += `• Proposta: *${totals.proposta || 0}*\n`;
+      invalidMsg += `• Venda: *${totals.venda || 0}*\n`;
+      invalidMsg += `• Descartado: *${totals.descartado || 0}*\n`;
+
+      if (feedbackResult.campanhas && Array.isArray(feedbackResult.campanhas)) {
+        invalidMsg += `\n📌 *Por campanha:*\n`;
+        for (const c of feedbackResult.campanhas) {
+          const noFunil = (c.descartado || 0) + (c.atendimento || 0) + (c.passou_corretor || 0) + (c.visita || 0) + (c.proposta || 0) + (c.venda || 0);
+          invalidMsg += `• ${c.nome}: recebidos *${c.recebidos || 0}* / no funil *${noFunil}*\n`;
+        }
+      }
+
+      invalidMsg += `\n❓ *Se teve ${totals.recebidos || 0} recebidos, o funil abaixo também precisa fechar ${totals.recebidos || 0}.*\n`;
+      invalidMsg += `Revise e envie novamente com a distribuição correta.`;
+      return invalidMsg;
+    }
+
     // === Handle existing feedback for same day ===
     if (feedbackResult.existing_feedback) {
       // Store the original message in context so we can replay it with force_update
@@ -619,7 +656,7 @@ async function handleFeedback(
       const etapaLabels: Record<string, string> = {
         quantidade_recebida: "Recebidos",
         quantidade_descartado: "Descartados",
-        quantidade_aguardando_retorno: "Aguardando Retorno",
+        quantidade_aguardando_retorno: "Atendimento SDR",
         quantidade_atendimento: "Atendimento SDR",
         quantidade_passou_corretor: "Passou p/ Corretor",
         quantidade_visita: "Visita",
@@ -770,7 +807,7 @@ async function handleFeedback(
           // Build stage breakdown
           const stages: string[] = [];
           if (c.descartado) stages.push(`${c.descartado} descartado(s)`);
-          if (c.aguardando_retorno) stages.push(`${c.aguardando_retorno} aguardando retorno`);
+          if (c.aguardando_retorno) stages.push(`${c.aguardando_retorno} em atendimento SDR`);
           if (c.atendimento) stages.push(`${c.atendimento} em atendimento SDR`);
           if (c.passou_corretor) stages.push(`${c.passou_corretor} passou para corretor`);
           if (c.visita) stages.push(`${c.visita} visita(s)`);
