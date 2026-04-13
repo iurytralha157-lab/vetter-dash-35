@@ -272,11 +272,11 @@ Deno.serve(async (req) => {
           (camp.quantidade_proposta || 0) +
           (camp.quantidade_venda || 0);
 
-        // If sub-stages don't add up and there's a gap, add the difference to aguardando_retorno
+        // If sub-stages don't add up and there's a gap, add the difference to atendimento SDR
         if (subStagesSum < camp.quantidade_recebida) {
           const gap = camp.quantidade_recebida - subStagesSum;
-          camp.quantidade_aguardando_retorno = (camp.quantidade_aguardando_retorno || 0) + gap;
-          console.log(`[process-feedback] Campaign "${camp.campanha_nome}": added ${gap} to aguardando_retorno to match leads_recebidos`);
+          camp.quantidade_atendimento = (camp.quantidade_atendimento || 0) + gap;
+          console.log(`[process-feedback] Campaign "${camp.campanha_nome}": added ${gap} to atendimento SDR to match leads_recebidos`);
         }
       }
     }
@@ -351,7 +351,17 @@ Deno.serve(async (req) => {
       processamento_status: processamentoStatus,
       tipo_funil: tipoFunil,
       campanhas_count: inserted.length,
-      campanhas: inserted.map(c => ({ nome: c.campanha_nome, recebidos: c.quantidade_recebida })),
+      campanhas: inserted.map(c => ({
+        nome: c.campanha_nome,
+        recebidos: c.quantidade_recebida,
+        descartado: c.quantidade_descartado,
+        aguardando_retorno: c.quantidade_aguardando_retorno,
+        atendimento: c.quantidade_atendimento,
+        passou_corretor: c.quantidade_passou_corretor,
+        visita: c.quantidade_visita,
+        proposta: c.quantidade_proposta,
+        venda: c.quantidade_venda,
+      })),
       periodo_detectado: periodoDetectado,
       data_inicio: dataInicio,
       data_fim: dataFim,
@@ -427,7 +437,9 @@ REGRA CRÍTICA de valores:
 
 REGRA IMPORTANTE sobre coerência:
 - Se o usuário informou "X leads recebidos" e depois deu o status de cada um, a SOMA dos status deve bater com X.
-- Se a soma dos status informados for MENOR que os leads recebidos, os restantes devem ficar como "aguardando retorno" (quantidade_aguardando_retorno).
+- Se a soma dos status informados for MENOR que os leads recebidos, os restantes que NÃO foram identificados devem ser colocados como "Atendimento SDR" (quantidade_atendimento). NUNCA em aguardando_retorno automaticamente.
+- REGRA DE OURO: tudo que não for explicitamente identificado com uma etapa específica, coloca como Atendimento SDR (quantidade_atendimento).
+- "aguardando retorno" (quantidade_aguardando_retorno) só deve ser preenchido se o usuário EXPLICITAMENTE mencionar "aguardando retorno", "sem resposta", "não respondeu".
 - Se nenhum campo "leads recebidos" for informado explicitamente, NÃO invente — retorne null.
 
 PERÍODO/DATA:
@@ -449,10 +461,10 @@ EXEMPLO:
 Mensagem: "47: 2 lead recebido, aguardando retorno / ap0145: 3 lead recebido, 2 em atendimento com o corretor"
 Resultado esperado:
 - tipo_funil: "terceiros" (mencionou corretor)
-- campanha "47": quantidade_recebida=2, quantidade_aguardando_retorno=2
-- campanha "ap0145": quantidade_recebida=3, quantidade_passou_corretor=2, quantidade_aguardando_retorno=1
+- campanha "47": quantidade_recebida=2, quantidade_aguardando_retorno=2 (usuário disse explicitamente "aguardando retorno")
+- campanha "ap0145": quantidade_recebida=3, quantidade_passou_corretor=2, quantidade_atendimento=1 (1 restante sem status → atendimento SDR)
 
-Note no exemplo acima: campanha ap0145 tem 3 recebidos, 2 com corretor. O 1 restante vai para aguardando_retorno automaticamente.
+Note no exemplo acima: campanha ap0145 tem 3 recebidos, 2 com corretor. O 1 restante vai para quantidade_atendimento (atendimento SDR) porque o usuário NÃO especificou o status desse lead.
 
 Retorne usando a tool extract_feedback_campaigns.`;
 
