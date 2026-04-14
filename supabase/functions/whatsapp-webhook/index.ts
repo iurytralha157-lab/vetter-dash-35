@@ -451,9 +451,7 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
 
           const accountList = (allAccounts || []).map((a: any, i: number) => `${i + 1}. ${a.nome_cliente}`).join("\n");
           
-          const errorMsg = accountName
-            ? `❌ *Conta "${accountName}" não encontrada!*\n\nContas disponíveis:\n${accountList}\n\n📝 Envie o comando assim:\n*#feedback*\n*NOME_DA_CONTA*\nterceiros\nreferente à campanha...\n`
-            : `❌ *Nome da conta não informado!*\n\nNo grupo da equipe, informe o nome da conta na segunda linha:\n*#feedback*\n*NOME_DA_CONTA*\nterceiros\nreferente à campanha...\n\nContas disponíveis:\n${accountList}`;
+          const errorMsg = `❌ *Nome da conta não informado ou não encontrado!*\n\nNo grupo da equipe, informe o nome da conta na segunda linha:\n*#feedback*\n*NOME_DA_CONTA*\nterceiros\nreferente à campanha...\n\nContas disponíveis:\n${accountList}`;
 
           await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, remoteJid, errorMsg);
           return new Response(JSON.stringify({ success: true, team_group: true, error: "account not found" }), {
@@ -461,14 +459,19 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
           });
         }
 
-        // For team group, remove the account name line from the text before processing
-        const lines2 = text.split("\n");
-        const firstLine2 = lines2[0];
-        const restLines = lines2.slice(1);
-        // Remove the account name line (it's the first non-command line)
-        const accountNameLower = accountName!.toLowerCase();
-        const filteredLines = restLines.filter((l: string) => l.trim().toLowerCase() !== accountNameLower);
-        text = [firstLine2, ...filteredLines].join("\n");
+        // For team group with account resolved via name (not context), remove the account name line
+        if (!isTeamContextCommand) {
+          const lines2 = text.split("\n");
+          const firstLine2 = lines2[0];
+          const restLines = lines2.slice(1);
+          // Try to find and remove the account name line
+          const accNameLower = account.nome_cliente.toLowerCase();
+          const filteredLines = restLines.filter((l: string) => {
+            const trimmed = l.trim().toLowerCase();
+            return trimmed !== accNameLower && !accNameLower.includes(trimmed) && !trimmed.includes(accNameLower);
+          });
+          text = [firstLine2, ...filteredLines].join("\n");
+        }
       } else {
         console.log("[whatsapp-webhook] No account linked to group:", groupNumber);
         return new Response(JSON.stringify({ ignored: true, reason: "no linked account" }), {
