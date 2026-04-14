@@ -81,7 +81,8 @@ Deno.serve(async (req) => {
           .from("accounts")
           .select("id, nome_cliente, meta_account_id, cliente_id")
           .eq("id_grupo", fmt)
-          .single();
+          .limit(1)
+          .maybeSingle();
         if (accData) {
           account = accData;
           break;
