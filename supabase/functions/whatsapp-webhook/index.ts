@@ -342,6 +342,42 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
         isTeamGroup = true;
         console.log("[whatsapp-webhook] Team group detected:", remoteJid);
 
+        // FIRST: For context-dependent commands (confirmations, shortcuts), resolve account from stored context
+        const cmdLowerTeam = text.toLowerCase().trim();
+        const isTeamContextCommand = 
+          cmdLowerTeam === "#feedback sim" || cmdLowerTeam === "#feedback\nsim" ||
+          cmdLowerTeam === "#feedback não" || cmdLowerTeam === "#feedback nao" ||
+          cmdLowerTeam === "#feedback\nnão" || cmdLowerTeam === "#feedback\nnao" ||
+          cmdLowerTeam === "#atualizar" ||
+          cmdLowerTeam === "#sim" || cmdLowerTeam === "#todas" || cmdLowerTeam === "#todos" ||
+          /^#\d+(\s+#?\d+)*$/.test(cmdLowerTeam);
+        
+        if (isTeamContextCommand) {
+          const { data: ctxRows } = await supabase
+            .from("whatsapp_chat_context")
+            .select("account_id, context_type, created_at")
+            .eq("group_jid", remoteJid)
+            .in("context_type", ["feedback_confirm", "feedback_update", "campanhas"])
+            .gte("expires_at", new Date().toISOString())
+            .order("created_at", { ascending: false })
+            .limit(10);
+
+          const ctxAccountId = ctxRows?.[0]?.account_id;
+          if (ctxAccountId) {
+            const { data: ctxAccount } = await supabase
+              .from("accounts")
+              .select("id, nome_cliente, meta_account_id, cliente_id")
+              .eq("id", ctxAccountId)
+              .single();
+            if (ctxAccount) {
+              account = ctxAccount;
+              console.log("[whatsapp-webhook] Team group resolved account from context:", ctxAccount.nome_cliente);
+            }
+          }
+        }
+
+        // SECOND: If no context match, extract account name from message lines
+        if (!account) {
         // For team group, extract account name from message lines
         const lines = text.split("\n").map((l: string) => l.trim()).filter(Boolean);
         // First line is the command (e.g., #feedback), second line should be account name
@@ -360,14 +396,7 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
             if (!secondLine.startsWith("#") && !funnelTypes.includes(secondLine.toLowerCase())) {
               accountName = secondLine;
             } else if (funnelTypes.includes(secondLine.toLowerCase()) && lines.length >= 3) {
-              // For #feedback with funnel type, account name might be on line 3
-              // Actually for #feedback format: #feedback\nACCOUNT\nterceiros\n...
-              // Let's check line 1 (after #feedback) as the account name
-              // Re-check: the user said "#feedback\nPRIMUS\n..." so PRIMUS is the account
-              // But "terceiros" is also valid as second line for funnel type
-              // So if second line is a funnel type, the format is the client-group format
-              // For team group, account name MUST be the second line
-              accountName = null; // Can't determine, will fail gracefully
+              accountName = null;
             }
           } else {
             // Simple commands like #saldo - second line is account name
@@ -409,6 +438,7 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
             }
           }
         }
+        } // end if (!account)
 
         if (!account) {
           // List available accounts for the user
