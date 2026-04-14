@@ -6,6 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +36,7 @@ import {
   Pause,
   Play,
   Wallet,
+  Trash2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -107,6 +118,7 @@ export default function ContasCliente() {
 
   const [showModernForm, setShowModernForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountData | null>(null);
+  const [deleteAccountId, setDeleteAccountId] = useState<string | null>(null);
 
   useEffect(() => { loadAccountsData(); }, []);
 
@@ -255,6 +267,21 @@ export default function ContasCliente() {
     } catch (error: any) {
       console.error("Erro ao alterar status:", error);
       toast({ title: "Erro", description: "Não foi possível alterar o status da conta", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deleteAccountId) return;
+    try {
+      const { error } = await supabase.from("accounts").delete().eq("id", deleteAccountId);
+      if (error) throw error;
+      toast({ title: "Sucesso", description: "Conta excluída com sucesso" });
+      await loadAccountsData();
+    } catch (error: any) {
+      console.error("Erro ao excluir conta:", error);
+      toast({ title: "Erro", description: `Não foi possível excluir: ${error.message}`, variant: "destructive" });
+    } finally {
+      setDeleteAccountId(null);
     }
   };
 
@@ -471,8 +498,8 @@ export default function ContasCliente() {
                             <Edit className="h-4 w-4 mr-2" /> Editar conta
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">
-                            <Archive className="h-4 w-4 mr-2" /> Arquivar
+                          <DropdownMenuItem className="text-destructive" onClick={() => setDeleteAccountId(account.id)}>
+                            <Trash2 className="h-4 w-4 mr-2" /> Excluir conta
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -527,6 +554,24 @@ export default function ContasCliente() {
           }
           isEdit={!!editingAccount}
         />
+
+        {/* Delete confirmation */}
+        <AlertDialog open={!!deleteAccountId} onOpenChange={() => setDeleteAccountId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir conta?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta ação não pode ser desfeita. Todos os dados desta conta serão permanentemente removidos.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );
