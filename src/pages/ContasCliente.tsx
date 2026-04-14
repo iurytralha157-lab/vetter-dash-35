@@ -118,6 +118,7 @@ export default function ContasCliente() {
 
   const [showModernForm, setShowModernForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountData | null>(null);
+  const [deleteAccountId, setDeleteAccountId] = useState<string | null>(null);
 
   useEffect(() => { loadAccountsData(); }, []);
 
@@ -266,6 +267,21 @@ export default function ContasCliente() {
     } catch (error: any) {
       console.error("Erro ao alterar status:", error);
       toast({ title: "Erro", description: "Não foi possível alterar o status da conta", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deleteAccountId) return;
+    try {
+      const { error } = await supabase.from("accounts").delete().eq("id", deleteAccountId);
+      if (error) throw error;
+      toast({ title: "Sucesso", description: "Conta excluída com sucesso" });
+      await loadAccountsData();
+    } catch (error: any) {
+      console.error("Erro ao excluir conta:", error);
+      toast({ title: "Erro", description: `Não foi possível excluir: ${error.message}`, variant: "destructive" });
+    } finally {
+      setDeleteAccountId(null);
     }
   };
 
