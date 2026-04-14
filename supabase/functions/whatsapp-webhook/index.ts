@@ -267,17 +267,17 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
       
       if (isContextCommand) {
         // Look up pending context for this group to resolve the account
-        const { data: ctxData } = await supabase
+        const { data: ctxRows } = await supabase
           .from("whatsapp_chat_context")
-          .select("context")
+          .select("account_id, context_type, created_at")
           .eq("group_jid", remoteJid)
+          .in("context_type", ["feedback_confirm", "feedback_update", "campanhas"])
           .gte("expires_at", new Date().toISOString())
           .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        if (ctxData?.context?.account_id) {
-          const ctxAccountId = ctxData.context.account_id;
+          .limit(10);
+
+        const ctxAccountId = ctxRows?.[0]?.account_id;
+        if (ctxAccountId) {
           const matched = multipleAccounts.find((a: any) => a.id === ctxAccountId);
           if (matched) {
             account = matched;
