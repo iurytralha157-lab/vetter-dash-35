@@ -241,7 +241,14 @@ Deno.serve(async (req) => {
           console.warn("[evolution-api] list-saved-groups error:", error.message);
           return jsonResponse([]);
         }
-        return jsonResponse(data || []);
+        // Deduplicate by group_jid, keeping the first occurrence
+        const seen = new Set<string>();
+        const unique = (data || []).filter((g: any) => {
+          if (seen.has(g.group_jid)) return false;
+          seen.add(g.group_jid);
+          return true;
+        });
+        return jsonResponse(unique);
       }
 
       // ─── List all from Evolution (for linking dialog) ───
