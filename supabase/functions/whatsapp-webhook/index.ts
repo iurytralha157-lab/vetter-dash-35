@@ -236,15 +236,55 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
 
     let account: any = null;
     let isTeamGroup = false;
+    let multipleAccounts: any[] = [];
+    
     for (const fmt of possibleFormats) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("accounts")
         .select("id, nome_cliente, meta_account_id, cliente_id")
-        .eq("id_grupo", fmt)
-        .single();
-      if (data) {
-        account = data;
+        .eq("id_grupo", fmt);
+      if (data && data.length === 1) {
+        account = data[0];
         break;
+      } else if (data && data.length > 1) {
+        multipleAccounts = data;
+        break;
+      }
+    }
+
+    // If multiple accounts found for this group, check if user specified which one
+    if (!account && multipleAccounts.length > 1) {
+      const lines = text.split("\n").map((l: string) => l.trim()).filter(Boolean);
+      const cmdLine = lines[0];
+      
+      // Check if there's a second line with account name
+      if (lines.length >= 2) {
+        const accountNameLine = lines[1].trim();
+        // Try to match account name
+        const matched = multipleAccounts.find((a: any) => 
+          a.nome_cliente.toLowerCase() === accountNameLine.toLowerCase() ||
+          a.nome_cliente.toLowerCase().includes(accountNameLine.toLowerCase())
+        );
+        if (matched) {
+          account = matched;
+          // Remove the account name line from text
+          const restLines = lines.slice(2);
+          text = [cmdLine, ...restLines].join("\n");
+        }
+      }
+      
+      // If still no match, list accounts for the user
+      if (!account) {
+        const accountList = multipleAccounts.map((a: any, i: number) => 
+          `${i + 1}. *${a.nome_cliente}*`
+        ).join("\n");
+        
+        const helpMsg = `📋 *Este grupo tem ${multipleAccounts.length} contas vinculadas:*\n\n${accountList}\n\n📝 Envie o comando assim:\n*${cmdLine}*\n*NOME_DA_CONTA*\n\nExemplo:\n*${cmdLine}*\n*${multipleAccounts[0].nome_cliente}*`;
+        
+        await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, remoteJid, helpMsg);
+        return new Response(JSON.stringify({ success: true, multiple_accounts: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
     }
 
