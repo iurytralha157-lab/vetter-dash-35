@@ -498,8 +498,8 @@ export default function ContasCliente() {
                             <Edit className="h-4 w-4 mr-2" /> Editar conta
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">
-                            <Archive className="h-4 w-4 mr-2" /> Arquivar
+                          <DropdownMenuItem className="text-destructive" onClick={() => setDeleteAccountId(account.id)}>
+                            <Trash2 className="h-4 w-4 mr-2" /> Excluir conta
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
