@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -23,6 +23,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { 
   Building2, 
   Target, 
@@ -297,36 +301,59 @@ export function ModernAccountForm({
                             <Users className="w-4 h-4" />
                             Grupo WhatsApp *
                           </FormLabel>
-                          <div className="flex gap-2">
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger className="flex-1">
-                                  <SelectValue placeholder="Selecione um grupo">
-                                    {field.value && (
+                           <div className="flex gap-2">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    className={cn(
+                                      "flex-1 justify-between h-auto min-h-10 font-normal",
+                                      !field.value && "text-muted-foreground"
+                                    )}
+                                  >
+                                    {field.value ? (
                                       <div className="flex min-w-0 flex-col items-start text-left">
                                         <span className="truncate">{selectedGroup?.group_name || "Grupo selecionado"}</span>
                                         <span className="text-xs text-muted-foreground truncate">{field.value}</span>
                                       </div>
+                                    ) : (
+                                      "Selecione um grupo"
                                     )}
-                                  </SelectValue>
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {savedGroups.map((group) => (
-                                  <SelectItem key={group.group_jid} value={group.group_jid}>
-                                    <div className="flex min-w-0 flex-col">
-                                      <span className="truncate">{group.group_name}</span>
-                                      <span className="text-xs text-muted-foreground truncate">{group.group_jid}</span>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                                {savedGroups.length === 0 && (
-                                  <div className="px-3 py-2 text-sm text-muted-foreground">
-                                    Nenhum grupo sincronizado ainda.
-                                  </div>
-                                )}
-                              </SelectContent>
-                            </Select>
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                                <Command>
+                                  <CommandInput placeholder="Buscar grupo pelo nome..." />
+                                  <CommandList>
+                                    <CommandEmpty>Nenhum grupo encontrado.</CommandEmpty>
+                                    <CommandGroup>
+                                      {savedGroups.map((group) => (
+                                        <CommandItem
+                                          key={group.group_jid}
+                                          value={group.group_name}
+                                          onSelect={() => field.onChange(group.group_jid)}
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              field.value === group.group_jid ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          <div className="flex min-w-0 flex-col">
+                                            <span className="truncate">{group.group_name}</span>
+                                            <span className="text-xs text-muted-foreground truncate">{group.group_jid}</span>
+                                          </div>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
                             <Button
                               type="button"
                               variant="outline"
