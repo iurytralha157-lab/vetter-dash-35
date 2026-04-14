@@ -748,8 +748,6 @@ async function handleFeedback(
             data_inicio: feedbackResult.data_inicio,
             data_fim: feedbackResult.data_fim,
           },
-          instance_name: null,
-          expiry_notified: false,
           created_at: new Date().toISOString(),
           expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         }, { onConflict: 'group_jid,account_id,context_type' });
