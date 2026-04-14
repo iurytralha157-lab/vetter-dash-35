@@ -253,7 +253,41 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
       }
     }
 
-    // If multiple accounts found for this group, check if user specified which one
+    // If multiple accounts found for this group, first check if there's a pending context
+    // (e.g., #feedback sim, #feedback não, #atualizar) that already knows which account to use
+    if (!account && multipleAccounts.length > 1) {
+      const cmdLower = text.toLowerCase().trim();
+      const isContextCommand = 
+        cmdLower === "#feedback sim" || cmdLower === "#feedback\nsim" ||
+        cmdLower === "#feedback não" || cmdLower === "#feedback nao" ||
+        cmdLower === "#feedback\nnão" || cmdLower === "#feedback\nnao" ||
+        cmdLower === "#atualizar" ||
+        cmdLower === "#sim" || cmdLower === "#todas" || cmdLower === "#todos" ||
+        /^#\d+(\s+#?\d+)*$/.test(cmdLower);
+      
+      if (isContextCommand) {
+        // Look up pending context for this group to resolve the account
+        const { data: ctxData } = await supabase
+          .from("whatsapp_chat_context")
+          .select("context")
+          .eq("group_jid", remoteJid)
+          .gte("expires_at", new Date().toISOString())
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (ctxData?.context?.account_id) {
+          const ctxAccountId = ctxData.context.account_id;
+          const matched = multipleAccounts.find((a: any) => a.id === ctxAccountId);
+          if (matched) {
+            account = matched;
+            console.log("[whatsapp-webhook] Resolved account from pending context:", matched.nome_cliente);
+          }
+        }
+      }
+    }
+
+    // If multiple accounts and still no match, check if user specified which one
     if (!account && multipleAccounts.length > 1) {
       const lines = text.split("\n").map((l: string) => l.trim()).filter(Boolean);
       const cmdLine = lines[0];
@@ -261,14 +295,12 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
       // Check if there's a second line with account name
       if (lines.length >= 2) {
         const accountNameLine = lines[1].trim();
-        // Try to match account name
         const matched = multipleAccounts.find((a: any) => 
           a.nome_cliente.toLowerCase() === accountNameLine.toLowerCase() ||
           a.nome_cliente.toLowerCase().includes(accountNameLine.toLowerCase())
         );
         if (matched) {
           account = matched;
-          // Remove the account name line from text
           const restLines = lines.slice(2);
           text = [cmdLine, ...restLines].join("\n");
         }
