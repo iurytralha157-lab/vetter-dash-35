@@ -556,9 +556,9 @@ async function processCommand(
   try {
     if (cmd.startsWith("#followup")) {
       responseText = await handleFollowup(text, account, groupJid, senderName, supabase);
-    } else if (cmd === "#feedback sim" || cmd === "#feedback\nsim") {
+    } else if (cmd === "#feedback sim" || cmd === "#feedback\nsim" || cmd === "sim") {
       responseText = await handleFeedbackConfirm(account, groupJid, senderName, senderJid, supabase);
-    } else if (cmd === "#feedback não" || cmd === "#feedback nao" || cmd === "#feedback\nnão" || cmd === "#feedback\nnao") {
+    } else if (cmd === "#feedback não" || cmd === "#feedback nao" || cmd === "#feedback\nnão" || cmd === "#feedback\nnao" || cmd === "não" || cmd === "nao") {
       responseText = await handleFeedbackReject(account, groupJid, senderJid, senderName, supabase);
     } else if (cmd.startsWith("#feedback")) {
       responseText = await handleFeedback(text, account, groupJid, senderName, senderJid, supabase);
