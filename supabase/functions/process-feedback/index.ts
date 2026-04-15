@@ -76,6 +76,31 @@ Deno.serve(async (req) => {
       usuario_origem: usuario_origem || null,
     };
 
+    // === Fetch real Meta campaigns for this account to classify tipo_funil per campaign ===
+    let metaCampaigns: Array<{ campaign_name: string; campaign_id: string }> = [];
+    try {
+      const { data: campRows } = await supabase
+        .from("campaign_history")
+        .select("campaign_name, campaign_id")
+        .eq("account_id", account_id)
+        .order("date", { ascending: false })
+        .limit(200);
+
+      if (campRows && campRows.length > 0) {
+        // Deduplicate by campaign_id
+        const seen = new Set<string>();
+        for (const r of campRows) {
+          if (!seen.has(r.campaign_id)) {
+            seen.add(r.campaign_id);
+            metaCampaigns.push({ campaign_name: r.campaign_name, campaign_id: r.campaign_id });
+          }
+        }
+      }
+      console.log(`[process-feedback] Found ${metaCampaigns.length} distinct Meta campaigns for account`);
+    } catch (e) {
+      console.error("[process-feedback] Error fetching Meta campaigns:", e);
+    }
+
     // Call AI to parse the message into campaigns
     let campaigns: CampaignData[] = [];
     let tipoFunil = "";
@@ -87,9 +112,14 @@ Deno.serve(async (req) => {
     let dataFim: string | null = null;
     let periodoDetectado = false;
 
+    // Build campaign list context for AI
+    const campaignListForAI = metaCampaigns.length > 0
+      ? metaCampaigns.map(c => c.campaign_name).join("\n")
+      : "";
+
     if (lovableApiKey) {
       try {
-        const result = await callAI(msg, lovableApiKey, aiModel);
+        const result = await callAI(msg, lovableApiKey, aiModel, campaignListForAI);
         tipoFunil = result.tipo_funil;
         campaigns = result.campanhas;
         dataInicio = result.data_inicio || null;
@@ -105,6 +135,39 @@ Deno.serve(async (req) => {
     } else {
       processamentoStatus = "erro";
       processamentoErro = "LOVABLE_API_KEY not configured";
+    }
+
+    // === PER-CAMPAIGN tipo_funil classification based on Meta campaign names ===
+    if (campaigns.length > 0 && metaCampaigns.length > 0) {
+      for (const camp of campaigns) {
+        // If the AI already set per-campaign tipo_funil, respect it
+        if (camp.tipo_funil && ["lancamento", "terceiros"].includes(camp.tipo_funil)) {
+          continue;
+        }
+
+        // Try to match this campaign to a real Meta campaign
+        const matched = matchCampaignToMeta(camp.campanha_nome, camp.campanha_codigo_curto, metaCampaigns);
+        if (matched) {
+          // Update campaign name to the real Meta name for consistency
+          camp._matched_meta_name = matched.campaign_name;
+          camp._matched_meta_id = matched.campaign_id;
+
+          // Classify based on Meta campaign name
+          camp.tipo_funil = classifyCampaignType(matched.campaign_name);
+          console.log(`[process-feedback] Campaign "${camp.campanha_nome}" matched to Meta "${matched.campaign_name}" → tipo_funil: ${camp.tipo_funil}`);
+        } else {
+          // No match found — use AI's global tipo_funil or default
+          camp.tipo_funil = tipoFunil || "lancamento";
+          console.log(`[process-feedback] Campaign "${camp.campanha_nome}" no Meta match, using: ${camp.tipo_funil}`);
+        }
+      }
+    } else if (campaigns.length > 0) {
+      // No Meta campaigns available — use AI's classification
+      for (const camp of campaigns) {
+        if (!camp.tipo_funil) {
+          camp.tipo_funil = tipoFunil || classifyCampaignType(camp.campanha_nome);
+        }
+      }
     }
 
     // If no date detected, default to yesterday
@@ -130,7 +193,6 @@ Deno.serve(async (req) => {
         .neq("campanha_nome", "desconhecida");
 
       if (existingFeedback && existingFeedback.length > 0) {
-        // There's already feedback for this day — return existing data and ask for confirmation
         return new Response(JSON.stringify({
           success: true,
           existing_feedback: true,
@@ -153,7 +215,6 @@ Deno.serve(async (req) => {
     if (force_update) {
       const isAdmin = body.is_admin === true;
 
-      // Fetch existing feedback for this period
       const { data: existingRows } = await supabase
         .from("feedback_campanha")
         .select("campanha_nome, quantidade_passou_corretor, quantidade_visita, quantidade_proposta, quantidade_venda, quantidade_descartado, quantidade_atendimento")
@@ -162,8 +223,6 @@ Deno.serve(async (req) => {
         .lte("data_referencia", dataFim)
         .neq("campanha_nome", "desconhecida");
 
-      // RULE: Once a campaign has advanced stages (corretor, visita, proposta, venda),
-      // non-admin users cannot set those values to 0 or move leads back to descartado/atendimento SDR
       if (!isAdmin && existingRows && existingRows.length > 0) {
         const advancedStages = ["quantidade_passou_corretor", "quantidade_visita", "quantidade_proposta", "quantidade_venda"] as const;
 
@@ -173,7 +232,6 @@ Deno.serve(async (req) => {
           );
           if (!existingCamp) continue;
 
-          // Preserve advanced stage values — cannot reduce them
           for (const stage of advancedStages) {
             const existingVal = existingCamp[stage] || 0;
             const newVal = camp[stage] ?? null;
@@ -183,7 +241,6 @@ Deno.serve(async (req) => {
             }
           }
 
-          // Cannot increase descartado or atendimento if advanced stages exist
           const hasAdvanced = advancedStages.some(s => (existingCamp[s] || 0) > 0);
           if (hasAdvanced) {
             const existingDescartado = existingCamp.quantidade_descartado || 0;
@@ -191,17 +248,14 @@ Deno.serve(async (req) => {
 
             if (camp.quantidade_descartado != null && camp.quantidade_descartado > existingDescartado) {
               camp.quantidade_descartado = existingDescartado;
-              console.log(`[process-feedback] Blocked descartado increase for "${camp.campanha_nome}" (has advanced stages)`);
             }
             if (camp.quantidade_atendimento != null && camp.quantidade_atendimento > existingAtendimento) {
               camp.quantidade_atendimento = existingAtendimento;
-              console.log(`[process-feedback] Blocked atendimento increase for "${camp.campanha_nome}" (has advanced stages)`);
             }
           }
         }
       }
 
-      // Delete old records to replace with new
       const { error: deleteError } = await supabase
         .from("feedback_campanha")
         .delete()
@@ -211,8 +265,6 @@ Deno.serve(async (req) => {
 
       if (deleteError) {
         console.error("[process-feedback] Delete old feedback error:", deleteError);
-      } else {
-        console.log("[process-feedback] Deleted old feedback for update");
       }
     }
 
@@ -238,11 +290,9 @@ Deno.serve(async (req) => {
       console.error("[process-feedback] Meta leads query error:", e);
     }
 
-    // Apply cap: total quantidade_recebida across all campaigns cannot exceed metaTotalLeads
     if (metaTotalLeads !== null && metaTotalLeads > 0 && campaigns.length > 0) {
       const totalRecebida = campaigns.reduce((s, c) => s + (c.quantidade_recebida || 0), 0);
       if (totalRecebida > metaTotalLeads) {
-        // Proportionally cap each campaign's quantidade_recebida
         const ratio = metaTotalLeads / totalRecebida;
         let remaining = metaTotalLeads;
         for (let i = 0; i < campaigns.length; i++) {
@@ -256,13 +306,14 @@ Deno.serve(async (req) => {
             }
           }
         }
-        console.log(`[process-feedback] Capped leads_recebidos from ${totalRecebida} to ${metaTotalLeads} (Meta total)`);
+        console.log(`[process-feedback] Capped leads_recebidos from ${totalRecebida} to ${metaTotalLeads}`);
       }
     }
 
     // === RULE 2: Normalize + validate funnel totals ===
     const buildCampaignSummary = (camp: CampaignData) => ({
       nome: camp.campanha_nome,
+      tipo_funil: camp.tipo_funil || tipoFunil || "lancamento",
       recebidos: camp.quantidade_recebida,
       descartado: camp.quantidade_descartado,
       aguardando_retorno: camp.quantidade_aguardando_retorno,
@@ -294,7 +345,6 @@ Deno.serve(async (req) => {
         const migrated = camp.quantidade_aguardando_retorno || 0;
         camp.quantidade_atendimento = (camp.quantidade_atendimento || 0) + migrated;
         camp.quantidade_aguardando_retorno = null;
-        console.log(`[process-feedback] Campaign "${camp.campanha_nome}": converted ${migrated} from aguardando_retorno to atendimento SDR`);
       }
 
       if (camp.quantidade_recebida != null && camp.quantidade_recebida > 0) {
@@ -310,7 +360,6 @@ Deno.serve(async (req) => {
           const gap = camp.quantidade_recebida - subStagesSum;
           camp.quantidade_atendimento = (camp.quantidade_atendimento || 0) + gap;
           subStagesSum += gap;
-          console.log(`[process-feedback] Campaign "${camp.campanha_nome}": added ${gap} to atendimento SDR to match leads_recebidos`);
         }
 
         if (subStagesSum !== camp.quantidade_recebida) {
@@ -339,12 +388,18 @@ Deno.serve(async (req) => {
       totais.proposta +
       totais.venda;
 
+    // Determine if there are mixed funnel types
+    const hasLancamento = campaigns.some(c => (c.tipo_funil || tipoFunil) === "lancamento");
+    const hasTerceiros = campaigns.some(c => (c.tipo_funil || tipoFunil) === "terceiros");
+    const mixedFunnel = hasLancamento && hasTerceiros;
+
     if (invalidCampaigns.length > 0 || (totais.recebidos > 0 && totalNoFunil !== totais.recebidos)) {
       return new Response(JSON.stringify({
         success: true,
         invalid_funnel: true,
         processamento_status: processamentoStatus,
-        tipo_funil: tipoFunil,
+        tipo_funil: mixedFunnel ? "misto" : tipoFunil,
+        mixed_funnel: mixedFunnel,
         campanhas_count: campaigns.length,
         campanhas: campaigns.map(buildCampaignSummary),
         totals: {
@@ -367,7 +422,8 @@ Deno.serve(async (req) => {
         success: true,
         dry_run: true,
         processamento_status: processamentoStatus,
-        tipo_funil: tipoFunil,
+        tipo_funil: mixedFunnel ? "misto" : tipoFunil,
+        mixed_funnel: mixedFunnel,
         campanhas_count: campaigns.length,
         campanhas: campaigns.map(buildCampaignSummary),
         totals: {
@@ -410,19 +466,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Validate tipo_funil
-    if (!["lancamento", "terceiros"].includes(tipoFunil)) {
-      tipoFunil = "lancamento";
-    }
-
-    // Insert one record per campaign
+    // Insert one record per campaign — each with its own tipo_funil
     const inserted: any[] = [];
     for (const camp of campaigns) {
       const campDataRef = camp.data_referencia || dataInicio;
+      const campTipoFunil = camp.tipo_funil || tipoFunil || "lancamento";
+
+      // Validate tipo_funil
+      const validTipoFunil = ["lancamento", "terceiros"].includes(campTipoFunil) ? campTipoFunil : "lancamento";
 
       const record = {
         ...sharedFields,
-        tipo_funil: tipoFunil,
+        tipo_funil: validTipoFunil,
         campanha_nome: camp.campanha_nome || "desconhecida",
         campanha_codigo_curto: camp.campanha_codigo_curto ?? null,
         data_referencia: campDataRef,
@@ -444,16 +499,17 @@ Deno.serve(async (req) => {
       if (insertError) {
         console.error("[process-feedback] Insert error:", insertError);
       } else {
-        inserted.push(record);
+        inserted.push({ ...record, _tipo_funil: validTipoFunil });
       }
     }
 
     return new Response(JSON.stringify({
       success: true,
       processamento_status: processamentoStatus,
-      tipo_funil: tipoFunil,
+      tipo_funil: mixedFunnel ? "misto" : (campaigns[0]?.tipo_funil || tipoFunil),
+      mixed_funnel: mixedFunnel,
       campanhas_count: inserted.length,
-      campanhas: inserted.map(buildCampaignSummary),
+      campanhas: campaigns.map(buildCampaignSummary),
       totals: {
         ...totais,
         no_funil: totalNoFunil,
@@ -478,6 +534,9 @@ interface CampaignData {
   campanha_nome: string;
   campanha_codigo_curto?: string | null;
   data_referencia?: string | null;
+  tipo_funil?: string;
+  _matched_meta_name?: string;
+  _matched_meta_id?: string;
   quantidade_recebida: number | null;
   quantidade_descartado: number | null;
   quantidade_aguardando_retorno: number | null;
@@ -495,14 +554,97 @@ interface AIResult {
   data_fim: string | null;
 }
 
-async function callAI(mensagem: string, apiKey: string, model: string): Promise<AIResult> {
+// === Campaign matching and classification ===
+
+function normalize(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+function classifyCampaignType(campaignName: string): string {
+  const n = normalize(campaignName);
+  // Check for explicit markers in campaign name
+  if (n.includes("lancamento") || n.includes("lançamento") || n.includes("lanc")) return "lancamento";
+  if (n.includes("terceiro") || n.includes("terceiros") || n.includes("terc")) return "terceiros";
+  // Check for WPP (WhatsApp) + terceiro pattern
+  if (n.includes("wpp") && (n.includes("terceiro") || n.includes("terc"))) return "terceiros";
+  return "lancamento"; // default
+}
+
+function matchCampaignToMeta(
+  parsedName: string,
+  parsedCode: string | null | undefined,
+  metaCampaigns: Array<{ campaign_name: string; campaign_id: string }>
+): { campaign_name: string; campaign_id: string } | null {
+  const normalizedParsed = normalize(parsedName);
+  const normalizedCode = parsedCode ? normalize(parsedCode) : null;
+
+  // 1. Exact match (normalized)
+  for (const mc of metaCampaigns) {
+    if (normalize(mc.campaign_name) === normalizedParsed) return mc;
+  }
+
+  // 2. Match by code (e.g. "REF698" matches "KK | LANÇAMENTO | REF698 | TAPETY")
+  if (normalizedCode) {
+    for (const mc of metaCampaigns) {
+      if (normalize(mc.campaign_name).includes(normalizedCode)) return mc;
+    }
+  }
+
+  // 3. Match by parsed name as substring of Meta campaign name
+  if (normalizedParsed.length >= 3) {
+    for (const mc of metaCampaigns) {
+      const normalizedMeta = normalize(mc.campaign_name);
+      if (normalizedMeta.includes(normalizedParsed)) return mc;
+    }
+  }
+
+  // 4. Match by any significant word from parsed name in Meta campaign name
+  // Split parsed name into words, try matching longer segments first
+  const words = normalizedParsed.split(/[\s|,\-_]+/).filter(w => w.length >= 3);
+  if (words.length > 0) {
+    // Try matching all words first
+    for (const mc of metaCampaigns) {
+      const normalizedMeta = normalize(mc.campaign_name);
+      if (words.every(w => normalizedMeta.includes(w))) return mc;
+    }
+
+    // Try matching any significant word (skip common words)
+    const skipWords = new Set(["kk", "ref", "campanha", "leads", "lead", "com", "para", "que", "dos", "das", "wpp"]);
+    const significantWords = words.filter(w => !skipWords.has(w) && w.length >= 4);
+    if (significantWords.length > 0) {
+      for (const mc of metaCampaigns) {
+        const normalizedMeta = normalize(mc.campaign_name);
+        if (significantWords.some(w => normalizedMeta.includes(w))) return mc;
+      }
+    }
+  }
+
+  // 5. Match code patterns like "47", "AP0145", "REF698" extracted from parsed name
+  const codePattern = normalizedParsed.match(/(?:ref|ap|cac|cod)?\.?\s*(\d{2,})/);
+  if (codePattern) {
+    const codeNum = codePattern[0].replace(/\s/g, "");
+    for (const mc of metaCampaigns) {
+      if (normalize(mc.campaign_name).includes(codeNum)) return mc;
+    }
+  }
+
+  return null;
+}
+
+async function callAI(mensagem: string, apiKey: string, model: string, campaignList: string): Promise<AIResult> {
+  const campaignContext = campaignList
+    ? `\n\nCAMPANHAS ATIVAS DESTA CONTA (do Meta Ads):\n${campaignList}\n\nIMPORTANTE: Use esses nomes reais como referência. Quando o usuário mencionar uma campanha por nome parcial, código ou apelido, tente identificar qual campanha real corresponde e use o NOME COMPLETO dela no campo campanha_nome. Por exemplo, se o usuário diz "Itapety" e existe "KK | LANÇAMENTO | REF698 | TAPETY", use "KK | LANÇAMENTO | REF698 | TAPETY" como campanha_nome.\n\nCLASSIFICAÇÃO LANÇAMENTO vs TERCEIROS:\n- Olhe para o NOME REAL da campanha no Meta para classificar.\n- Se o nome contém "LANÇAMENTO" ou "LANC", é tipo "lancamento".\n- Se o nome contém "TERCEIRO" ou "TERCEIROS" ou "TERC", é tipo "terceiros".\n- Cada campanha pode ter seu próprio tipo de funil! Uma mesma mensagem pode conter campanhas de lançamento E terceiros misturadas.\n- O campo tipo_funil no nível raiz deve ser o tipo predominante, mas cada campanha individual deve ter seu próprio tipo correto no campo tipo_funil.\n`
+    : "";
+
   const systemPrompt = `Você é um assistente que interpreta mensagens de feedback de vendas imobiliárias enviadas via WhatsApp.
 
 A mensagem segue o formato:
 #feedback
-<tipo_funil> (lancamento ou terceiros — se não informado, infira pelo contexto; se menciona SDR ou corretor, é "terceiros"; se não mencionar, é "lancamento")
+<texto do feedback com campanhas e números>
 
-Pode haver MÚLTIPLAS campanhas na mesma mensagem, identificadas por códigos como "47:", "ap0145:", "REF47", etc.
+O tipo do funil (lançamento ou terceiros) agora é determinado PELO NOME DA CAMPANHA no Meta Ads, não pelo que o usuário escreve na mensagem. Se o usuário escrever "terceiros" ou "lançamento" na mensagem, use como DICA, mas o nome real da campanha tem prioridade.
+${campaignContext}
+Pode haver MÚLTIPLAS campanhas na mesma mensagem, identificadas por códigos como "47:", "ap0145:", "REF47", nomes parciais, etc.
 
 MAPEAMENTO DE ETAPAS (CRÍTICO — leia com atenção):
 
@@ -549,18 +691,12 @@ PERÍODO/DATA:
 - "hoje" = data atual.
 
 Extraia:
-1. tipo_funil: "lancamento" ou "terceiros"
+1. tipo_funil: o tipo predominante ("lancamento" ou "terceiros") — será sobrescrito por campanha individual se necessário
 2. data_inicio e data_fim: o período do feedback (null se não mencionado)
-3. Para cada campanha mencionada, extraia APENAS as quantidades explicitamente informadas
-
-EXEMPLO:
-Mensagem: "47: 2 lead recebido, aguardando retorno / ap0145: 3 lead recebido, 2 em atendimento com o corretor"
-Resultado esperado:
-- tipo_funil: "terceiros" (mencionou corretor)
-- campanha "47": quantidade_recebida=2, quantidade_atendimento=2
-- campanha "ap0145": quantidade_recebida=3, quantidade_passou_corretor=2, quantidade_atendimento=1
-
-Note no exemplo acima: "aguardando retorno" entra como Atendimento SDR. E na campanha ap0145 o 1 restante sem status explícito também vai para Atendimento SDR para fechar o total recebido.
+3. Para cada campanha mencionada:
+   - campanha_nome: o NOME COMPLETO da campanha real do Meta se possível, senão o nome/código informado pelo usuário
+   - tipo_funil: "lancamento" ou "terceiros" baseado no nome real da campanha
+   - Quantidades explicitamente informadas
 
 Retorne usando a tool extract_feedback_campaigns.`;
 
@@ -581,14 +717,14 @@ Retorne usando a tool extract_feedback_campaigns.`;
           type: "function",
           function: {
             name: "extract_feedback_campaigns",
-            description: "Extract campaign-level feedback data from a WhatsApp message, including date/period",
+            description: "Extract campaign-level feedback data from a WhatsApp message, including date/period. Each campaign can have its own tipo_funil.",
             parameters: {
               type: "object",
               properties: {
                 tipo_funil: {
                   type: "string",
                   enum: ["lancamento", "terceiros"],
-                  description: "Tipo do funil, extraído da linha após #feedback",
+                  description: "Tipo predominante do funil (será sobrescrito por campanha individual se necessário)",
                 },
                 data_inicio: {
                   type: ["string", "null"],
@@ -603,8 +739,9 @@ Retorne usando a tool extract_feedback_campaigns.`;
                   items: {
                     type: "object",
                     properties: {
-                      campanha_nome: { type: "string", description: "Nome completo da campanha" },
+                      campanha_nome: { type: "string", description: "Nome completo da campanha (preferencialmente o nome real do Meta Ads)" },
                       campanha_codigo_curto: { type: ["string", "null"], description: "Código curto se houver (ex: REF47, AP0145). null se não mencionado." },
+                      tipo_funil: { type: "string", enum: ["lancamento", "terceiros"], description: "Tipo do funil desta campanha específica, baseado no nome real da campanha" },
                       quantidade_recebida: { type: ["integer", "null"], description: "Leads recebidos. null se não mencionado." },
                       quantidade_descartado: { type: ["integer", "null"], description: "Leads descartados. null se não mencionado." },
                       quantidade_aguardando_retorno: { type: ["integer", "null"], description: "Aguardando retorno. null se não mencionado." },
