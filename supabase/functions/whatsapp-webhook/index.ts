@@ -5,6 +5,53 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function normalizeSenderValue(value: string | null | undefined): string {
+  return (value || "").trim().toLowerCase();
+}
+
+function getSenderJid(key: any): string {
+  return key?.participantAlt || key?.participant || "";
+}
+
+function contextBelongsToSender(contextData: any, senderJid: string, senderName?: string): boolean {
+  const normalizedContextSenderJid = normalizeSenderValue(contextData?.sender_jid);
+  const normalizedSenderJid = normalizeSenderValue(senderJid);
+
+  if (normalizedContextSenderJid && normalizedSenderJid) {
+    return normalizedContextSenderJid === normalizedSenderJid;
+  }
+
+  const normalizedContextSenderName = normalizeSenderValue(contextData?.sender_name);
+  const normalizedSenderName = normalizeSenderValue(senderName);
+
+  if (normalizedContextSenderName && normalizedSenderName) {
+    return normalizedContextSenderName === normalizedSenderName;
+  }
+
+  return false;
+}
+
+function getMatchingContextRow(rows: any[] | null | undefined, senderJid: string, senderName?: string): any | null {
+  if (!rows?.length) return null;
+
+  const matchedRow = rows.find((row: any) => contextBelongsToSender(row.context_data, senderJid, senderName));
+  if (matchedRow) return matchedRow;
+
+  if (rows.length === 1) {
+    const onlyRow = rows[0];
+    const hasSenderMetadata = Boolean(
+      normalizeSenderValue(onlyRow?.context_data?.sender_jid) ||
+      normalizeSenderValue(onlyRow?.context_data?.sender_name)
+    );
+
+    if (!hasSenderMetadata) {
+      return onlyRow;
+    }
+  }
+
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -37,6 +84,8 @@ Deno.serve(async (req) => {
     const message = data.message;
     const key = data.key;
     const instanceName = payload.instance;
+    const senderJid = getSenderJid(key);
+    const senderName = data.pushName || senderJid || "Desconhecido";
 
     if (!key || !message) {
       return new Response(JSON.stringify({ ignored: true, reason: "no key/message" }), {
@@ -94,8 +143,6 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-
-      const senderName = data.pushName || key.participant || "Desconhecido";
 
       try {
         // 1. Download audio via Evolution API getBase64FromMediaMessage
@@ -217,7 +264,7 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
           `🎙️ *Comando por voz recebido!*\n_"${interpretedCommand}"_\n\nProcessando...`
         );
 
-        return await processCommand(interpretedCommand, account, remoteJid, instanceName, evolutionUrl, evolutionKey, supabase, senderName);
+        return await processCommand(interpretedCommand, account, remoteJid, instanceName, evolutionUrl, evolutionKey, supabase, senderName, senderJid);
       } catch (audioErr) {
         console.error("[whatsapp-webhook] Audio processing error:", audioErr);
         return new Response(JSON.stringify({ ignored: true, reason: "audio error" }), {
@@ -269,14 +316,15 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
         // Look up pending context for this group to resolve the account
         const { data: ctxRows } = await supabase
           .from("whatsapp_chat_context")
-          .select("account_id, context_type, created_at")
+          .select("account_id, context_type, created_at, context_data")
           .eq("group_jid", remoteJid)
           .in("context_type", ["feedback_confirm", "feedback_update", "campanhas"])
           .gte("expires_at", new Date().toISOString())
           .order("created_at", { ascending: false })
           .limit(10);
 
-        const ctxAccountId = ctxRows?.[0]?.account_id;
+        const matchedContext = getMatchingContextRow(ctxRows, senderJid, senderName);
+        const ctxAccountId = matchedContext?.account_id;
         if (ctxAccountId) {
           const matched = multipleAccounts.find((a: any) => a.id === ctxAccountId);
           if (matched) {
@@ -355,14 +403,15 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
         if (isTeamContextCommand) {
           const { data: ctxRows } = await supabase
             .from("whatsapp_chat_context")
-            .select("account_id, context_type, created_at")
+            .select("account_id, context_type, created_at, context_data")
             .eq("group_jid", remoteJid)
             .in("context_type", ["feedback_confirm", "feedback_update", "campanhas"])
             .gte("expires_at", new Date().toISOString())
             .order("created_at", { ascending: false })
             .limit(10);
 
-          const ctxAccountId = ctxRows?.[0]?.account_id;
+          const matchedContext = getMatchingContextRow(ctxRows, senderJid, senderName);
+          const ctxAccountId = matchedContext?.account_id;
           if (ctxAccountId) {
             const { data: ctxAccount } = await supabase
               .from("accounts")
@@ -480,9 +529,7 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
       }
     }
 
-    const senderName = data.pushName || key.participant || "Desconhecido";
-
-    return await processCommand(text, account, remoteJid, instanceName, evolutionUrl, evolutionKey, supabase, senderName);
+    return await processCommand(text, account, remoteJid, instanceName, evolutionUrl, evolutionKey, supabase, senderName, senderJid);
   } catch (err) {
     console.error("[whatsapp-webhook] Error:", err);
     return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Internal error" }), {
@@ -500,7 +547,8 @@ async function processCommand(
   evolutionUrl: string,
   evolutionKey: string,
   supabase: any,
-  senderName: string
+  senderName: string,
+  senderJid: string
 ) {
   const cmd = text.toLowerCase().trim();
   let responseText = "";
@@ -509,11 +557,11 @@ async function processCommand(
     if (cmd.startsWith("#followup")) {
       responseText = await handleFollowup(text, account, groupJid, senderName, supabase);
     } else if (cmd === "#feedback sim" || cmd === "#feedback\nsim") {
-      responseText = await handleFeedbackConfirm(account, groupJid, senderName, supabase);
+      responseText = await handleFeedbackConfirm(account, groupJid, senderName, senderJid, supabase);
     } else if (cmd === "#feedback não" || cmd === "#feedback nao" || cmd === "#feedback\nnão" || cmd === "#feedback\nnao") {
-      responseText = await handleFeedbackReject(account, groupJid, supabase);
+      responseText = await handleFeedbackReject(account, groupJid, senderJid, senderName, supabase);
     } else if (cmd.startsWith("#feedback")) {
-      responseText = await handleFeedback(text, account, groupJid, senderName, supabase);
+      responseText = await handleFeedback(text, account, groupJid, senderName, senderJid, supabase);
     } else if (cmd === "#saldo") {
       responseText = await handleSaldo(account, supabase);
     } else if (cmd.startsWith("#gasto")) {
@@ -522,22 +570,22 @@ async function processCommand(
       responseText = await handleFunil(account, supabase);
     } else if (cmd.startsWith("#campanhas")) {
       const periodArg = cmd.replace("#campanhas", "").trim();
-      responseText = await handleCampanhas(account, supabase, periodArg || null, groupJid, instanceName);
+      responseText = await handleCampanhas(account, supabase, periodArg || null, groupJid, instanceName, senderName, senderJid);
     } else if (cmd === "#relatorio") {
       return await handleRelatorioAll(account, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
     } else if (cmd === "#todas" || cmd === "#todos") {
       // Send detailed reports for all campaigns from context
-      return await handleContextDetailAll(account, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
+      return await handleContextDetailAll(account, groupJid, instanceName, evolutionUrl, evolutionKey, supabase, senderJid, senderName);
     } else if (cmd === "#atualizar") {
       // User confirmed they want to update existing feedback
-      responseText = await handleFeedbackUpdate(account, groupJid, senderName, supabase);
+      responseText = await handleFeedbackUpdate(account, groupJid, senderName, senderJid, supabase);
     } else if (cmd === "#sim") {
       // User said "yes" to seeing detailed reports - ask which one
-      responseText = await handleSimResponse(account, supabase, groupJid);
+      responseText = await handleSimResponse(account, supabase, groupJid, senderJid, senderName);
     } else if (cmd.match(/^#\d+(\s+#?\d+)*$/)) {
       // Matches "#1", "#2", "#1 #3", "#1 2 3" etc.
       const numbers = cmd.match(/\d+/g)!.map(Number);
-      return await handleContextDetailMultiple(account, numbers, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
+      return await handleContextDetailMultiple(account, numbers, groupJid, instanceName, evolutionUrl, evolutionKey, supabase, senderJid, senderName);
     } else if (cmd.startsWith("#campanha")) {
       const num = parseInt(cmd.replace("#campanha", "").trim());
       responseText = await handleCampanhaDetail(account, num, supabase);
@@ -653,6 +701,7 @@ async function handleFeedback(
   account: any,
   groupJid: string,
   senderName: string,
+  senderJid: string,
   supabase: any
 ): Promise<string> {
   const feedbackBody = text.replace(/^#feedback\s*/i, "").trim();
@@ -743,6 +792,7 @@ async function handleFeedback(
           context_data: {
             original_message: text,
             sender_name: senderName,
+            sender_jid: senderJid,
             existing_data: feedbackResult.existing_data,
             new_parsed: feedbackResult.new_parsed,
             data_inicio: feedbackResult.data_inicio,
@@ -855,6 +905,7 @@ async function handleFeedback(
         context_data: {
           original_message: text,
           sender_name: senderName,
+            sender_jid: senderJid,
           parsed_result: feedbackResult,
         },
         created_at: new Date().toISOString(),
@@ -877,17 +928,21 @@ async function handleFeedbackConfirm(
   account: any,
   groupJid: string,
   senderName: string,
+  senderJid: string,
   supabase: any
 ): Promise<string> {
   try {
     // Get stored context
-    const { data: ctxData } = await supabase
+    const { data: ctxRows } = await supabase
       .from('whatsapp_chat_context')
-      .select('context_data')
+      .select('id, context_data, created_at')
       .eq('group_jid', groupJid)
       .eq('account_id', account.id)
       .eq('context_type', 'feedback_confirm')
-      .maybeSingle();
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    const ctxData = getMatchingContextRow(ctxRows, senderJid, senderName);
 
     if (!ctxData?.context_data?.original_message) {
       return `⚠️ Nenhum feedback pendente de confirmação. Envie *#feedback* com os dados primeiro.`;
@@ -918,11 +973,9 @@ async function handleFeedbackConfirm(
     const feedbackResult = await feedbackResponse.json();
 
     // Clean up context
-    await supabase.from('whatsapp_chat_context')
-      .delete()
-      .eq('group_jid', groupJid)
-      .eq('account_id', account.id)
-      .eq('context_type', 'feedback_confirm');
+    if (ctxData?.id) {
+      await supabase.from('whatsapp_chat_context').delete().eq('id', ctxData.id);
+    }
 
     if (!feedbackResponse.ok || !feedbackResult.success) {
       return `⚠️ Erro ao salvar feedback: ${feedbackResult.error || "erro desconhecido"}`;
@@ -1004,14 +1057,26 @@ async function handleFeedbackConfirm(
 async function handleFeedbackReject(
   account: any,
   groupJid: string,
+  senderJid: string,
+  senderName: string,
   supabase: any
 ): Promise<string> {
-  // Clean up context
-  await supabase.from('whatsapp_chat_context')
-    .delete()
+  const { data: ctxRows } = await supabase
+    .from('whatsapp_chat_context')
+    .select('id, context_data, created_at')
     .eq('group_jid', groupJid)
     .eq('account_id', account.id)
-    .eq('context_type', 'feedback_confirm');
+    .eq('context_type', 'feedback_confirm')
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  const ctxData = getMatchingContextRow(ctxRows, senderJid, senderName);
+
+  if (!ctxData?.id) {
+    return `⚠️ Nenhum feedback pendente de confirmação para cancelar.`;
+  }
+
+  await supabase.from('whatsapp_chat_context').delete().eq('id', ctxData.id);
 
   return `❌ *Feedback cancelado.*\n\nEnvie novamente *#feedback* com os dados corretos.`;
 }
@@ -1022,17 +1087,21 @@ async function handleFeedbackUpdate(
   account: any,
   groupJid: string,
   senderName: string,
+  senderJid: string,
   supabase: any
 ): Promise<string> {
   try {
     // Get the stored context
-    const { data: ctxData } = await supabase
+    const { data: ctxRows } = await supabase
       .from('whatsapp_chat_context')
-      .select('context_data')
+      .select('id, context_data, created_at')
       .eq('group_jid', groupJid)
       .eq('account_id', account.id)
       .eq('context_type', 'feedback_update')
-      .single();
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    const ctxData = getMatchingContextRow(ctxRows, senderJid, senderName);
 
     if (!ctxData?.context_data) {
       return `ℹ️ Nenhum feedback pendente de atualização.\n\nEnvie *#feedback* seguido do relatório para registrar.`;
@@ -1064,12 +1133,9 @@ async function handleFeedbackUpdate(
     const feedbackResult = await feedbackResponse.json();
 
     // Clean up context
-    await supabase
-      .from('whatsapp_chat_context')
-      .delete()
-      .eq('group_jid', groupJid)
-      .eq('account_id', account.id)
-      .eq('context_type', 'feedback_update');
+    if (ctxData?.id) {
+      await supabase.from('whatsapp_chat_context').delete().eq('id', ctxData.id);
+    }
 
     if (!feedbackResponse.ok || !feedbackResult.success) {
       return `⚠️ Erro ao atualizar feedback: ${feedbackResult.error || "erro desconhecido"}`;
@@ -1321,7 +1387,7 @@ function buildCampaignReport(
   return msg;
 }
 
-async function handleCampanhas(account: any, supabase: any, periodArg: string | null = null, groupJid: string = '', instanceName: string = ''): Promise<string> {
+async function handleCampanhas(account: any, supabase: any, periodArg: string | null = null, groupJid: string = '', instanceName: string = '', senderName: string = '', senderJid: string = ''): Promise<string> {
   if (!account.meta_account_id) {
     return `⚠️ *${account.nome_cliente}*\nConta sem Meta Ads configurado.`;
   }
@@ -1390,6 +1456,8 @@ async function handleCampanhas(account: any, supabase: any, periodArg: string | 
           account_id: account.id,
           context_type: 'campanhas',
           context_data: {
+            sender_name: senderName,
+            sender_jid: senderJid,
             campaigns: campaignList,
             since: since || null,
             until: until || null,
@@ -1443,14 +1511,17 @@ async function handleCampanhas(account: any, supabase: any, periodArg: string | 
 
 // ─── Context-based Conversational Handlers ───
 
-async function getActiveContext(supabase: any, groupJid: string, accountId: string): Promise<any | null> {
-  const { data } = await supabase
+async function getActiveContext(supabase: any, groupJid: string, accountId: string, senderJid: string, senderName?: string): Promise<any | null> {
+  const { data: rows } = await supabase
     .from('whatsapp_chat_context')
     .select('context_data, created_at, expires_at')
     .eq('group_jid', groupJid)
     .eq('account_id', accountId)
     .eq('context_type', 'campanhas')
-    .single();
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  const data = getMatchingContextRow(rows, senderJid, senderName);
 
   if (!data) return null;
 
@@ -1462,8 +1533,8 @@ async function getActiveContext(supabase: any, groupJid: string, accountId: stri
   return data.context_data;
 }
 
-async function handleSimResponse(account: any, supabase: any, groupJid: string): Promise<string> {
-  const ctx = await getActiveContext(supabase, groupJid, account.id);
+async function handleSimResponse(account: any, supabase: any, groupJid: string, senderJid: string, senderName?: string): Promise<string> {
+  const ctx = await getActiveContext(supabase, groupJid, account.id, senderJid, senderName);
   if (ctx?._expired) {
     return `⏰ *Sessão expirada*\n\nA consulta anterior expirou após 30 min de inatividade.\n\nEnvie *#campanhas* novamente para iniciar uma nova consulta.`;
   }
@@ -1486,9 +1557,11 @@ async function handleContextDetailMultiple(
   instanceName: string,
   evolutionUrl: string,
   evolutionKey: string,
-  supabase: any
+  supabase: any,
+  senderJid: string,
+  senderName?: string
 ): Promise<Response> {
-  const ctx = await getActiveContext(supabase, groupJid, account.id);
+  const ctx = await getActiveContext(supabase, groupJid, account.id, senderJid, senderName);
 
   if (ctx?._expired) {
     const msg = `⏰ *Sessão expirada*\n\nA consulta anterior expirou após 30 min de inatividade.\n\nEnvie *#campanhas* novamente para iniciar uma nova consulta.`;
@@ -1601,9 +1674,11 @@ async function handleContextDetailAll(
   instanceName: string,
   evolutionUrl: string,
   evolutionKey: string,
-  supabase: any
+  supabase: any,
+  senderJid: string,
+  senderName?: string
 ): Promise<Response> {
-  const ctx = await getActiveContext(supabase, groupJid, account.id);
+  const ctx = await getActiveContext(supabase, groupJid, account.id, senderJid, senderName);
 
   if (ctx?._expired) {
     const msg = `⏰ *Sessão expirada*\n\nA consulta anterior expirou após 30 min de inatividade.\n\nEnvie *#campanhas* novamente para iniciar uma nova consulta.`;
@@ -1619,7 +1694,7 @@ async function handleContextDetailAll(
   }
 
   const allNumbers = ctx.campaigns.map((c: any) => c.index);
-  return await handleContextDetailMultiple(account, allNumbers, groupJid, instanceName, evolutionUrl, evolutionKey, supabase);
+  return await handleContextDetailMultiple(account, allNumbers, groupJid, instanceName, evolutionUrl, evolutionKey, supabase, senderJid, senderName);
 }
 
 /**
