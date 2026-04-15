@@ -857,14 +857,22 @@ async function handleFeedback(
     msg += `🏢 Conta: *${account.nome_cliente}*\n`;
     msg += `📅 Período: *${periodLabel}*${!periodoDetectado ? ' _(padrão)_' : ''}\n`;
 
-    if (feedbackResult.tipo_funil) {
-      msg += `📋 Tipo: *${feedbackResult.tipo_funil === "terceiros" ? "Terceiros" : "Lançamento"}*\n`;
-    }
+    if (feedbackResult.campanhas_count > 0 && feedbackResult.campanhas && Array.isArray(feedbackResult.campanhas)) {
+      // Group campaigns by tipo_funil
+      const lancCamps = feedbackResult.campanhas.filter((c: any) => (c.tipo_funil || feedbackResult.tipo_funil) === "lancamento");
+      const tercCamps = feedbackResult.campanhas.filter((c: any) => (c.tipo_funil || feedbackResult.tipo_funil) === "terceiros");
+      const isMixed = lancCamps.length > 0 && tercCamps.length > 0;
 
-    if (feedbackResult.campanhas_count > 0) {
-      msg += `\n📊 *${feedbackResult.campanhas_count} campanha(s):*\n`;
-      if (feedbackResult.campanhas && Array.isArray(feedbackResult.campanhas)) {
-        for (const c of feedbackResult.campanhas) {
+      if (isMixed) {
+        msg += `\n📋 *Funil misto detectado (Lançamento + Terceiros)*\n`;
+      } else if (feedbackResult.tipo_funil) {
+        msg += `📋 Tipo: *${feedbackResult.tipo_funil === "terceiros" ? "Terceiros" : "Lançamento"}*\n`;
+      }
+
+      const formatCampaignGroup = (camps: any[], label: string) => {
+        if (camps.length === 0) return "";
+        let section = `\n📊 *${label} (${camps.length} campanha${camps.length > 1 ? 's' : ''}):*\n`;
+        for (const c of camps) {
           const stages: string[] = [];
           if (c.descartado) stages.push(`${c.descartado} descartado(s)`);
           if (c.atendimento) stages.push(`${c.atendimento} em atendimento SDR`);
@@ -873,16 +881,24 @@ async function handleFeedback(
           if (c.proposta) stages.push(`${c.proposta} proposta(s)`);
           if (c.venda) stages.push(`${c.venda} venda(s)`);
 
-          msg += `   • ${c.nome} — ${c.recebidos || 0} recebidos`;
+          section += `   • ${c.nome} — ${c.recebidos || 0} recebidos`;
           if (stages.length > 0) {
-            msg += ` sendo:\n`;
+            section += ` sendo:\n`;
             for (const s of stages) {
-              msg += `${s}\n`;
+              section += `${s}\n`;
             }
           } else {
-            msg += `\n`;
+            section += `\n`;
           }
         }
+        return section;
+      };
+
+      if (isMixed) {
+        msg += formatCampaignGroup(lancCamps, "🏗️ Lançamento");
+        msg += formatCampaignGroup(tercCamps, "🏘️ Terceiros");
+      } else {
+        msg += formatCampaignGroup(feedbackResult.campanhas, `${feedbackResult.campanhas_count} campanha(s)`);
       }
     }
 
@@ -1017,29 +1033,66 @@ async function handleFeedbackConfirm(
     msg += `🏢 Conta: *${account.nome_cliente}*\n`;
     msg += `📅 Período: *${periodLabel}*\n`;
 
-    if (feedbackResult.tipo_funil) {
-      msg += `📋 Tipo: *${feedbackResult.tipo_funil === "terceiros" ? "Terceiros" : "Lançamento"}*\n`;
-    }
-
     if (feedbackResult.campanhas && Array.isArray(feedbackResult.campanhas)) {
-      msg += `\n📊 *${feedbackResult.campanhas_count} campanha(s) registrada(s):*\n`;
-      for (const c of feedbackResult.campanhas) {
-        const stages: string[] = [];
-        if (c.descartado) stages.push(`${c.descartado} descartado(s)`);
-        if (c.atendimento) stages.push(`${c.atendimento} em atendimento SDR`);
-        if (c.passou_corretor) stages.push(`${c.passou_corretor} passou para corretor`);
-        if (c.visita) stages.push(`${c.visita} visita(s)`);
-        if (c.proposta) stages.push(`${c.proposta} proposta(s)`);
-        if (c.venda) stages.push(`${c.venda} venda(s)`);
+      // Group by tipo_funil for display
+      const lancCamps = feedbackResult.campanhas.filter((c: any) => (c.tipo_funil || feedbackResult.tipo_funil) === "lancamento");
+      const tercCamps = feedbackResult.campanhas.filter((c: any) => (c.tipo_funil || feedbackResult.tipo_funil) === "terceiros");
+      const isMixed = lancCamps.length > 0 && tercCamps.length > 0;
 
-        msg += `   • ${c.nome} — ${c.recebidos || 0} recebidos`;
-        if (stages.length > 0) {
-          msg += ` sendo:\n`;
-          for (const s of stages) {
-            msg += `${s}\n`;
+      if (isMixed) {
+        msg += `\n📋 *Registrado como funil misto (Lançamento + Terceiros)*\n`;
+      } else if (feedbackResult.tipo_funil) {
+        msg += `📋 Tipo: *${feedbackResult.tipo_funil === "terceiros" ? "Terceiros" : "Lançamento"}*\n`;
+      }
+
+      const formatGroup = (camps: any[], label: string) => {
+        if (camps.length === 0) return "";
+        let section = `\n📊 *${label}:*\n`;
+        for (const c of camps) {
+          const stages: string[] = [];
+          if (c.descartado) stages.push(`${c.descartado} descartado(s)`);
+          if (c.atendimento) stages.push(`${c.atendimento} em atendimento SDR`);
+          if (c.passou_corretor) stages.push(`${c.passou_corretor} passou para corretor`);
+          if (c.visita) stages.push(`${c.visita} visita(s)`);
+          if (c.proposta) stages.push(`${c.proposta} proposta(s)`);
+          if (c.venda) stages.push(`${c.venda} venda(s)`);
+
+          section += `   • ${c.nome} — ${c.recebidos || 0} recebidos`;
+          if (stages.length > 0) {
+            section += ` sendo:\n`;
+            for (const s of stages) {
+              section += `${s}\n`;
+            }
+          } else {
+            section += `\n`;
           }
-        } else {
-          msg += `\n`;
+        }
+        return section;
+      };
+
+      if (isMixed) {
+        msg += formatGroup(lancCamps, "🏗️ Lançamento");
+        msg += formatGroup(tercCamps, "🏘️ Terceiros");
+      } else {
+        msg += `\n📊 *${feedbackResult.campanhas_count} campanha(s) registrada(s):*\n`;
+        for (const c of feedbackResult.campanhas) {
+          const stages: string[] = [];
+          if (c.descartado) stages.push(`${c.descartado} descartado(s)`);
+          if (c.atendimento) stages.push(`${c.atendimento} em atendimento SDR`);
+          if (c.passou_corretor) stages.push(`${c.passou_corretor} passou para corretor`);
+          if (c.visita) stages.push(`${c.visita} visita(s)`);
+          if (c.proposta) stages.push(`${c.proposta} proposta(s)`);
+          if (c.venda) stages.push(`${c.venda} venda(s)`);
+
+          msg += `   • ${c.nome} — ${c.recebidos || 0} recebidos`;
+          if (stages.length > 0) {
+            msg += ` sendo:\n`;
+            for (const s of stages) {
+              msg += `${s}\n`;
+            }
+          } else {
+            msg += `\n`;
+          }
         }
       }
     }
