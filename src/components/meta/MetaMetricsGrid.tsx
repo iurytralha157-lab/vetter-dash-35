@@ -30,8 +30,11 @@ export function MetaMetricsGrid({ metrics, loading, balance }: MetaMetricsGridPr
     ? (metrics.total_conversions / metrics.total_clicks) * 100 
     : 0;
 
-  const hasPaymentIssue = balance && (balance.account_status === 3 || balance.account_status === 9 || balance.disable_reason === 3);
-  const isLowBalance = balance && balance.balance <= 0;
+  const balanceMode = balance?.balance_mode ?? 'unknown';
+  const hasPaymentIssue = balance?.has_payment_issue ?? false;
+  const isCardMode = ['card_ok', 'card_and_funds', 'card_failing'].includes(balanceMode);
+  const shouldMonitorFunds = ['funds', 'prepay', 'unknown'].includes(balanceMode);
+  const isLowBalance = Boolean(balance && shouldMonitorFunds && balance.balance <= 0);
 
   const metricsData = [
     {
@@ -94,7 +97,9 @@ export function MetaMetricsGrid({ metrics, loading, balance }: MetaMetricsGridPr
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium text-muted-foreground">
-              {balance?.funds_amount !== null && balance?.funds_amount !== undefined
+              {isCardMode && !hasPaymentIssue
+                ? 'Cartão Ativo'
+                : balance?.funds_amount !== null && balance?.funds_amount !== undefined
                 ? 'Fundos'
                 : balance?.is_prepay_account
                   ? 'Saldo Pré-pago'
@@ -116,10 +121,14 @@ export function MetaMetricsGrid({ metrics, loading, balance }: MetaMetricsGridPr
           }`}>
             {balance ? formatCurrency(balance.balance) : 'R$ —'}
           </p>
-          {/* Show raw balance (saldo devedor) when funds exist and there's also a debt */}
-          {balance?.funds_amount !== null && balance?.funds_amount !== undefined && balance?.balance_raw > 0 && (
+          {isCardMode && !hasPaymentIssue && (
             <p className="text-xs text-muted-foreground mt-1">
-              Saldo devedor: {formatCurrency(balance.balance_raw)}
+              Alerta apenas se houver falha de cobrança
+            </p>
+          )}
+          {balanceMode === 'card_and_funds' && balance?.funds_amount !== null && balance?.funds_amount !== undefined && balance.debt_amount > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Saldo devedor: {formatCurrency(balance.debt_amount)}
             </p>
           )}
           {balance?.funding_source_type && !hasPaymentIssue && (
@@ -136,6 +145,9 @@ export function MetaMetricsGrid({ metrics, loading, balance }: MetaMetricsGridPr
           )}
           {isLowBalance && !hasPaymentIssue && (
             <Badge variant="outline" className="mt-2 text-xs border-red-500/50 text-red-600">Sem saldo</Badge>
+          )}
+          {balanceMode === 'card_ok' && !hasPaymentIssue && (
+            <Badge variant="outline" className="mt-2 text-xs">Cartão ativo</Badge>
           )}
         </CardContent>
       </Card>

@@ -99,6 +99,15 @@ const FILTER_PILLS = [
 
 type FilterKey = (typeof FILTER_PILLS)[number]["key"];
 
+const CARD_BALANCE_MODES = new Set(["Cartão", "card_ok", "card_failing", "card_and_funds"]);
+
+const hasPaymentIssue = (mode?: string | null) => mode === "card_failing";
+
+const shouldMonitorFunds = (mode?: string | null) => {
+  if (!mode) return true;
+  return !CARD_BALANCE_MODES.has(mode) || hasPaymentIssue(mode);
+};
+
 export default function ContasCliente() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -385,9 +394,13 @@ export default function ContasCliente() {
             // Balance-based card styling
             const saldo = account.saldo_meta ?? 0;
             const limite = account.alerta_saldo_baixo ?? 200;
-            const isZeroBalance = account.usa_meta_ads && saldo <= 0;
-            const isLowBalance = account.usa_meta_ads && !isZeroBalance && saldo < limite;
-            const cardBorderClass = isZeroBalance
+            const paymentIssue = hasPaymentIssue(account.modo_saldo_meta);
+            const monitorFunds = shouldMonitorFunds(account.modo_saldo_meta);
+            const isZeroBalance = account.usa_meta_ads && monitorFunds && saldo <= 0;
+            const isLowBalance = account.usa_meta_ads && monitorFunds && !isZeroBalance && saldo < limite;
+            const cardBorderClass = paymentIssue
+              ? "border-red-500/50 hover:border-red-500/70"
+              : isZeroBalance
               ? "border-red-500/50 hover:border-red-500/70"
               : isLowBalance
               ? "border-yellow-500/50 hover:border-yellow-500/70"
@@ -441,17 +454,30 @@ export default function ContasCliente() {
                         {(() => {
                           const saldo = account.saldo_meta ?? 0;
                           const limite = account.alerta_saldo_baixo ?? 200;
-                          const isZero = saldo <= 0;
-                          const isLow = !isZero && saldo < limite;
+                          const paymentIssue = hasPaymentIssue(account.modo_saldo_meta);
+                          const protectedByCard = CARD_BALANCE_MODES.has(account.modo_saldo_meta || "") && !paymentIssue;
+                          const monitorFunds = shouldMonitorFunds(account.modo_saldo_meta);
+                          const isZero = monitorFunds && saldo <= 0;
+                          const isLow = monitorFunds && !isZero && saldo < limite;
 
                           return (
                             <>
                               <span className={`inline-flex items-center gap-1 text-[11px] ${
-                                isZero ? "text-red-500" : isLow ? "text-yellow-500" : "text-muted-foreground"
+                                paymentIssue ? "text-red-500" : isZero ? "text-red-500" : isLow ? "text-yellow-500" : "text-muted-foreground"
                               }`}>
                                 <Wallet className="h-3 w-3" />
                                 Saldo Disponível: <span className="font-medium">{formatMoney(saldo)}</span>
                               </span>
+                              {protectedByCard && (
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0">
+                                  Cartão ativo
+                                </Badge>
+                              )}
+                              {paymentIssue && (
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-red-500/50 text-red-500 bg-red-500/10">
+                                  Problema no cartão
+                                </Badge>
+                              )}
                               {isZero && (
                                 <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-red-500/50 text-red-500 bg-red-500/10">
                                   Sem saldo
