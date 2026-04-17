@@ -5,6 +5,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const BALANCE_DATA_MAX_AGE_HOURS = 24;
+
+function hasFreshBalanceData(lastBalanceCheck: string | null) {
+  if (!lastBalanceCheck) return false;
+
+  const lastCheckTime = new Date(lastBalanceCheck).getTime();
+  if (Number.isNaN(lastCheckTime)) return false;
+
+  const maxAgeMs = BALANCE_DATA_MAX_AGE_HOURS * 60 * 60 * 1000;
+  return Date.now() - lastCheckTime <= maxAgeMs;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -35,7 +47,7 @@ Deno.serve(async (req) => {
     // Fetch all active accounts with Meta Ads and a group configured
     const { data: accounts, error } = await supabase
       .from('accounts')
-      .select('id, nome_cliente, saldo_meta, alerta_saldo_baixo, id_grupo, meta_account_id, modo_saldo_meta')
+      .select('id, nome_cliente, saldo_meta, alerta_saldo_baixo, id_grupo, meta_account_id, modo_saldo_meta, notificacao_saldo_baixo, last_balance_check_meta')
       .eq('status', 'Ativo')
       .eq('usa_meta_ads', true)
       .not('id_grupo', 'is', null)
@@ -53,9 +65,16 @@ Deno.serve(async (req) => {
     const skipped: string[] = [];
 
     for (const acc of accounts || []) {
+      if (acc.notificacao_saldo_baixo === false) {
+        console.log(`[balance-alert] ⏭️ ${acc.nome_cliente} - alerta de saldo desativado manualmente`);
+        skipped.push(`${acc.nome_cliente} (alerta desativado)`);
+        continue;
+      }
+
       const saldo = acc.saldo_meta ?? 0;
       const limiteAlerta = acc.alerta_saldo_baixo ?? 200;
       const modoSaldo = acc.modo_saldo_meta || 'unknown';
+      const freshBalanceData = hasFreshBalanceData(acc.last_balance_check_meta ?? null);
 
       let message = '';
       let alertType = '';
@@ -84,6 +103,12 @@ Deno.serve(async (req) => {
         skipped.push(`${acc.nome_cliente} (cartão ativo + fundos)`);
         continue;
       } else {
+        if (!freshBalanceData) {
+          console.log(`[balance-alert] ⏭️ ${acc.nome_cliente} - sem leitura de saldo válida/recente`);
+          skipped.push(`${acc.nome_cliente} (sem leitura válida)`);
+          continue;
+        }
+
         // Standard funds/prepay/unknown accounts → normal alert logic
         if (saldo <= 0) {
           alertType = 'saldo_zero';
