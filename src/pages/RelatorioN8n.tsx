@@ -25,7 +25,9 @@ import {
   Clock,
   Chrome,
   Facebook,
+  Wallet,
 } from "lucide-react";
+import { updateAccount } from "@/services/accountsService";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +43,7 @@ interface ClientReport {
   meta_account_id?: string;
   google_ads_id?: string;
   status: string;
+  notificacao_saldo_baixo: boolean;
   config?: {
     ativo_meta: boolean;
     ativo_google: boolean;
@@ -74,7 +77,7 @@ export default function RelatorioN8n() {
       // Buscar dados da tabela accounts
       const { data: accountsData, error: accountsError } = await supabase
         .from("accounts")
-        .select("id, nome_cliente, id_grupo, meta_account_id, google_ads_id, status, telefone, email")
+        .select("id, nome_cliente, id_grupo, meta_account_id, google_ads_id, status, telefone, email, notificacao_saldo_baixo")
         .eq("status", "Ativo")
         .order("nome_cliente");
 
@@ -126,6 +129,7 @@ export default function RelatorioN8n() {
           meta_account_id: account.meta_account_id,
           google_ads_id: account.google_ads_id,
           status: account.status,
+          notificacao_saldo_baixo: account.notificacao_saldo_baixo ?? true,
           config: config
             ? {
                 ativo_meta: config.ativo_meta || false,
@@ -298,6 +302,39 @@ export default function RelatorioN8n() {
       toast({
         title: "Erro",
         description: "Não foi possível alterar o status Google: " + (error as Error).message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleToggleBalanceAlerts = async (clientId: string) => {
+    try {
+      const client = clients.find((c) => c.id === clientId);
+      if (!client) return;
+
+      const newStatus = !client.notificacao_saldo_baixo;
+      await updateAccount(clientId, { notificacao_saldo_baixo: newStatus });
+
+      setClients((prev) =>
+        prev.map((c) =>
+          c.id === clientId
+            ? {
+                ...c,
+                notificacao_saldo_baixo: newStatus,
+              }
+            : c
+        )
+      );
+
+      toast({
+        title: "Sucesso",
+        description: `Avisos de saldo ${newStatus ? "ativados" : "desativados"} para ${client.nome_cliente}`,
+      });
+    } catch (error) {
+      console.error("Erro ao alterar aviso de saldo:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível alterar o aviso de saldo: " + (error as Error).message,
         variant: "destructive",
       });
     }
@@ -586,15 +623,15 @@ export default function RelatorioN8n() {
               icon={<BarChart3 className="h-5 w-5" />}
               title="Meta Ads"
               value={totalMeta}
-              iconWrapClass="bg-blue-500/10 ring-blue-500/20"
-              iconClass="text-blue-500"
+              iconWrapClass="bg-primary/10 ring-primary/20"
+              iconClass="text-primary"
             />
             <StatCard
               icon={<Target className="h-5 w-5" />}
               title="Google Ads"
               value={totalGoogle}
-              iconWrapClass="bg-amber-500/10 ring-amber-500/20"
-              iconClass="text-amber-500"
+              iconWrapClass="bg-warning/10 ring-warning/20"
+              iconClass="text-warning"
             />
           </div>
 
@@ -674,7 +711,7 @@ export default function RelatorioN8n() {
                                 className={[
                                   "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium border",
                                   metaConfigured
-                                    ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
+                                    ? "border-primary/30 bg-primary/10 text-primary"
                                     : "border-border/40 bg-transparent text-text-muted",
                                 ].join(" ")}
                               >
@@ -693,7 +730,7 @@ export default function RelatorioN8n() {
                                 className={[
                                   "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium border",
                                   googleConfigured
-                                    ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+                                    ? "border-warning/30 bg-warning/10 text-warning"
                                     : "border-border/40 bg-transparent text-text-muted",
                                 ].join(" ")}
                               >
@@ -727,11 +764,11 @@ export default function RelatorioN8n() {
                         {/* Switch Meta */}
                         <div className="flex flex-col items-center gap-1">
                           <div className="flex items-center gap-2">
-                            <Facebook className="h-4 w-4 text-blue-600" />
+                              <Facebook className="h-4 w-4 text-primary" />
                             <Switch
                               checked={client.config?.ativo_meta || false}
                               onCheckedChange={() => handleToggleMeta(client.id)}
-                              className="data-[state=checked]:bg-blue-600"
+                                className="data-[state=checked]:bg-primary"
                               disabled={!metaConfigured}
                             />
                           </div>
@@ -741,16 +778,29 @@ export default function RelatorioN8n() {
                         {/* Switch Google */}
                         <div className="flex flex-col items-center gap-1">
                           <div className="flex items-center gap-2">
-                            <Chrome className="h-4 w-4 text-amber-600" />
+                              <Chrome className="h-4 w-4 text-warning" />
                             <Switch
                               checked={client.config?.ativo_google || false}
                               onCheckedChange={() => handleToggleGoogle(client.id)}
-                              className="data-[state=checked]:bg-amber-600"
+                                className="data-[state=checked]:bg-warning"
                               disabled={!googleConfigured}
                             />
                           </div>
                           <span className="text-xs text-text-tertiary">Google</span>
                         </div>
+
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="flex items-center gap-2">
+                              <Wallet className="h-4 w-4 text-foreground" />
+                              <Switch
+                                checked={client.notificacao_saldo_baixo}
+                                onCheckedChange={() => handleToggleBalanceAlerts(client.id)}
+                                className="data-[state=checked]:bg-foreground data-[state=unchecked]:bg-input"
+                                disabled={!metaConfigured}
+                              />
+                            </div>
+                            <span className="text-xs text-text-tertiary">Saldo</span>
+                          </div>
 
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
