@@ -224,7 +224,7 @@ export default function ClientDetailPage() {
         </div>
 
         {/* Payment issue alert - only shown when there's a problem */}
-        {accountBalance && (accountBalance.account_status === 3 || accountBalance.account_status === 9 || accountBalance.disable_reason === 3) && (
+        {accountBalance?.has_payment_issue && (
           <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
             <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
             <p className="text-sm text-destructive font-medium">

@@ -36,6 +36,7 @@ export interface MetaAccountBalance {
   balance: number;
   balance_raw: number;
   funds_amount: number | null;
+  debt_amount: number;
   amount_spent: number;
   spend_cap: number | null;
   currency: string;
@@ -45,6 +46,9 @@ export interface MetaAccountBalance {
   is_prepay_account: boolean;
   funding_source_details: any | null;
   funding_source_type: string | null;
+  balance_mode: 'funds' | 'card_ok' | 'card_failing' | 'card_and_funds' | 'prepay' | 'unknown';
+  has_card: boolean;
+  has_payment_issue: boolean;
 }
 
 export interface MetaAdsResponse {

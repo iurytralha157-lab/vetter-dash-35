@@ -29,6 +29,74 @@ interface MetaInsightsResponse {
   cost_per_action_type?: Array<{ action_type: string; value: string }>;
 }
 
+type BalanceMode = 'funds' | 'card_ok' | 'card_failing' | 'card_and_funds' | 'prepay' | 'unknown';
+
+function parseCurrencyValue(value: string | undefined | null): number | null {
+  if (!value) return null;
+  const match = value.match(/R\$\s?([\d.,]+)/i);
+  if (!match) return null;
+  return parseFloat(match[1].replace(/\./g, '').replace(',', '.'));
+}
+
+function inferFundingSourceType(fundingType: number | null | undefined, displayString: string): string | null {
+  if (fundingType === 1) return 'credit_card';
+  if (fundingType === 2) return 'debit_card';
+  if (fundingType === 4 || fundingType === 20) return 'funds';
+  if (fundingType === 7) return 'boleto';
+  if (fundingType === 12) return 'pix';
+  if (/mastercard|visa|elo|amex|cart[aã]o|card|\*{3,}/i.test(displayString)) return 'credit_card';
+  if (/pix/i.test(displayString)) return 'pix';
+  if (/boleto/i.test(displayString)) return 'boleto';
+  if (/saldo|fundos?|dispon[ií]vel/i.test(displayString)) return 'funds';
+  return null;
+}
+
+function classifyBalance(accountInfo: any) {
+  const displayString = accountInfo.funding_source_details?.display_string || '';
+  const fundingType = accountInfo.funding_source_details?.type;
+  const fundingSourceType = inferFundingSourceType(fundingType, displayString);
+  const hasCard = fundingSourceType === 'credit_card' || fundingSourceType === 'debit_card';
+  const balanceRaw = parseFloat(accountInfo.balance || '0') / 100;
+  const debtAmount = balanceRaw;
+  const fundsMatch = displayString.match(/(?:saldo\s+dispon[ií]vel|fundos?|dispon[ií]vel|balance)[^R$]*R\$\s?([\d.,]+)/i);
+  const fundsAmount = fundsMatch
+    ? parseFloat(fundsMatch[1].replace(/\./g, '').replace(',', '.'))
+    : !hasCard
+      ? parseCurrencyValue(displayString)
+      : null;
+
+  const accountStatus = accountInfo.account_status;
+  const disableReason = accountInfo.disable_reason;
+  const hasPaymentIssue = accountStatus === 3 || accountStatus === 9 || accountStatus === 100 || (accountStatus === 2 && disableReason === 3);
+
+  let balanceMode: BalanceMode = 'unknown';
+  let displayBalance = balanceRaw;
+
+  if (hasCard && fundsAmount !== null && fundsAmount > 0) {
+    balanceMode = hasPaymentIssue ? 'card_failing' : 'card_and_funds';
+    displayBalance = fundsAmount;
+  } else if (hasCard) {
+    balanceMode = hasPaymentIssue ? 'card_failing' : 'card_ok';
+    displayBalance = 0;
+  } else if (fundsAmount !== null) {
+    balanceMode = 'funds';
+    displayBalance = fundsAmount;
+  } else if (accountInfo.is_prepay_account) {
+    balanceMode = 'prepay';
+  }
+
+  return {
+    balance: displayBalance,
+    balance_raw: balanceRaw,
+    debt_amount: debtAmount,
+    funds_amount: fundsAmount,
+    funding_source_type: fundingSourceType,
+    balance_mode: balanceMode,
+    has_card: hasCard,
+    has_payment_issue: hasPaymentIssue,
+  };
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -37,6 +105,8 @@ Deno.serve(async (req) => {
 
   try {
     const { meta_account_id, period = 'last_7d', since: customSince, until: customUntil } = await req.json();
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     console.log('Fetching Meta campaigns for account:', meta_account_id, 'Period:', period);
 
@@ -351,42 +421,29 @@ Deno.serve(async (req) => {
       };
     }
 
+    const classifiedBalance = accountInfo ? classifyBalance(accountInfo) : null;
+
+    if (classifiedBalance && supabaseUrl && serviceRoleKey) {
+      const supabase = createClient(supabaseUrl, serviceRoleKey);
+      const rawAccountId = formattedAccountId.replace(/^act_/, '');
+
+      await supabase
+        .from('accounts')
+        .update({
+          saldo_meta: classifiedBalance.balance,
+          modo_saldo_meta: classifiedBalance.balance_mode,
+          last_balance_check_meta: new Date().toISOString(),
+        })
+        .in('meta_account_id', [formattedAccountId, rawAccountId]);
+    }
+
     const response = {
       success: true,
       account_id: formattedAccountId,
       campaigns: campaignsWithInsights,
       account_metrics: accountMetrics,
-      account_balance: accountInfo ? (() => {
-        // Parse available balance from funding_source_details.display_string
-        // e.g. "Saldo disponível (R$752,95 BRL)" or "Fundos (R$1.880,41 BRL)"
-        let fundsAmount: number | null = null;
-        const displayString = accountInfo.funding_source_details?.display_string || '';
-        const balanceMatch = displayString.match(/R\$\s?([\d.,]+)/);
-        if (balanceMatch) {
-          fundsAmount = parseFloat(balanceMatch[1].replace(/\./g, '').replace(',', '.'));
-        }
-
-        // balance_raw = Meta's raw balance field (saldo devedor for post-pay, remaining for pre-pay)
-        const balanceRaw = parseFloat(accountInfo.balance || '0') / 100;
-        
-        // Determine funding source type from details
-        const fundingType = accountInfo.funding_source_details?.type;
-        let fundingSourceType: string | null = null;
-        if (fundingType === 1) fundingSourceType = 'credit_card';
-        else if (fundingType === 2) fundingSourceType = 'debit_card';
-        else if (fundingType === 4) fundingSourceType = 'funds'; // prepaid funds
-        else if (fundingType === 7) fundingSourceType = 'boleto';
-        else if (fundingType === 12) fundingSourceType = 'pix';
-        else if (displayString.toLowerCase().includes('fundo')) fundingSourceType = 'funds';
-        else if (displayString.toLowerCase().includes('mastercard') || displayString.toLowerCase().includes('visa')) fundingSourceType = 'credit_card';
-
-        // For display: if funds exist, show funds. Otherwise show raw balance.
-        const displayBalance = fundsAmount ?? balanceRaw;
-
-        return {
-          balance: displayBalance,
-          balance_raw: balanceRaw,
-          funds_amount: fundsAmount,
+      account_balance: accountInfo ? {
+          ...classifiedBalance,
           amount_spent: parseFloat(accountInfo.amount_spent || '0') / 100,
           spend_cap: accountInfo.spend_cap ? parseFloat(accountInfo.spend_cap) / 100 : null,
           currency: accountInfo.currency || 'BRL',
@@ -395,9 +452,7 @@ Deno.serve(async (req) => {
           disable_reason: accountInfo.disable_reason || null,
           is_prepay_account: accountInfo.is_prepay_account || false,
           funding_source_details: accountInfo.funding_source_details || null,
-          funding_source_type: fundingSourceType,
-        };
-      })() : null,
+      } : null,
       fetched_at: new Date().toISOString()
     };
 

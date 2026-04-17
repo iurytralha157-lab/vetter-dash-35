@@ -79,26 +79,10 @@ Deno.serve(async (req) => {
           `📋 Verifique o cartão no Gerenciador de Anúncios ou entre em contato com o banco.\n` +
           `Responda aqui se precisar de ajuda.`;
       } else if (modoSaldo === 'card_and_funds') {
-        // Has card + funds: card is working, but funds are getting low
-        if (saldo <= 0) {
-          // Funds zeroed but card covers it → mild informational, no urgency
-          console.log(`[balance-alert] ℹ️ ${acc.nome_cliente} - Fundos zerados mas cartão ativo, sem alerta`);
-          skipped.push(`${acc.nome_cliente} (fundos zero + cartão OK)`);
-          continue;
-        } else if (saldo < limiteAlerta) {
-          alertType = 'fundos_baixo_com_cartao';
-          message = `ℹ️ *Aviso - Fundos Baixos*\n\n` +
-            `A conta *${acc.nome_cliente}* está utilizando cartão de crédito, ` +
-            `porém os fundos disponíveis estão abaixo do limite.\n\n` +
-            `💰 Fundos disponíveis: *R$ ${saldo.toFixed(2).replace('.', ',')}*\n` +
-            `🔔 Limite configurado: *R$ ${limiteAlerta.toFixed(2).replace('.', ',')}*\n` +
-            `💳 Cartão: Ativo e funcionando\n\n` +
-            `ℹ️ O cartão está cobrindo os gastos normalmente.\n` +
-            `Deseja recarregar os fundos mesmo assim?`;
-        } else {
-          // Funds above threshold, card working → no alert needed
-          continue;
-        }
+        // Card is active, so do not alert for low/zero funds
+        console.log(`[balance-alert] ⏭️ ${acc.nome_cliente} - Cartão ativo cobrindo a conta, sem alerta de saldo`);
+        skipped.push(`${acc.nome_cliente} (cartão ativo + fundos)`);
+        continue;
       } else {
         // Standard funds/prepay/unknown accounts → normal alert logic
         if (saldo <= 0) {
