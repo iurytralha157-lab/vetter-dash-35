@@ -43,10 +43,20 @@ export function AppSidebar({
     const saved = localStorage.getItem('sidebar-collapsed');
     return saved ? JSON.parse(saved) : false;
   });
-  const [userName, setUserName] = useState<string | null>(null);
-  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
-  const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null);
-  const [orgName, setOrgName] = useState<string | null>(null);
+
+  const profileCache = (() => {
+    try {
+      const raw = localStorage.getItem('user-profile-cache');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const [userName, setUserName] = useState<string | null>(profileCache?.userName ?? null);
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(profileCache?.userAvatarUrl ?? null);
+  const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(profileCache?.orgLogoUrl ?? null);
+  const [orgName, setOrgName] = useState<string | null>(profileCache?.orgName ?? null);
   
   const location = useLocation();
   const navigate = useNavigate();
@@ -85,36 +95,56 @@ export function AppSidebar({
   const displayName = orgName || systemName || brandName;
   const displayLogoSize = systemLogoSize || 40;
 
-  // Buscar dados do perfil e organização
+  // Buscar dados do perfil e organização (atualiza cache em background)
   useEffect(() => {
     const fetchUserData = async () => {
       if (!user?.id) return;
-      
+
       const { data: profile } = await supabase
         .from('profiles')
         .select('name, avatar_url, organization_id')
         .eq('id', user.id)
         .single();
-      
+
       if (profile) {
         setUserName(profile.name);
         setUserAvatarUrl(profile.avatar_url);
-        
+
+        let nextOrgName: string | null = null;
+        let nextOrgLogo: string | null = null;
+
         if (profile.organization_id) {
           const { data: org } = await supabase
             .from('organizations')
             .select('name, sidebar_logo_url')
             .eq('id', profile.organization_id)
             .single();
-          
+
           if (org) {
+            nextOrgName = org.name;
+            nextOrgLogo = org.sidebar_logo_url;
             setOrgName(org.name);
             setOrgLogoUrl(org.sidebar_logo_url);
           }
         }
+
+        try {
+          localStorage.setItem(
+            'user-profile-cache',
+            JSON.stringify({
+              userId: user.id,
+              userName: profile.name,
+              userAvatarUrl: profile.avatar_url,
+              orgName: nextOrgName,
+              orgLogoUrl: nextOrgLogo,
+            })
+          );
+        } catch {
+          // ignore storage errors
+        }
       }
     };
-    
+
     fetchUserData();
   }, [user?.id]);
 
