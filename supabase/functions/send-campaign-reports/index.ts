@@ -286,8 +286,11 @@ Deno.serve(async (req) => {
 
     const targetAccountId: string | undefined = body.account_id;
     const dryRun: boolean = body.dry_run === true;
+    // Modo: 'daily' | 'weekly' | 'auto' (auto = weekly se segunda, senão daily)
+    const requestedMode: 'daily' | 'weekly' | 'auto' = body.mode || 'auto';
+    const isWeekly = requestedMode === 'weekly' || (requestedMode === 'auto' && isMondayInSaoPaulo());
 
-    console.log('[send-campaign-reports] Trigger:', body.trigger || 'manual', 'targetAccount:', targetAccountId, 'dryRun:', dryRun);
+    console.log('[send-campaign-reports] Trigger:', body.trigger || 'manual', 'mode:', isWeekly ? 'weekly' : 'daily', 'targetAccount:', targetAccountId, 'dryRun:', dryRun);
 
     // 1. Buscar contas elegíveis
     let accountsQuery = supabase
@@ -314,7 +317,8 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const dataDate = yesterdayInSaoPaulo();
+    const weeklyRange = isWeekly ? lastWeekRangeSaoPaulo() : null;
+    const dataDate = isWeekly ? weeklyRange!.end : yesterdayInSaoPaulo();
     const dispatchDate = todayInSaoPaulo();
     const summaries: DispatchSummary[] = [];
     const previewMessages: Array<{ account: string; campaign: string; text: string }> = [];
@@ -333,15 +337,21 @@ Deno.serve(async (req) => {
       };
 
       try {
-        const campaigns = await fetchYesterdayCampaigns(account.meta_account_id!, accessToken, dataDate);
+        const campaigns = await fetchCampaignInsights(
+          account.meta_account_id!,
+          accessToken,
+          isWeekly
+            ? { type: 'range', since: weeklyRange!.start, until: weeklyRange!.end }
+            : { type: 'yesterday' }
+        );
         summary.campaigns_total = campaigns.length;
 
-        // Filtrar apenas campanhas COM gasto > 0 no dia anterior
+        // Filtrar apenas campanhas COM gasto > 0 no período
         const eligible = campaigns.filter((c) => c.spend > 0);
         summary.campaigns_with_spend = eligible.length;
 
         if (eligible.length === 0) {
-          console.log(`[${account.nome_cliente}] No campaigns with spend yesterday, skipping`);
+          console.log(`[${account.nome_cliente}] No campaigns with spend in period, skipping`);
           summaries.push(summary);
           continue;
         }
@@ -375,6 +385,7 @@ Deno.serve(async (req) => {
             accountName: account.nome_cliente,
             dataDate,
             campaign,
+            weekly: weeklyRange || undefined,
           });
 
           if (dryRun) {
@@ -441,7 +452,9 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       dry_run: dryRun,
+      mode: isWeekly ? 'weekly' : 'daily',
       data_date: dataDate,
+      weekly_range: weeklyRange,
       dispatch_date: dispatchDate,
       accounts_processed: accounts.length,
       summaries,
