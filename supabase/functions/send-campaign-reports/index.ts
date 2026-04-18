@@ -492,9 +492,94 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // 3. Para cada campanha elegível: enviar mensagem com pausa
+        // ===== MODO SEMANAL: 1 mensagem agregada por conta =====
+        if (isWeekly) {
+          const weeklyKey = `WEEKLY-${weeklyRange!.start}_${weeklyRange!.end}`;
+
+          // Idempotência semanal
+          const { data: existing } = await supabase
+            .from('campaign_report_dispatches')
+            .select('id')
+            .eq('account_id', account.id)
+            .eq('campaign_id', weeklyKey)
+            .eq('dispatch_date', dispatchDate)
+            .maybeSingle();
+
+          if (existing && !dryRun) {
+            console.log(`[${account.nome_cliente}] Weekly summary already dispatched today, skipping`);
+            summary.skipped = eligible.length;
+            summaries.push(summary);
+            continue;
+          }
+
+          const funnel = await fetchWeeklyFunnelTotals(supabase, account.id, weeklyRange!);
+          const messageText = buildWeeklyAccountMessage({
+            accountName: account.nome_cliente,
+            range: weeklyRange!,
+            campaigns: eligible,
+            funnel,
+          });
+
+          if (dryRun) {
+            previewMessages.push({
+              account: account.nome_cliente,
+              campaign: '[RESUMO SEMANAL]',
+              text: messageText,
+            });
+            summary.sent = 1;
+            summaries.push(summary);
+            continue;
+          }
+
+          const sendResult = await sendWhatsAppMessage({
+            evolutionUrl,
+            evolutionKey,
+            instanceName: instanceName!,
+            groupJid: account.id_grupo!,
+            text: messageText,
+          });
+
+          const totalSpend = eligible.reduce((s, c) => s + c.spend, 0);
+          const totalLeads = eligible.reduce((s, c) => s + c.leads, 0);
+          const totalMessages = eligible.reduce((s, c) => s + c.messages, 0);
+          const totalReach = eligible.reduce((s, c) => s + c.reach, 0);
+          const totalClicks = eligible.reduce((s, c) => s + c.clicks, 0);
+
+          await supabase.from('campaign_report_dispatches').insert({
+            account_id: account.id,
+            campaign_id: weeklyKey,
+            campaign_name: `Resumo semanal (${weeklyRange!.start} a ${weeklyRange!.end})`,
+            dispatch_date: dispatchDate,
+            data_date: dataDate,
+            whatsapp_group_id: account.id_grupo,
+            whatsapp_instance: instanceName,
+            status: sendResult.ok ? 'sent' : 'failed',
+            error_message: sendResult.error || null,
+            spend: totalSpend,
+            leads: totalLeads,
+            messages: totalMessages,
+            reach: totalReach,
+            clicks: totalClicks,
+            ctr: totalReach > 0 ? (totalClicks / totalReach) * 100 : 0,
+            cpm: 0,
+            message_text: messageText,
+          });
+
+          if (sendResult.ok) {
+            summary.sent = 1;
+            console.log(`[${account.nome_cliente}] Sent weekly summary`);
+          } else {
+            summary.failed = 1;
+            summary.errors.push(`Weekly: ${sendResult.error}`);
+            console.error(`[${account.nome_cliente}] Failed weekly summary: ${sendResult.error}`);
+          }
+
+          summaries.push(summary);
+          continue;
+        }
+
+        // ===== MODO DIÁRIO: 1 mensagem por campanha =====
         for (const campaign of eligible) {
-          // Idempotência: já foi disparada hoje?
           const { data: existing } = await supabase
             .from('campaign_report_dispatches')
             .select('id')
@@ -513,7 +598,6 @@ Deno.serve(async (req) => {
             accountName: account.nome_cliente,
             dataDate,
             campaign,
-            weekly: weeklyRange || undefined,
           });
 
           if (dryRun) {
@@ -526,7 +610,6 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          // Enviar
           const sendResult = await sendWhatsAppMessage({
             evolutionUrl,
             evolutionKey,
@@ -535,7 +618,6 @@ Deno.serve(async (req) => {
             text: messageText,
           });
 
-          // Registrar log (sucesso ou falha)
           await supabase.from('campaign_report_dispatches').insert({
             account_id: account.id,
             campaign_id: campaign.id,
