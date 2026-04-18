@@ -151,6 +151,134 @@ function buildMessage(params: {
   return lines.join('\n');
 }
 
+interface FunnelTotals {
+  recebidos: number;
+  qualificados: number;  // passou_corretor + atendimento
+  descartados: number;
+  visitas: number;
+  propostas: number;
+  vendas: number;
+  aguardando: number;
+}
+
+async function fetchWeeklyFunnelTotals(
+  supabase: any,
+  accountId: string,
+  range: { start: string; end: string }
+): Promise<FunnelTotals> {
+  const { data } = await supabase
+    .from('feedback_campanha')
+    .select('quantidade_recebida, quantidade_descartado, quantidade_aguardando_retorno, quantidade_atendimento, quantidade_passou_corretor, quantidade_visita, quantidade_proposta, quantidade_venda')
+    .eq('account_id', accountId)
+    .gte('data_referencia', range.start)
+    .lte('data_referencia', range.end);
+
+  const t: FunnelTotals = {
+    recebidos: 0, qualificados: 0, descartados: 0,
+    visitas: 0, propostas: 0, vendas: 0, aguardando: 0,
+  };
+  (data || []).forEach((r: any) => {
+    t.recebidos += r.quantidade_recebida || 0;
+    t.descartados += r.quantidade_descartado || 0;
+    t.aguardando += r.quantidade_aguardando_retorno || 0;
+    t.qualificados += (r.quantidade_passou_corretor || 0) + (r.quantidade_atendimento || 0);
+    t.visitas += r.quantidade_visita || 0;
+    t.propostas += r.quantidade_proposta || 0;
+    t.vendas += r.quantidade_venda || 0;
+  });
+  return t;
+}
+
+function buildWeeklyAccountMessage(params: {
+  accountName: string;
+  range: { start: string; end: string };
+  campaigns: CampaignInsight[];
+  funnel: FunnelTotals;
+}): string {
+  const { accountName, range, campaigns, funnel } = params;
+
+  // Totais agregados
+  const totalSpend = campaigns.reduce((s, c) => s + c.spend, 0);
+  const totalReach = campaigns.reduce((s, c) => s + c.reach, 0);
+  const totalClicks = campaigns.reduce((s, c) => s + c.clicks, 0);
+  const totalLeads = campaigns.reduce((s, c) => s + c.leads, 0);
+  const totalMessages = campaigns.reduce((s, c) => s + c.messages, 0);
+  const totalConv = totalLeads + totalMessages;
+  const avgCPL = totalConv > 0 ? totalSpend / totalConv : 0;
+  const avgCTR = totalReach > 0 ? (totalClicks / totalReach) * 100 : 0;
+
+  // Top campanha por menor custo/conversão (com pelo menos 1 conversão)
+  const withConv = campaigns
+    .map((c) => {
+      const conv = (c.objective === 'OUTCOME_ENGAGEMENT' || c.objective === 'MESSAGES') ? c.messages : c.leads;
+      return { c, conv, cost: conv > 0 ? c.spend / conv : Infinity };
+    })
+    .filter((x) => x.conv > 0)
+    .sort((a, b) => a.cost - b.cost);
+
+  const topByCost = withConv[0];
+  const topByVolume = [...campaigns].sort((a, b) => (b.leads + b.messages) - (a.leads + a.messages))[0];
+
+  const lines: string[] = [];
+  lines.push('📊 *RESUMO SEMANAL DE CAMPANHAS*');
+  lines.push(`👤 Conta: ${accountName}`);
+  lines.push(`📅 Período: ${formatDateBR(range.start)} a ${formatDateBR(range.end)}`);
+  lines.push('');
+  lines.push('📈 *VISÃO GERAL (7 DIAS):*');
+  lines.push(`• Campanhas ativas: ${formatInt(campaigns.length)}`);
+  lines.push(`• Investimento total: R$ ${formatBRL(totalSpend)}`);
+  lines.push(`• Leads/Mensagens: ${formatInt(totalConv)}`);
+  lines.push(`• Custo médio por conversão: R$ ${formatBRL(avgCPL)}`);
+  lines.push(`• Alcance total: ${formatInt(totalReach)}`);
+  lines.push(`• Cliques no link: ${formatInt(totalClicks)}`);
+  lines.push(`• CTR médio: ${avgCTR.toFixed(2).replace('.', ',')}%`);
+
+  // Funil (só mostra se houver dados)
+  if (funnel.recebidos > 0 || funnel.visitas > 0 || funnel.vendas > 0) {
+    lines.push('');
+    lines.push('🎯 *QUALIFICAÇÃO DOS LEADS:*');
+    if (funnel.recebidos > 0) lines.push(`• Leads recebidos: ${formatInt(funnel.recebidos)}`);
+    if (funnel.qualificados > 0) lines.push(`• Qualificados (em atendimento): ${formatInt(funnel.qualificados)}`);
+    if (funnel.aguardando > 0) lines.push(`• Aguardando retorno: ${formatInt(funnel.aguardando)}`);
+    if (funnel.descartados > 0) {
+      const pctDesc = funnel.recebidos > 0 ? (funnel.descartados / funnel.recebidos) * 100 : 0;
+      lines.push(`• Descartados: ${formatInt(funnel.descartados)}${pctDesc > 0 ? ` (${pctDesc.toFixed(0)}%)` : ''}`);
+    }
+    if (funnel.visitas > 0) lines.push(`• Visitas registradas: ${formatInt(funnel.visitas)}`);
+    if (funnel.propostas > 0) lines.push(`• Propostas: ${formatInt(funnel.propostas)}`);
+    if (funnel.vendas > 0) lines.push(`• ✅ Vendas: ${formatInt(funnel.vendas)}`);
+  }
+
+  // Destaques
+  if (topByCost || topByVolume) {
+    lines.push('');
+    lines.push('🏆 *DESTAQUES:*');
+    if (topByCost) {
+      lines.push(`• Melhor custo: ${topByCost.c.name}`);
+      lines.push(`  R$ ${formatBRL(topByCost.cost)}/conversão (${formatInt(topByCost.conv)} resultados)`);
+    }
+    if (topByVolume && topByVolume.id !== topByCost?.c.id) {
+      const vol = topByVolume.leads + topByVolume.messages;
+      if (vol > 0) {
+        lines.push(`• Maior volume: ${topByVolume.name}`);
+        lines.push(`  ${formatInt(vol)} conversões — R$ ${formatBRL(topByVolume.spend)} investidos`);
+      }
+    }
+  }
+
+  // Sinais de alerta
+  const descartePct = funnel.recebidos > 0 ? (funnel.descartados / funnel.recebidos) * 100 : 0;
+  if (descartePct >= 40) {
+    lines.push('');
+    lines.push('⚠️ *ATENÇÃO:* Taxa de descarte alta. Vale revisar a segmentação ou qualificação dos leads.');
+  }
+
+  lines.push('');
+  lines.push('💬 Como podemos melhorar essa semana?');
+
+  return lines.join('\n');
+}
+
 async function fetchCampaignInsights(
   metaAccountId: string,
   accessToken: string,
