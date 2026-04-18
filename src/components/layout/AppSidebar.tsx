@@ -6,7 +6,11 @@ import {
   LogOut,
   User,
   Settings as SettingsIcon,
+  Bell,
+  Check,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { useNotifications } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
