@@ -8,6 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -26,6 +28,7 @@ import {
   Chrome,
   Facebook,
   Wallet,
+  Eye,
 } from "lucide-react";
 import { updateAccount } from "@/services/accountsService";
 import {
@@ -74,6 +77,10 @@ export default function RelatorioN8n() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [sendingReport, setSendingReport] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewMessages, setPreviewMessages] = useState<PreviewMessage[]>([]);
+  const [previewClientName, setPreviewClientName] = useState("");
   const { toast } = useToast();
 
   // ======= LOAD DATA =======
@@ -84,7 +91,7 @@ export default function RelatorioN8n() {
       // Buscar dados da tabela accounts
       const { data: accountsData, error: accountsError } = await supabase
         .from("accounts")
-        .select("id, nome_cliente, id_grupo, meta_account_id, google_ads_id, status, telefone, email, notificacao_saldo_baixo")
+        .select("id, nome_cliente, id_grupo, meta_account_id, google_ads_id, status, telefone, email, notificacao_saldo_baixo, enviar_relatorio_meta")
         .eq("status", "Ativo")
         .order("nome_cliente");
 
@@ -137,6 +144,7 @@ export default function RelatorioN8n() {
           google_ads_id: account.google_ads_id,
           status: account.status,
           notificacao_saldo_baixo: account.notificacao_saldo_baixo ?? true,
+          enviar_relatorio_meta: (account as any).enviar_relatorio_meta ?? false,
           config: config
             ? {
                 ativo_meta: config.ativo_meta || false,
