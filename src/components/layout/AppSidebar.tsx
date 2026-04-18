@@ -53,6 +53,29 @@ export function AppSidebar({
   const { user, signOut } = useAuth();
   const { role } = useUserRole();
   const { logoUrl: systemLogoUrl, faviconUrl: systemFaviconUrl, name: systemName, logoSize: systemLogoSize } = useSystemBranding();
+  const { notifications, unreadCount, loading: notificationsLoading, markAllAsRead, navigateToNotification } = useNotifications();
+
+  const formatNotificationTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const diffMins = Math.floor((Date.now() - date.getTime()) / 60000);
+    if (diffMins < 1) return 'agora';
+    if (diffMins < 60) return `há ${diffMins}min`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `há ${diffHours}h`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `há ${diffDays}d`;
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'post': return '📢';
+      case 'demanda_designada': return '📋';
+      case 'demanda_nova': return '🆕';
+      case 'demanda_status': return '🔄';
+      default: return '🔔';
+    }
+  };
   const currentPath = location.pathname;
   const filteredNavItems = filterNavigationByRole(navigationItems, role);
   
