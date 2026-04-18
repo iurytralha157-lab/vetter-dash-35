@@ -61,6 +61,33 @@ function yesterdayInSaoPaulo(): string {
   return `${y}-${m}-${d}`;
 }
 
+function nowInSaoPaulo(): Date {
+  const now = new Date();
+  return new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+}
+
+function isMondayInSaoPaulo(): boolean {
+  return nowInSaoPaulo().getDay() === 1; // 0=domingo, 1=segunda
+}
+
+function lastWeekRangeSaoPaulo(): { start: string; end: string } {
+  // Segunda a domingo da semana anterior, no fuso BRT
+  const sp = nowInSaoPaulo();
+  const dow = sp.getDay(); // 1 = segunda
+  // Domingo passado = hoje (segunda) - 1 dia
+  const sunday = new Date(sp);
+  sunday.setDate(sp.getDate() - (dow === 0 ? 7 : dow));
+  const monday = new Date(sunday);
+  monday.setDate(sunday.getDate() - 6);
+  const fmt = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  return { start: fmt(monday), end: fmt(sunday) };
+}
+
 function todayInSaoPaulo(): string {
   const now = new Date();
   const sp = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
@@ -78,22 +105,29 @@ function buildMessage(params: {
   accountName: string;
   dataDate: string;
   campaign: CampaignInsight;
+  weekly?: { start: string; end: string };
 }): string {
-  const { accountName, dataDate, campaign } = params;
+  const { accountName, dataDate, campaign, weekly } = params;
   const isMessaging = campaign.objective === 'OUTCOME_ENGAGEMENT' || campaign.objective === 'MESSAGES';
   const conversionCount = isMessaging ? campaign.messages : campaign.leads;
   const conversionLabel = isMessaging ? 'Mensagens' : 'Leads';
   const costPer = conversionCount > 0 ? campaign.spend / conversionCount : 0;
 
   const lines: string[] = [];
-  lines.push('📊 *RELATÓRIO DE CAMPANHA*');
-  lines.push(`👤 Conta de Anúncio: ${accountName}`);
-  lines.push(`📅 Data: ${formatDateBR(dataDate)}`);
+  if (weekly) {
+    lines.push('📊 *RELATÓRIO SEMANAL DE CAMPANHA*');
+    lines.push(`👤 Conta de Anúncio: ${accountName}`);
+    lines.push(`📅 Período: ${formatDateBR(weekly.start)} a ${formatDateBR(weekly.end)}`);
+  } else {
+    lines.push('📊 *RELATÓRIO DE CAMPANHA*');
+    lines.push(`👤 Conta de Anúncio: ${accountName}`);
+    lines.push(`📅 Data: ${formatDateBR(dataDate)}`);
+  }
   lines.push('');
   lines.push('🎯 *CAMPANHA:*');
   lines.push(campaign.name);
   lines.push('');
-  lines.push('💰 *INVESTIMENTO & RESULTADOS:*');
+  lines.push(weekly ? '💰 *INVESTIMENTO & RESULTADOS (7 DIAS):*' : '💰 *INVESTIMENTO & RESULTADOS:*');
   lines.push(`• Gasto: R$ ${formatBRL(campaign.spend)}`);
   lines.push(`• ${conversionLabel}: ${formatInt(conversionCount)}`);
   lines.push(`• Custo por ${conversionLabel}: R$ ${formatBRL(costPer)}`);
@@ -117,10 +151,13 @@ function buildMessage(params: {
   return lines.join('\n');
 }
 
-async function fetchYesterdayCampaigns(metaAccountId: string, accessToken: string, dataDate: string): Promise<CampaignInsight[]> {
+async function fetchCampaignInsights(
+  metaAccountId: string,
+  accessToken: string,
+  range: { type: 'yesterday' } | { type: 'range'; since: string; until: string }
+): Promise<CampaignInsight[]> {
   const formattedAccountId = metaAccountId.startsWith('act_') ? metaAccountId : `act_${metaAccountId}`;
 
-  // 1. Buscar campanhas
   const campaignsUrl = `${META_BASE_URL}/${formattedAccountId}/campaigns?fields=id,name,status,objective&limit=200&access_token=${accessToken}`;
   const campaignsRes = await fetch(campaignsUrl);
   if (!campaignsRes.ok) {
@@ -129,10 +166,13 @@ async function fetchYesterdayCampaigns(metaAccountId: string, accessToken: strin
   const campaignsData = await campaignsRes.json();
   const campaigns = campaignsData.data || [];
 
-  // 2. Buscar insights (yesterday) para cada campanha em paralelo
+  const dateParam = range.type === 'yesterday'
+    ? 'date_preset=yesterday'
+    : `time_range=${encodeURIComponent(JSON.stringify({ since: range.since, until: range.until }))}`;
+
   const insightsPromises = campaigns.map(async (c: any): Promise<CampaignInsight | null> => {
     try {
-      const insightsUrl = `${META_BASE_URL}/${c.id}/insights?fields=spend,reach,clicks,ctr,cpm,actions&date_preset=yesterday&access_token=${accessToken}`;
+      const insightsUrl = `${META_BASE_URL}/${c.id}/insights?fields=spend,reach,clicks,ctr,cpm,actions&${dateParam}&access_token=${accessToken}`;
       const r = await fetch(insightsUrl);
       if (!r.ok) return null;
       const data = await r.json();
@@ -246,8 +286,11 @@ Deno.serve(async (req) => {
 
     const targetAccountId: string | undefined = body.account_id;
     const dryRun: boolean = body.dry_run === true;
+    // Modo: 'daily' | 'weekly' | 'auto' (auto = weekly se segunda, senão daily)
+    const requestedMode: 'daily' | 'weekly' | 'auto' = body.mode || 'auto';
+    const isWeekly = requestedMode === 'weekly' || (requestedMode === 'auto' && isMondayInSaoPaulo());
 
-    console.log('[send-campaign-reports] Trigger:', body.trigger || 'manual', 'targetAccount:', targetAccountId, 'dryRun:', dryRun);
+    console.log('[send-campaign-reports] Trigger:', body.trigger || 'manual', 'mode:', isWeekly ? 'weekly' : 'daily', 'targetAccount:', targetAccountId, 'dryRun:', dryRun);
 
     // 1. Buscar contas elegíveis
     let accountsQuery = supabase
@@ -274,7 +317,8 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const dataDate = yesterdayInSaoPaulo();
+    const weeklyRange = isWeekly ? lastWeekRangeSaoPaulo() : null;
+    const dataDate = isWeekly ? weeklyRange!.end : yesterdayInSaoPaulo();
     const dispatchDate = todayInSaoPaulo();
     const summaries: DispatchSummary[] = [];
     const previewMessages: Array<{ account: string; campaign: string; text: string }> = [];
@@ -293,15 +337,21 @@ Deno.serve(async (req) => {
       };
 
       try {
-        const campaigns = await fetchYesterdayCampaigns(account.meta_account_id!, accessToken, dataDate);
+        const campaigns = await fetchCampaignInsights(
+          account.meta_account_id!,
+          accessToken,
+          isWeekly
+            ? { type: 'range', since: weeklyRange!.start, until: weeklyRange!.end }
+            : { type: 'yesterday' }
+        );
         summary.campaigns_total = campaigns.length;
 
-        // Filtrar apenas campanhas COM gasto > 0 no dia anterior
+        // Filtrar apenas campanhas COM gasto > 0 no período
         const eligible = campaigns.filter((c) => c.spend > 0);
         summary.campaigns_with_spend = eligible.length;
 
         if (eligible.length === 0) {
-          console.log(`[${account.nome_cliente}] No campaigns with spend yesterday, skipping`);
+          console.log(`[${account.nome_cliente}] No campaigns with spend in period, skipping`);
           summaries.push(summary);
           continue;
         }
@@ -335,6 +385,7 @@ Deno.serve(async (req) => {
             accountName: account.nome_cliente,
             dataDate,
             campaign,
+            weekly: weeklyRange || undefined,
           });
 
           if (dryRun) {
@@ -401,7 +452,9 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       dry_run: dryRun,
+      mode: isWeekly ? 'weekly' : 'daily',
       data_date: dataDate,
+      weekly_range: weeklyRange,
       dispatch_date: dispatchDate,
       accounts_processed: accounts.length,
       summaries,
