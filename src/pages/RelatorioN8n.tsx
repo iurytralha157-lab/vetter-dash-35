@@ -44,6 +44,7 @@ interface ClientReport {
   google_ads_id?: string;
   status: string;
   notificacao_saldo_baixo: boolean;
+  enviar_relatorio_meta: boolean; // novo: controla disparo automático interno (substitui N8N)
   config?: {
     ativo_meta: boolean;
     ativo_google: boolean;
@@ -59,6 +60,12 @@ interface ClientReport {
     total_leads: number;
     leads_convertidos: number;
   };
+}
+
+interface PreviewMessage {
+  account: string;
+  campaign: string;
+  text: string;
 }
 
 export default function RelatorioN8n() {
