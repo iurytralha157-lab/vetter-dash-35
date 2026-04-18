@@ -927,6 +927,30 @@ export default function RelatorioN8n() {
             </Card>
           )}
         </div>
+
+        {/* Dialog de Pré-visualização */}
+        <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle>Pré-visualização — {previewClientName}</DialogTitle>
+              <DialogDescription>
+                {previewMessages.length} mensagem(ns) seriam enviadas (uma por campanha com gasto ontem). Nada foi enviado.
+              </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-[60vh] pr-4">
+              <div className="space-y-3">
+                {previewMessages.map((m, idx) => (
+                  <Card key={idx} className="surface-elevated">
+                    <CardContent className="p-4">
+                      <div className="text-xs text-text-tertiary mb-2 font-medium">{m.campaign}</div>
+                      <pre className="whitespace-pre-wrap text-sm text-foreground font-sans">{m.text}</pre>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
       </TooltipProvider>
     </AppLayout>
   );
