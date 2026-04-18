@@ -261,93 +261,76 @@ export function AppSidebar({
           </div>
         </nav>
 
-        {/* Footer com User Info */}
+        {/* Footer com User Info (Dropdown: Perfil, Configurações, Sair) */}
         <div className={`
           border-t border-border/50 bg-dark-800/50
           transition-all duration-500 ease-in-out
-          ${isCollapsed ? 'p-2' : 'p-4'}
+          ${isCollapsed ? 'p-2' : 'p-3'}
         `}>
-          {isCollapsed ? (
-            <div className="space-y-3">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex justify-center">
-                    <Avatar className="h-10 w-10 border-2 border-border/50 hover:scale-105 transition-transform duration-200 hover:border-primary/30">
-                      <AvatarImage src={userAvatarUrl || undefined} />
-                      <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white text-xs font-bold">
-                        {userName?.charAt(0).toUpperCase() || 
-                         user?.email?.charAt(0).toUpperCase() || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={12} className="bg-dark-800 border-border/50">
-                  <div className="text-sm">
-                    <div className="font-medium">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              {isCollapsed ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="w-12 h-12 mx-auto rounded-xl hover:bg-dark-700 hover:scale-105 transition-all duration-200"
+                >
+                  <Avatar className="h-9 w-9 border-2 border-border/50">
+                    <AvatarImage src={userAvatarUrl || undefined} />
+                    <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white text-xs font-bold">
+                      {userName?.charAt(0).toUpperCase() ||
+                       user?.email?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              ) : (
+                <button
+                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-dark-700/50 hover:bg-dark-700 transition-colors duration-200 text-left"
+                >
+                  <Avatar className="h-10 w-10 border-2 border-border/50">
+                    <AvatarImage src={userAvatarUrl || undefined} />
+                    <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white text-sm font-bold">
+                      {userName?.charAt(0).toUpperCase() ||
+                       user?.email?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-foreground truncate">
                       {userName || 'Usuário'}
                     </div>
-                    <div className="text-muted-foreground text-xs">
+                    <div className="text-xs text-muted-foreground truncate">
                       {user?.email}
                     </div>
                   </div>
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleLogout}
-                    className="w-10 h-10 mx-auto text-muted-foreground hover:text-destructive hover:bg-destructive/10 hover:scale-105 transition-all duration-200"
-                  >
-                    <LogOut className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={12} className="bg-dark-800 border-border/50">
-                  Sair do Sistema
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-dark-700/50 hover:bg-dark-700 transition-colors duration-200">
-                <Avatar className="h-10 w-10 border-2 border-border/50">
-                  <AvatarImage src={userAvatarUrl || undefined} />
-                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white text-sm font-bold">
-                    {userName?.charAt(0).toUpperCase() || 
-                     user?.email?.charAt(0).toUpperCase() || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className={`
-                  flex-1 min-w-0 transition-all duration-500
-                  ${isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'}
-                `}>
-                  <div className="text-sm font-semibold text-foreground truncate">
-                    {userName || 'Usuário'}
-                  </div>
-                  <div className="text-xs text-muted-foreground truncate">
-                    {user?.email}
-                  </div>
-                </div>
-              </div>
-              
-              <div className={`
-                flex gap-2 transition-all duration-500
-                ${isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'}
-              `}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleLogout}
-                  className="flex-1 justify-start gap-2 px-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Sair
-                </Button>
-              </div>
-            </div>
-          )}
+                </button>
+              )}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              side={isCollapsed ? 'right' : 'top'}
+              align={isCollapsed ? 'start' : 'center'}
+              sideOffset={12}
+              className="w-56 shadow-xl bg-dark-800 border-border/50"
+            >
+              <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-border/50" />
+              <DropdownMenuItem className="hover:bg-dark-700 cursor-pointer" onClick={() => navigate('/configuracoes')}>
+                <User className="mr-2 h-4 w-4" />
+                Perfil
+              </DropdownMenuItem>
+              <DropdownMenuItem className="hover:bg-dark-700 cursor-pointer" onClick={() => navigate('/configuracoes')}>
+                <SettingsIcon className="mr-2 h-4 w-4" />
+                Configurações
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-border/50" />
+              <DropdownMenuItem
+                className="text-destructive hover:bg-destructive/10 cursor-pointer"
+                onClick={handleLogout}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Sair
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </aside>
     </TooltipProvider>
