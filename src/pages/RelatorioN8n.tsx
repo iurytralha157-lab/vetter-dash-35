@@ -8,6 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -26,6 +28,7 @@ import {
   Chrome,
   Facebook,
   Wallet,
+  Eye,
 } from "lucide-react";
 import { updateAccount } from "@/services/accountsService";
 import {
@@ -44,6 +47,7 @@ interface ClientReport {
   google_ads_id?: string;
   status: string;
   notificacao_saldo_baixo: boolean;
+  enviar_relatorio_meta: boolean; // novo: controla disparo automático interno (substitui N8N)
   config?: {
     ativo_meta: boolean;
     ativo_google: boolean;
@@ -61,12 +65,22 @@ interface ClientReport {
   };
 }
 
+interface PreviewMessage {
+  account: string;
+  campaign: string;
+  text: string;
+}
+
 export default function RelatorioN8n() {
   const [clients, setClients] = useState<ClientReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [sendingReport, setSendingReport] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewMessages, setPreviewMessages] = useState<PreviewMessage[]>([]);
+  const [previewClientName, setPreviewClientName] = useState("");
   const { toast } = useToast();
 
   // ======= LOAD DATA =======
@@ -75,9 +89,10 @@ export default function RelatorioN8n() {
       setLoading(true);
 
       // Buscar dados da tabela accounts
+      // (enviar_relatorio_meta vem via "*" para evitar bloqueio do typecheck enquanto a migration roda)
       const { data: accountsData, error: accountsError } = await supabase
         .from("accounts")
-        .select("id, nome_cliente, id_grupo, meta_account_id, google_ads_id, status, telefone, email, notificacao_saldo_baixo")
+        .select("*")
         .eq("status", "Ativo")
         .order("nome_cliente");
 
@@ -130,6 +145,7 @@ export default function RelatorioN8n() {
           google_ads_id: account.google_ads_id,
           status: account.status,
           notificacao_saldo_baixo: account.notificacao_saldo_baixo ?? true,
+          enviar_relatorio_meta: (account as any).enviar_relatorio_meta ?? false,
           config: config
             ? {
                 ativo_meta: config.ativo_meta || false,
@@ -199,6 +215,14 @@ export default function RelatorioN8n() {
       const currentStatus = client?.config?.ativo_meta || false;
       const newStatus = !currentStatus;
 
+      // 1. Sincroniza accounts.enviar_relatorio_meta (NOVO sistema interno)
+      const { error: accountErr } = await supabase
+        .from("accounts")
+        .update({ enviar_relatorio_meta: newStatus } as any)
+        .eq("id", clientId);
+      if (accountErr) throw accountErr;
+
+      // 2. Mantém compatibilidade com N8N (relatorio_config.ativo_meta)
       const { data: existingConfig } = await supabase
         .from("relatorio_config")
         .select("id")
@@ -227,6 +251,7 @@ export default function RelatorioN8n() {
           c.id === clientId
             ? {
                 ...c,
+                enviar_relatorio_meta: newStatus,
                 config: {
                   ...c.config,
                   ativo_meta: newStatus,
@@ -343,21 +368,65 @@ export default function RelatorioN8n() {
   const handleSendReport = async (clientId: string, clientName: string) => {
     try {
       setSendingReport(clientId);
-      await new Promise((res) => setTimeout(res, 1000));
-      toast({ title: "Relatório enviado!", description: `Relatório de ${clientName} enviado com sucesso` });
-      try {
-        await supabase.from("relatorio_disparos").insert({
-          client_id: clientId,
-          data_disparo: new Date().toISOString(),
-          horario_disparo: new Date().toTimeString().slice(0, 8),
-          status: "enviado",
-          dados_enviados: { trigger: "manual", user_action: true, timestamp: new Date().toISOString() },
+      const { data, error } = await supabase.functions.invoke("send-campaign-reports", {
+        body: { account_id: clientId },
+      });
+      if (error) throw error;
+      const summary = data?.summaries?.[0];
+      if (summary) {
+        const msg = summary.campaigns_with_spend === 0
+          ? `Nenhuma campanha com gasto ontem para ${clientName}`
+          : `${summary.sent} enviada(s), ${summary.failed} falha(s), ${summary.skipped} já enviada(s) hoje`;
+        toast({
+          title: summary.failed > 0 ? "Concluído com erros" : "Relatório enviado!",
+          description: `${clientName}: ${msg}`,
+          variant: summary.failed > 0 ? "destructive" : "default",
         });
-      } catch (e) {
-        console.log("Erro ao registrar disparo (ignorado):", e);
+      } else {
+        toast({ title: "Sem contas elegíveis", description: `${clientName} não está marcada para receber relatório`, variant: "destructive" });
       }
+      await loadClientsData();
+    } catch (e: any) {
+      console.error("Erro ao disparar:", e);
+      toast({ title: "Erro", description: e.message || "Falha ao disparar", variant: "destructive" });
     } finally {
       setSendingReport(null);
+    }
+  };
+
+  const handlePreview = async (clientId: string, clientName: string) => {
+    try {
+      setPreviewLoading(clientId);
+      // Para preview, força ignorar o toggle: temporariamente liga + chama dry_run + desliga (não — só chamamos com account_id e dry_run; precisa estar marcado)
+      const client = clients.find((c) => c.id === clientId);
+      if (!client?.enviar_relatorio_meta) {
+        toast({
+          title: "Ative primeiro",
+          description: "Ligue o switch Meta para esta conta antes de pré-visualizar",
+          variant: "destructive",
+        });
+        return;
+      }
+      const { data, error } = await supabase.functions.invoke("send-campaign-reports", {
+        body: { account_id: clientId, dry_run: true },
+      });
+      if (error) throw error;
+      const messages: PreviewMessage[] = data?.preview_messages || [];
+      if (messages.length === 0) {
+        toast({
+          title: "Nenhuma campanha elegível",
+          description: `${clientName} não tem campanhas com gasto > 0 ontem`,
+        });
+        return;
+      }
+      setPreviewMessages(messages);
+      setPreviewClientName(clientName);
+      setPreviewOpen(true);
+    } catch (e: any) {
+      console.error("Erro ao pré-visualizar:", e);
+      toast({ title: "Erro", description: e.message || "Falha ao pré-visualizar", variant: "destructive" });
+    } finally {
+      setPreviewLoading(null);
     }
   };
 
@@ -811,15 +880,27 @@ export default function RelatorioN8n() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
                               className="gap-2"
+                              onClick={() => handlePreview(client.id, client.nome_cliente)}
+                              disabled={previewLoading === client.id || !metaConfigured}
+                            >
+                              {previewLoading === client.id ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                              {previewLoading === client.id ? "Carregando..." : "Pré-visualizar"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="gap-2"
                               onClick={() => handleSendReport(client.id, client.nome_cliente)}
-                              disabled={sendingReport === client.id}
+                              disabled={sendingReport === client.id || !metaConfigured}
                             >
                               {sendingReport === client.id ? (
                                 <RefreshCw className="h-4 w-4 animate-spin" />
                               ) : (
                                 <Zap className="h-4 w-4" />
                               )}
-                              {sendingReport === client.id ? "Enviando..." : "Enviar agora"}
+                              {sendingReport === client.id ? "Disparando..." : "Disparar agora"}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -846,6 +927,30 @@ export default function RelatorioN8n() {
             </Card>
           )}
         </div>
+
+        {/* Dialog de Pré-visualização */}
+        <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle>Pré-visualização — {previewClientName}</DialogTitle>
+              <DialogDescription>
+                {previewMessages.length} mensagem(ns) seriam enviadas (uma por campanha com gasto ontem). Nada foi enviado.
+              </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-[60vh] pr-4">
+              <div className="space-y-3">
+                {previewMessages.map((m, idx) => (
+                  <Card key={idx} className="surface-elevated">
+                    <CardContent className="p-4">
+                      <div className="text-xs text-text-tertiary mb-2 font-medium">{m.campaign}</div>
+                      <pre className="whitespace-pre-wrap text-sm text-foreground font-sans">{m.text}</pre>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
       </TooltipProvider>
     </AppLayout>
   );
