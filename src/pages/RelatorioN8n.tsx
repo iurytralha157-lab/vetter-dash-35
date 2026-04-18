@@ -368,21 +368,65 @@ export default function RelatorioN8n() {
   const handleSendReport = async (clientId: string, clientName: string) => {
     try {
       setSendingReport(clientId);
-      await new Promise((res) => setTimeout(res, 1000));
-      toast({ title: "Relatório enviado!", description: `Relatório de ${clientName} enviado com sucesso` });
-      try {
-        await supabase.from("relatorio_disparos").insert({
-          client_id: clientId,
-          data_disparo: new Date().toISOString(),
-          horario_disparo: new Date().toTimeString().slice(0, 8),
-          status: "enviado",
-          dados_enviados: { trigger: "manual", user_action: true, timestamp: new Date().toISOString() },
+      const { data, error } = await supabase.functions.invoke("send-campaign-reports", {
+        body: { account_id: clientId },
+      });
+      if (error) throw error;
+      const summary = data?.summaries?.[0];
+      if (summary) {
+        const msg = summary.campaigns_with_spend === 0
+          ? `Nenhuma campanha com gasto ontem para ${clientName}`
+          : `${summary.sent} enviada(s), ${summary.failed} falha(s), ${summary.skipped} já enviada(s) hoje`;
+        toast({
+          title: summary.failed > 0 ? "Concluído com erros" : "Relatório enviado!",
+          description: `${clientName}: ${msg}`,
+          variant: summary.failed > 0 ? "destructive" : "default",
         });
-      } catch (e) {
-        console.log("Erro ao registrar disparo (ignorado):", e);
+      } else {
+        toast({ title: "Sem contas elegíveis", description: `${clientName} não está marcada para receber relatório`, variant: "destructive" });
       }
+      await loadClientsData();
+    } catch (e: any) {
+      console.error("Erro ao disparar:", e);
+      toast({ title: "Erro", description: e.message || "Falha ao disparar", variant: "destructive" });
     } finally {
       setSendingReport(null);
+    }
+  };
+
+  const handlePreview = async (clientId: string, clientName: string) => {
+    try {
+      setPreviewLoading(clientId);
+      // Para preview, força ignorar o toggle: temporariamente liga + chama dry_run + desliga (não — só chamamos com account_id e dry_run; precisa estar marcado)
+      const client = clients.find((c) => c.id === clientId);
+      if (!client?.enviar_relatorio_meta) {
+        toast({
+          title: "Ative primeiro",
+          description: "Ligue o switch Meta para esta conta antes de pré-visualizar",
+          variant: "destructive",
+        });
+        return;
+      }
+      const { data, error } = await supabase.functions.invoke("send-campaign-reports", {
+        body: { account_id: clientId, dry_run: true },
+      });
+      if (error) throw error;
+      const messages: PreviewMessage[] = data?.preview_messages || [];
+      if (messages.length === 0) {
+        toast({
+          title: "Nenhuma campanha elegível",
+          description: `${clientName} não tem campanhas com gasto > 0 ontem`,
+        });
+        return;
+      }
+      setPreviewMessages(messages);
+      setPreviewClientName(clientName);
+      setPreviewOpen(true);
+    } catch (e: any) {
+      console.error("Erro ao pré-visualizar:", e);
+      toast({ title: "Erro", description: e.message || "Falha ao pré-visualizar", variant: "destructive" });
+    } finally {
+      setPreviewLoading(null);
     }
   };
 
