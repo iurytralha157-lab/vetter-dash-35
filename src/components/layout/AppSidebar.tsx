@@ -405,8 +405,7 @@ export function AppSidebar({
                   )}
                 </div>
               </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          </DropdownMenu>
 
           {/* User Menu */}
           <DropdownMenu>
