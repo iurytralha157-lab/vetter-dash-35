@@ -9,12 +9,27 @@ interface SystemBranding {
   loading: boolean;
 }
 
+const CACHE_KEY = 'system-branding-cache';
+
+const readCache = (): Omit<SystemBranding, 'loading'> | null => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
 export function useSystemBranding(): SystemBranding {
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
-  const [name, setName] = useState('MetaFlow');
-  const [logoSize, setLogoSize] = useState(40);
-  const [loading, setLoading] = useState(true);
+  const cached = readCache();
+
+  const [logoUrl, setLogoUrl] = useState<string | null>(cached?.logoUrl ?? null);
+  const [faviconUrl, setFaviconUrl] = useState<string | null>(cached?.faviconUrl ?? null);
+  const [name, setName] = useState(cached?.name ?? 'MetaFlow');
+  const [logoSize, setLogoSize] = useState(cached?.logoSize ?? 40);
+  // Se já temos cache, não estamos "carregando" — evita o fallback "M" piscar
+  const [loading, setLoading] = useState(!cached);
 
   useEffect(() => {
     const fetchBranding = async () => {
@@ -26,10 +41,21 @@ export function useSystemBranding(): SystemBranding {
           .single();
 
         if (data && !error) {
-          setLogoUrl(data.logo_url);
-          setFaviconUrl(data.favicon_url);
-          setName(data.name || 'MetaFlow');
-          setLogoSize(data.logo_size || 40);
+          const next = {
+            logoUrl: data.logo_url,
+            faviconUrl: data.favicon_url,
+            name: data.name || 'MetaFlow',
+            logoSize: data.logo_size || 40,
+          };
+          setLogoUrl(next.logoUrl);
+          setFaviconUrl(next.faviconUrl);
+          setName(next.name);
+          setLogoSize(next.logoSize);
+          try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify(next));
+          } catch {
+            // ignore quota errors
+          }
         }
       } catch (err) {
         console.error('Error fetching system branding:', err);
