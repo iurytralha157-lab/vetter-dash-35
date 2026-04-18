@@ -295,25 +295,50 @@ export function AppSidebar({
           ${isCollapsed ? 'p-2 space-y-2' : 'p-3 space-y-2'}
         `}>
           {/* Notifications */}
-          <div className={isCollapsed ? 'flex justify-center' : 'flex justify-end'}>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              {isCollapsed ? (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="relative h-9 w-9 hover:bg-dark-700 transition-all duration-200 hover:scale-105"
+                  className="relative w-12 h-12 mx-auto rounded-xl hover:bg-dark-700 hover:scale-105 transition-all duration-200"
                 >
                   <Bell className="h-5 w-5" />
                   {unreadCount > 0 && (
                     <Badge
                       variant="destructive"
-                      className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs"
+                      className="absolute top-1.5 right-1.5 h-4 w-4 p-0 flex items-center justify-center text-[10px]"
                     >
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </Badge>
                   )}
                 </Button>
-              </DropdownMenuTrigger>
+              ) : (
+                <button
+                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-dark-700/30 hover:bg-dark-700 transition-colors duration-200 text-left"
+                >
+                  <div className="relative">
+                    <Bell className="h-5 w-5 text-foreground" />
+                    {unreadCount > 0 && (
+                      <Badge
+                        variant="destructive"
+                        className="absolute -top-2 -right-2 h-4 w-4 p-0 flex items-center justify-center text-[10px]"
+                      >
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-foreground">Notificações</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {unreadCount > 0
+                        ? `${unreadCount} não lida${unreadCount > 1 ? 's' : ''}`
+                        : 'Nenhuma nova'}
+                    </div>
+                  </div>
+                </button>
+              )}
+            </DropdownMenuTrigger>
               <DropdownMenuContent
                 side={isCollapsed ? 'right' : 'top'}
                 align={isCollapsed ? 'start' : 'end'}
