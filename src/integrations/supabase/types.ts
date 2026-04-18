@@ -81,6 +81,7 @@ export type Database = {
           created_at: string
           dias_estimados_saldo: number | null
           email: string | null
+          enviar_relatorio_meta: boolean
           forma_pagamento: string | null
           ga4_stream_id: string | null
           gestor_id: string | null
@@ -147,6 +148,7 @@ export type Database = {
           created_at?: string
           dias_estimados_saldo?: number | null
           email?: string | null
+          enviar_relatorio_meta?: boolean
           forma_pagamento?: string | null
           ga4_stream_id?: string | null
           gestor_id?: string | null
@@ -213,6 +215,7 @@ export type Database = {
           created_at?: string
           dias_estimados_saldo?: number | null
           email?: string | null
+          enviar_relatorio_meta?: boolean
           forma_pagamento?: string | null
           ga4_stream_id?: string | null
           gestor_id?: string | null
@@ -972,6 +975,97 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_campaigns"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_report_dispatches: {
+        Row: {
+          account_id: string
+          campaign_id: string
+          campaign_name: string | null
+          clicks: number | null
+          cpm: number | null
+          created_at: string
+          ctr: number | null
+          data_date: string
+          dispatch_date: string
+          error_message: string | null
+          id: string
+          leads: number | null
+          message_text: string | null
+          messages: number | null
+          reach: number | null
+          sent_at: string
+          spend: number | null
+          status: string
+          whatsapp_group_id: string | null
+          whatsapp_instance: string | null
+        }
+        Insert: {
+          account_id: string
+          campaign_id: string
+          campaign_name?: string | null
+          clicks?: number | null
+          cpm?: number | null
+          created_at?: string
+          ctr?: number | null
+          data_date: string
+          dispatch_date?: string
+          error_message?: string | null
+          id?: string
+          leads?: number | null
+          message_text?: string | null
+          messages?: number | null
+          reach?: number | null
+          sent_at?: string
+          spend?: number | null
+          status?: string
+          whatsapp_group_id?: string | null
+          whatsapp_instance?: string | null
+        }
+        Update: {
+          account_id?: string
+          campaign_id?: string
+          campaign_name?: string | null
+          clicks?: number | null
+          cpm?: number | null
+          created_at?: string
+          ctr?: number | null
+          data_date?: string
+          dispatch_date?: string
+          error_message?: string | null
+          id?: string
+          leads?: number | null
+          message_text?: string | null
+          messages?: number | null
+          reach?: number | null
+          sent_at?: string
+          spend?: number | null
+          status?: string
+          whatsapp_group_id?: string | null
+          whatsapp_instance?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_report_dispatches_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_report_dispatches_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "leads_stats"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_report_dispatches_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "relatorio_n8n_consolidated"
+            referencedColumns: ["conta_id"]
           },
         ]
       }
