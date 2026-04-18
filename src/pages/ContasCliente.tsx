@@ -37,6 +37,7 @@ import {
   Play,
   Wallet,
   Trash2,
+  Filter,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -45,6 +46,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface AccountData {
   id: string;
@@ -328,36 +330,50 @@ export default function ContasCliente() {
               <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline ml-1">Atualizar</span>
             </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="relative">
+                  <Filter className="h-4 w-4" />
+                  <span className="hidden sm:inline ml-1">Filtrar</span>
+                  {activePill !== "todos" && (
+                    <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-56 p-2">
+                <p className="text-xs font-medium text-muted-foreground px-2 py-1.5">
+                  Filtrar contas
+                </p>
+                <div className="flex flex-col gap-1">
+                  {FILTER_PILLS.map((p) => {
+                    const active = activePill === p.key;
+                    const count = pillCounts[p.key] ?? 0;
+                    return (
+                      <button
+                        key={p.key}
+                        onClick={() => setActivePill(p.key)}
+                        className={[
+                          "flex items-center justify-between w-full px-2 py-1.5 rounded-md text-sm transition-colors",
+                          active
+                            ? "bg-primary text-primary-foreground"
+                            : "text-foreground hover:bg-secondary/50",
+                        ].join(" ")}
+                      >
+                        <span>{p.label}</span>
+                        <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${active ? "bg-primary-foreground/20" : "bg-muted/50 text-muted-foreground"}`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
             <Button size="sm" onClick={handleCreateAccount}>
               <Plus className="h-4 w-4" />
               <span className="ml-1">Nova Conta</span>
             </Button>
           </div>
-        </div>
-
-        {/* Filter pills */}
-        <div className="flex flex-wrap gap-1.5">
-          {FILTER_PILLS.map((p) => {
-            const active = activePill === p.key;
-            const count = pillCounts[p.key] ?? 0;
-            return (
-              <button
-                key={p.key}
-                onClick={() => setActivePill(p.key)}
-                className={[
-                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium border transition-colors",
-                  active
-                    ? "bg-primary text-primary-foreground border-primary/40"
-                    : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-secondary/50",
-                ].join(" ")}
-              >
-                {p.label}
-                <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${active ? "bg-primary-foreground/15" : "bg-muted/50"}`}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
         </div>
 
         {/* Search + Client filter */}
