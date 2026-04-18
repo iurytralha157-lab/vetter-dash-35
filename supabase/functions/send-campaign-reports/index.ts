@@ -61,6 +61,33 @@ function yesterdayInSaoPaulo(): string {
   return `${y}-${m}-${d}`;
 }
 
+function nowInSaoPaulo(): Date {
+  const now = new Date();
+  return new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+}
+
+function isMondayInSaoPaulo(): boolean {
+  return nowInSaoPaulo().getDay() === 1; // 0=domingo, 1=segunda
+}
+
+function lastWeekRangeSaoPaulo(): { start: string; end: string } {
+  // Segunda a domingo da semana anterior, no fuso BRT
+  const sp = nowInSaoPaulo();
+  const dow = sp.getDay(); // 1 = segunda
+  // Domingo passado = hoje (segunda) - 1 dia
+  const sunday = new Date(sp);
+  sunday.setDate(sp.getDate() - (dow === 0 ? 7 : dow));
+  const monday = new Date(sunday);
+  monday.setDate(sunday.getDate() - 6);
+  const fmt = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  return { start: fmt(monday), end: fmt(sunday) };
+}
+
 function todayInSaoPaulo(): string {
   const now = new Date();
   const sp = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
