@@ -45,6 +45,7 @@ export function AppSidebar({
   const [orgName, setOrgName] = useState<string | null>(null);
   
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { role } = useUserRole();
   const { logoUrl: systemLogoUrl, faviconUrl: systemFaviconUrl, name: systemName, logoSize: systemLogoSize } = useSystemBranding();
