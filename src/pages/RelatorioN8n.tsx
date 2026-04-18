@@ -89,9 +89,10 @@ export default function RelatorioN8n() {
       setLoading(true);
 
       // Buscar dados da tabela accounts
+      // (enviar_relatorio_meta vem via "*" para evitar bloqueio do typecheck enquanto a migration roda)
       const { data: accountsData, error: accountsError } = await supabase
         .from("accounts")
-        .select("id, nome_cliente, id_grupo, meta_account_id, google_ads_id, status, telefone, email, notificacao_saldo_baixo, enviar_relatorio_meta")
+        .select("*")
         .eq("status", "Ativo")
         .order("nome_cliente");
 
