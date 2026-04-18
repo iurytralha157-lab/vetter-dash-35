@@ -342,36 +342,6 @@ export default function ClientesReformulada() {
 
                   <h1 className="text-2xl md:text-3xl font-bold tracking-tight mt-3">Clientes</h1>
 
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {FILTER_PILLS.map((p) => {
-                      const active = filterStatus === p.key;
-                      const badgeCount = (counts as any)[p.key] ?? 0;
-
-                      return (
-                        <button
-                          key={p.key}
-                          onClick={() => setFilterStatus(p.key)}
-                          className={[
-                            "group inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm border transition",
-                            "shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
-                            active
-                              ? "bg-primary text-primary-foreground border-primary/40"
-                              : "bg-background/30 text-muted-foreground border-border/60 hover:text-foreground hover:bg-background/40",
-                          ].join(" ")}
-                        >
-                          <span>{p.label}</span>
-                          <span
-                            className={[
-                              "text-xs rounded-full px-2 py-0.5 transition",
-                              active ? "bg-primary-foreground/15" : "bg-muted/30 group-hover:bg-muted/40",
-                            ].join(" ")}
-                          >
-                            {badgeCount}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -379,6 +349,45 @@ export default function ClientesReformulada() {
                     <RefreshCw className="h-4 w-4" />
                     Atualizar
                   </Button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="gap-2 relative">
+                        <Filter className="h-4 w-4" />
+                        Filtrar
+                        {filterStatus !== "todos" && (
+                          <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary" />
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-56 p-2">
+                      <p className="text-xs font-medium text-muted-foreground px-2 py-1.5">
+                        Filtrar clientes
+                      </p>
+                      <div className="flex flex-col gap-1">
+                        {FILTER_PILLS.map((p) => {
+                          const active = filterStatus === p.key;
+                          const badgeCount = (counts as any)[p.key] ?? 0;
+                          return (
+                            <button
+                              key={p.key}
+                              onClick={() => setFilterStatus(p.key)}
+                              className={[
+                                "flex items-center justify-between w-full px-2 py-1.5 rounded-md text-sm transition-colors",
+                                active
+                                  ? "bg-primary text-primary-foreground"
+                                  : "text-foreground hover:bg-secondary/50",
+                              ].join(" ")}
+                            >
+                              <span>{p.label}</span>
+                              <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${active ? "bg-primary-foreground/20" : "bg-muted/50 text-muted-foreground"}`}>
+                                {badgeCount}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                   <Button onClick={() => setShowCreateModal(true)} className="gap-2">
                     <Plus className="h-4 w-4" />
                     Novo Cliente
