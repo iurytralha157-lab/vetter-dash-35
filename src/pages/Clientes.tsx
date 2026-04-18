@@ -27,7 +27,9 @@ import {
   Play,
   Sparkles,
   ShieldCheck,
+  Filter,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
