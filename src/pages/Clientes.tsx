@@ -330,16 +330,6 @@ export default function ClientesReformulada() {
 
               <div className="relative px-6 py-7 md:px-8 md:py-8 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
                 <div className="max-w-3xl">
-                  <div className="inline-flex items-center gap-2 text-xs text-muted-foreground border border-border/60 bg-background/30 px-3 py-1.5 rounded-full">
-                    <Sparkles className="h-3.5 w-3.5 text-primary" />
-                    Visão geral da base
-                    <span className="text-[10px] opacity-70">•</span>
-                    <span className="inline-flex items-center gap-1">
-                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" />
-                      Status e integrações
-                    </span>
-                  </div>
-
                   <h1 className="text-2xl md:text-3xl font-bold tracking-tight mt-3">Clientes</h1>
 
                 </div>
