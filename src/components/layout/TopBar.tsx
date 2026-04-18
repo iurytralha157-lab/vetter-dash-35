@@ -243,40 +243,6 @@ export function TopBar() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* User Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="flex items-center gap-2 px-3 hover:bg-dark-700 transition-all duration-200"
-              >
-                <div className="text-right">
-                  <p className="text-sm font-medium text-foreground">
-                    {profileName}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {profileEmail ? profileEmail : "Conta"}
-                  </p>
-                </div>
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent align="end" className="w-56 shadow-xl bg-dark-800 border-border/50">
-              <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-border/50" />
-              <DropdownMenuItem className="hover:bg-dark-700" onClick={() => navigate('/configuracoes')}>
-                Perfil
-              </DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-dark-700" onClick={() => navigate('/configuracoes')}>
-                Configurações
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-border/50" />
-              <DropdownMenuItem className="text-destructive hover:bg-destructive/10" onClick={handleLogout}>
-                Sair
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </header>
 
