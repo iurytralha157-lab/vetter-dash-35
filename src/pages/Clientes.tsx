@@ -411,18 +411,6 @@ export default function ClientesReformulada() {
                   className="pl-10 h-11 rounded-xl bg-background/40 border-border/60 focus-visible:ring-primary/30"
                 />
               </div>
-
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-full lg:w-[240px] h-11 rounded-xl bg-background/40 border-border/60">
-                  <SelectValue placeholder="Filtrar por status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os Status</SelectItem>
-                  <SelectItem value="Ativo">Ativos</SelectItem>
-                  <SelectItem value="Pausado">Pausados</SelectItem>
-                  <SelectItem value="Aguardando confirmação">Aguardando</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </CardContent>
         </Card>
