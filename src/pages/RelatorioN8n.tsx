@@ -880,15 +880,27 @@ export default function RelatorioN8n() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
                               className="gap-2"
+                              onClick={() => handlePreview(client.id, client.nome_cliente)}
+                              disabled={previewLoading === client.id || !metaConfigured}
+                            >
+                              {previewLoading === client.id ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                              {previewLoading === client.id ? "Carregando..." : "Pré-visualizar"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="gap-2"
                               onClick={() => handleSendReport(client.id, client.nome_cliente)}
-                              disabled={sendingReport === client.id}
+                              disabled={sendingReport === client.id || !metaConfigured}
                             >
                               {sendingReport === client.id ? (
                                 <RefreshCw className="h-4 w-4 animate-spin" />
                               ) : (
                                 <Zap className="h-4 w-4" />
                               )}
-                              {sendingReport === client.id ? "Enviando..." : "Enviar agora"}
+                              {sendingReport === client.id ? "Disparando..." : "Disparar agora"}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
