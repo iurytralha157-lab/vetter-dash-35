@@ -288,12 +288,102 @@ export function AppSidebar({
           </div>
         </nav>
 
-        {/* Footer com User Info (Dropdown: Perfil, Configurações, Sair) */}
+        {/* Footer com Notificações + User Info (Dropdown: Perfil, Configurações, Sair) */}
         <div className={`
           border-t border-border/50 bg-dark-800/50
           transition-all duration-500 ease-in-out
-          ${isCollapsed ? 'p-2' : 'p-3'}
+          ${isCollapsed ? 'p-2 space-y-2' : 'p-3 space-y-2'}
         `}>
+          {/* Notifications */}
+          <div className={isCollapsed ? 'flex justify-center' : 'flex justify-end'}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative h-9 w-9 hover:bg-dark-700 transition-all duration-200 hover:scale-105"
+                >
+                  <Bell className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs"
+                    >
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </Badge>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                side={isCollapsed ? 'right' : 'top'}
+                align={isCollapsed ? 'start' : 'end'}
+                sideOffset={12}
+                className="w-96 shadow-xl bg-dark-800 border-border/50"
+              >
+                <DropdownMenuLabel className="flex items-center justify-between">
+                  <span>Notificações</span>
+                  {unreadCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs text-primary hover:text-primary/80"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        markAllAsRead();
+                      }}
+                    >
+                      <Check className="h-3 w-3 mr-1" />
+                      Marcar todas como lidas
+                    </Button>
+                  )}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-border/50" />
+                <div className="max-h-96 overflow-y-auto scrollbar-thin">
+                  {notificationsLoading ? (
+                    <div className="p-4 text-sm text-muted-foreground">Carregando...</div>
+                  ) : notifications.length === 0 ? (
+                    <div className="p-4 text-sm text-muted-foreground text-center">
+                      Nenhuma notificação no momento.
+                    </div>
+                  ) : (
+                    notifications.map((n) => (
+                      <DropdownMenuItem
+                        key={n.id}
+                        className={`flex flex-col items-start p-4 gap-1 hover:bg-dark-700 cursor-pointer ${
+                          !n.is_read ? 'bg-primary/5 border-l-2 border-l-primary' : ''
+                        }`}
+                        onClick={() => navigateToNotification(n)}
+                      >
+                        <div className="flex items-start justify-between w-full gap-2">
+                          <div className="flex items-start gap-2 flex-1">
+                            <span className="text-lg">{getNotificationIcon(n.type)}</span>
+                            <div className="flex-1 min-w-0">
+                              <span className={`text-sm ${!n.is_read ? 'font-semibold' : 'font-medium'} text-foreground`}>
+                                {n.title}
+                              </span>
+                              {n.message && (
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                  {n.message}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          {!n.is_read && (
+                            <div className="h-2 w-2 rounded-full bg-primary shrink-0 mt-1" />
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground ml-7">
+                          {formatNotificationTime(n.created_at)}
+                        </span>
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               {isCollapsed ? (
