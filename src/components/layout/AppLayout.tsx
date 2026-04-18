@@ -31,17 +31,19 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sidebar - Fixa no lado esquerdo */}
+      {/* Sidebar - Fixa no lado esquerdo (desktop) */}
       <AppSidebar />
       
-      {/* TopBar - Fixa no topo, ajustada conforme sidebar */}
-      <TopBar />
+      {/* TopBar - apenas mobile (contém MobileDrawer e notificações) */}
+      <div className="lg:hidden">
+        <TopBar />
+      </div>
       
       {/* Main Content - Ajustado dinamicamente */}
       <main 
         className={`
           transition-all duration-500 ease-in-out min-h-screen
-          lg:pt-16 pt-16
+          lg:pt-0 pt-0
           ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}
         `}
         style={{
