@@ -105,22 +105,29 @@ function buildMessage(params: {
   accountName: string;
   dataDate: string;
   campaign: CampaignInsight;
+  weekly?: { start: string; end: string };
 }): string {
-  const { accountName, dataDate, campaign } = params;
+  const { accountName, dataDate, campaign, weekly } = params;
   const isMessaging = campaign.objective === 'OUTCOME_ENGAGEMENT' || campaign.objective === 'MESSAGES';
   const conversionCount = isMessaging ? campaign.messages : campaign.leads;
   const conversionLabel = isMessaging ? 'Mensagens' : 'Leads';
   const costPer = conversionCount > 0 ? campaign.spend / conversionCount : 0;
 
   const lines: string[] = [];
-  lines.push('📊 *RELATÓRIO DE CAMPANHA*');
-  lines.push(`👤 Conta de Anúncio: ${accountName}`);
-  lines.push(`📅 Data: ${formatDateBR(dataDate)}`);
+  if (weekly) {
+    lines.push('📊 *RELATÓRIO SEMANAL DE CAMPANHA*');
+    lines.push(`👤 Conta de Anúncio: ${accountName}`);
+    lines.push(`📅 Período: ${formatDateBR(weekly.start)} a ${formatDateBR(weekly.end)}`);
+  } else {
+    lines.push('📊 *RELATÓRIO DE CAMPANHA*');
+    lines.push(`👤 Conta de Anúncio: ${accountName}`);
+    lines.push(`📅 Data: ${formatDateBR(dataDate)}`);
+  }
   lines.push('');
   lines.push('🎯 *CAMPANHA:*');
   lines.push(campaign.name);
   lines.push('');
-  lines.push('💰 *INVESTIMENTO & RESULTADOS:*');
+  lines.push(weekly ? '💰 *INVESTIMENTO & RESULTADOS (7 DIAS):*' : '💰 *INVESTIMENTO & RESULTADOS:*');
   lines.push(`• Gasto: R$ ${formatBRL(campaign.spend)}`);
   lines.push(`• ${conversionLabel}: ${formatInt(conversionCount)}`);
   lines.push(`• Custo por ${conversionLabel}: R$ ${formatBRL(costPer)}`);
