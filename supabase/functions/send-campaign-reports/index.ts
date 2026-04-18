@@ -151,10 +151,13 @@ function buildMessage(params: {
   return lines.join('\n');
 }
 
-async function fetchYesterdayCampaigns(metaAccountId: string, accessToken: string, dataDate: string): Promise<CampaignInsight[]> {
+async function fetchCampaignInsights(
+  metaAccountId: string,
+  accessToken: string,
+  range: { type: 'yesterday' } | { type: 'range'; since: string; until: string }
+): Promise<CampaignInsight[]> {
   const formattedAccountId = metaAccountId.startsWith('act_') ? metaAccountId : `act_${metaAccountId}`;
 
-  // 1. Buscar campanhas
   const campaignsUrl = `${META_BASE_URL}/${formattedAccountId}/campaigns?fields=id,name,status,objective&limit=200&access_token=${accessToken}`;
   const campaignsRes = await fetch(campaignsUrl);
   if (!campaignsRes.ok) {
@@ -163,10 +166,13 @@ async function fetchYesterdayCampaigns(metaAccountId: string, accessToken: strin
   const campaignsData = await campaignsRes.json();
   const campaigns = campaignsData.data || [];
 
-  // 2. Buscar insights (yesterday) para cada campanha em paralelo
+  const dateParam = range.type === 'yesterday'
+    ? 'date_preset=yesterday'
+    : `time_range=${encodeURIComponent(JSON.stringify({ since: range.since, until: range.until }))}`;
+
   const insightsPromises = campaigns.map(async (c: any): Promise<CampaignInsight | null> => {
     try {
-      const insightsUrl = `${META_BASE_URL}/${c.id}/insights?fields=spend,reach,clicks,ctr,cpm,actions&date_preset=yesterday&access_token=${accessToken}`;
+      const insightsUrl = `${META_BASE_URL}/${c.id}/insights?fields=spend,reach,clicks,ctr,cpm,actions&${dateParam}&access_token=${accessToken}`;
       const r = await fetch(insightsUrl);
       if (!r.ok) return null;
       const data = await r.json();
