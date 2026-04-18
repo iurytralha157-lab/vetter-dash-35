@@ -215,6 +215,14 @@ export default function RelatorioN8n() {
       const currentStatus = client?.config?.ativo_meta || false;
       const newStatus = !currentStatus;
 
+      // 1. Sincroniza accounts.enviar_relatorio_meta (NOVO sistema interno)
+      const { error: accountErr } = await supabase
+        .from("accounts")
+        .update({ enviar_relatorio_meta: newStatus } as any)
+        .eq("id", clientId);
+      if (accountErr) throw accountErr;
+
+      // 2. Mantém compatibilidade com N8N (relatorio_config.ativo_meta)
       const { data: existingConfig } = await supabase
         .from("relatorio_config")
         .select("id")
@@ -243,6 +251,7 @@ export default function RelatorioN8n() {
           c.id === clientId
             ? {
                 ...c,
+                enviar_relatorio_meta: newStatus,
                 config: {
                   ...c.config,
                   ativo_meta: newStatus,
