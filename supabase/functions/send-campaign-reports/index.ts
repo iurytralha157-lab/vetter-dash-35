@@ -11,6 +11,7 @@ const corsHeaders = {
 
 const META_API_VERSION = 'v21.0';
 const META_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
+const MAX_ACCOUNTS_PER_INVOCATION = 3;
 
 interface CampaignInsight {
   id: string;
@@ -390,6 +391,26 @@ async function findInstanceForGroup(supabase: any, groupJid: string): Promise<st
   return anyInstance?.instance_name || null;
 }
 
+async function triggerNextBatch(params: {
+  supabaseUrl: string;
+  serviceRoleKey: string;
+  body: Record<string, unknown>;
+}): Promise<void> {
+  const response = await fetch(`${params.supabaseUrl.replace(/\/+$/, '')}/functions/v1/send-campaign-reports`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${params.serviceRoleKey}`,
+      apikey: params.serviceRoleKey,
+    },
+    body: JSON.stringify(params.body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to trigger next batch: ${response.status} - ${await response.text()}`);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -418,11 +439,12 @@ Deno.serve(async (req) => {
 
     const targetAccountId: string | undefined = body.account_id;
     const dryRun: boolean = body.dry_run === true;
+    const batchStart = Math.max(0, Number(body.batch_start ?? 0) || 0);
     // Modo: 'daily' | 'weekly' | 'auto' (auto = weekly se segunda, senão daily)
     const requestedMode: 'daily' | 'weekly' | 'auto' = body.mode || 'auto';
     const isWeekly = requestedMode === 'weekly' || (requestedMode === 'auto' && isMondayInSaoPaulo());
 
-    console.log('[send-campaign-reports] Trigger:', body.trigger || 'manual', 'mode:', isWeekly ? 'weekly' : 'daily', 'targetAccount:', targetAccountId, 'dryRun:', dryRun);
+    console.log('[send-campaign-reports] Trigger:', body.trigger || 'manual', 'mode:', isWeekly ? 'weekly' : 'daily', 'targetAccount:', targetAccountId, 'dryRun:', dryRun, 'batchStart:', batchStart);
 
     // 1. Buscar contas elegíveis
     // Fonte de verdade: relatorio_config.ativo_meta (controlado pelo UI)
@@ -450,6 +472,12 @@ Deno.serve(async (req) => {
       (a: any) => activeMetaIds.has(a.id) || a.enviar_relatorio_meta === true
     );
 
+    const accountsToProcess = (targetAccountId || dryRun)
+      ? accounts
+      : accounts.slice(batchStart, batchStart + MAX_ACCOUNTS_PER_INVOCATION);
+    const nextBatchStart = batchStart + accountsToProcess.length;
+    const hasMoreAccounts = !targetAccountId && !dryRun && nextBatchStart < accounts.length;
+
     if (!accounts || accounts.length === 0) {
       return new Response(JSON.stringify({
         success: true,
@@ -465,10 +493,8 @@ Deno.serve(async (req) => {
     const summaries: DispatchSummary[] = [];
     const previewMessages: Array<{ account: string; campaign: string; text: string }> = [];
 
-    // Função que processa todas as contas (pode ser executada em background)
     const processAllAccounts = async () => {
-    // 2. Processar cada conta SEQUENCIALMENTE
-    for (const account of accounts) {
+    for (const account of accountsToProcess) {
       const summary: DispatchSummary = {
         account_id: account.id,
         account_name: account.nome_cliente,
@@ -676,39 +702,43 @@ Deno.serve(async (req) => {
       summaries.push(summary);
     }
 
-    }; // fim processAllAccounts
+    };
 
-    // Modo dry-run: roda síncrono para retornar previews
-    if (dryRun) {
-      await processAllAccounts();
-      return new Response(JSON.stringify({
-        success: true,
-        dry_run: true,
-        mode: isWeekly ? 'weekly' : 'daily',
-        data_date: dataDate,
-        weekly_range: weeklyRange,
-        dispatch_date: dispatchDate,
-        accounts_processed: accounts.length,
-        summaries,
-        preview_messages: previewMessages,
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    await processAllAccounts();
+
+    if (hasMoreAccounts) {
+      console.log(`[send-campaign-reports] Scheduling next batch from index ${nextBatchStart}`);
+      // @ts-ignore - EdgeRuntime é global no Deno Deploy
+      EdgeRuntime.waitUntil(triggerNextBatch({
+        supabaseUrl,
+        serviceRoleKey,
+        body: {
+          ...body,
+          batch_start: nextBatchStart,
+          trigger: body.trigger || 'batch-chain',
+        },
+      }).catch((err) => {
+        console.error('[send-campaign-reports] Failed to schedule next batch:', err);
+      }));
     }
-
-    // Modo real: roda em background para evitar timeout do edge runtime
-    // @ts-ignore - EdgeRuntime é global no Deno Deploy
-    EdgeRuntime.waitUntil(processAllAccounts().catch((err) => {
-      console.error('[send-campaign-reports] Background error:', err);
-    }));
 
     return new Response(JSON.stringify({
       success: true,
-      background: true,
-      message: `Processando ${accounts.length} contas em background. Acompanhe nos logs.`,
+      dry_run: dryRun,
+      background: hasMoreAccounts,
       mode: isWeekly ? 'weekly' : 'daily',
       data_date: dataDate,
       weekly_range: weeklyRange,
       dispatch_date: dispatchDate,
-      accounts_queued: accounts.length,
+      accounts_processed: accountsToProcess.length,
+      accounts_total: accounts.length,
+      remaining_accounts: Math.max(accounts.length - nextBatchStart, 0),
+      next_batch_start: hasMoreAccounts ? nextBatchStart : null,
+      message: hasMoreAccounts
+        ? `Lote processado (${nextBatchStart}/${accounts.length}). O restante continuará automaticamente.`
+        : `Processamento concluído para ${accountsToProcess.length} conta(s).`,
+      summaries,
+      preview_messages: dryRun ? previewMessages : [],
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (e) {
