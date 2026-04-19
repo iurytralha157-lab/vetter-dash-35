@@ -664,8 +664,8 @@ Deno.serve(async (req) => {
             console.error(`[${account.nome_cliente}] Failed campaign ${campaign.name}: ${sendResult.error}`);
           }
 
-          // Pausa 3-5s aleatório entre mensagens
-          const delay = Math.floor(Math.random() * 2000) + 3000;
+          // Pausa 1-2s aleatório entre mensagens
+          const delay = Math.floor(Math.random() * 1000) + 1000;
           await sleep(delay);
         }
       } catch (e) {
