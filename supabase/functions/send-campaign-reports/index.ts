@@ -676,16 +676,39 @@ Deno.serve(async (req) => {
       summaries.push(summary);
     }
 
+    }; // fim processAllAccounts
+
+    // Modo dry-run: roda síncrono para retornar previews
+    if (dryRun) {
+      await processAllAccounts();
+      return new Response(JSON.stringify({
+        success: true,
+        dry_run: true,
+        mode: isWeekly ? 'weekly' : 'daily',
+        data_date: dataDate,
+        weekly_range: weeklyRange,
+        dispatch_date: dispatchDate,
+        accounts_processed: accounts.length,
+        summaries,
+        preview_messages: previewMessages,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Modo real: roda em background para evitar timeout do edge runtime
+    // @ts-ignore - EdgeRuntime é global no Deno Deploy
+    EdgeRuntime.waitUntil(processAllAccounts().catch((err) => {
+      console.error('[send-campaign-reports] Background error:', err);
+    }));
+
     return new Response(JSON.stringify({
       success: true,
-      dry_run: dryRun,
+      background: true,
+      message: `Processando ${accounts.length} contas em background. Acompanhe nos logs.`,
       mode: isWeekly ? 'weekly' : 'daily',
       data_date: dataDate,
       weekly_range: weeklyRange,
       dispatch_date: dispatchDate,
-      accounts_processed: accounts.length,
-      summaries,
-      preview_messages: dryRun ? previewMessages : undefined,
+      accounts_queued: accounts.length,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (e) {
