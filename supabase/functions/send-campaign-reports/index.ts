@@ -465,6 +465,8 @@ Deno.serve(async (req) => {
     const summaries: DispatchSummary[] = [];
     const previewMessages: Array<{ account: string; campaign: string; text: string }> = [];
 
+    // Função que processa todas as contas (pode ser executada em background)
+    const processAllAccounts = async () => {
     // 2. Processar cada conta SEQUENCIALMENTE
     for (const account of accounts) {
       const summary: DispatchSummary = {
