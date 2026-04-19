@@ -422,6 +422,7 @@ export default function RelatorioN8n() {
     }
   };
 
+  const handlePreview = async (clientId: string, clientName: string) => {
     try {
       setPreviewLoading(clientId);
       // Para preview, força ignorar o toggle: temporariamente liga + chama dry_run + desliga (não — só chamamos com account_id e dry_run; precisa estar marcado)
