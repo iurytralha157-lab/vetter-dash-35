@@ -29,6 +29,7 @@ import {
   Facebook,
   Wallet,
   Eye,
+  Send,
 } from "lucide-react";
 import { updateAccount } from "@/services/accountsService";
 import {
@@ -77,6 +78,7 @@ export default function RelatorioN8n() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [sendingReport, setSendingReport] = useState<string | null>(null);
+  const [sendingAll, setSendingAll] = useState(false);
   const [previewLoading, setPreviewLoading] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewMessages, setPreviewMessages] = useState<PreviewMessage[]>([]);
@@ -394,6 +396,32 @@ export default function RelatorioN8n() {
     }
   };
 
+  const handleSendAllReports = async () => {
+    try {
+      setSendingAll(true);
+      toast({ title: "Disparando relatórios...", description: "Aguarde, isso pode levar alguns minutos" });
+      const { data, error } = await supabase.functions.invoke("send-campaign-reports", {
+        body: { trigger: "manual", time: new Date().toISOString() },
+      });
+      if (error) throw error;
+      const summaries = data?.summaries || [];
+      const totalSent = summaries.reduce((acc: number, s: any) => acc + (s.sent || 0), 0);
+      const totalFailed = summaries.reduce((acc: number, s: any) => acc + (s.failed || 0), 0);
+      const totalSkipped = summaries.reduce((acc: number, s: any) => acc + (s.skipped || 0), 0);
+      toast({
+        title: totalFailed > 0 ? "Concluído com erros" : "Disparo concluído!",
+        description: `${summaries.length} conta(s) processada(s) — ${totalSent} enviada(s), ${totalFailed} falha(s), ${totalSkipped} já enviada(s)`,
+        variant: totalFailed > 0 ? "destructive" : "default",
+      });
+      await loadClientsData();
+    } catch (e: any) {
+      console.error("Erro no disparo manual:", e);
+      toast({ title: "Erro", description: e.message || "Falha ao disparar", variant: "destructive" });
+    } finally {
+      setSendingAll(false);
+    }
+  };
+
   const handlePreview = async (clientId: string, clientName: string) => {
     try {
       setPreviewLoading(clientId);
@@ -664,6 +692,16 @@ export default function RelatorioN8n() {
               >
                 {allGoogleInactive ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
                 {allGoogleInactive ? "Ativar Google" : "Desativar Google"}
+              </Button>
+              <Button 
+                variant="default"
+                className="gap-2"
+                onClick={handleSendAllReports}
+                disabled={sendingAll}
+                aria-label="Disparar relatórios agora"
+              >
+                {sendingAll ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {sendingAll ? "Disparando..." : "Disparar Agora"}
               </Button>
               <Button variant="outline" className="gap-2" onClick={() => loadClientsData()} aria-label="Atualizar">
                 <RefreshCw className="h-4 w-4" />
