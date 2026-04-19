@@ -29,6 +29,7 @@ import {
   Facebook,
   Wallet,
   Eye,
+  Send,
 } from "lucide-react";
 import { updateAccount } from "@/services/accountsService";
 import {
