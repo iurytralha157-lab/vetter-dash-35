@@ -396,7 +396,32 @@ export default function RelatorioN8n() {
     }
   };
 
-  const handlePreview = async (clientId: string, clientName: string) => {
+  const handleSendAllReports = async () => {
+    try {
+      setSendingAll(true);
+      toast({ title: "Disparando relatórios...", description: "Aguarde, isso pode levar alguns minutos" });
+      const { data, error } = await supabase.functions.invoke("send-campaign-reports", {
+        body: { trigger: "manual", time: new Date().toISOString() },
+      });
+      if (error) throw error;
+      const summaries = data?.summaries || [];
+      const totalSent = summaries.reduce((acc: number, s: any) => acc + (s.sent || 0), 0);
+      const totalFailed = summaries.reduce((acc: number, s: any) => acc + (s.failed || 0), 0);
+      const totalSkipped = summaries.reduce((acc: number, s: any) => acc + (s.skipped || 0), 0);
+      toast({
+        title: totalFailed > 0 ? "Concluído com erros" : "Disparo concluído!",
+        description: `${summaries.length} conta(s) processada(s) — ${totalSent} enviada(s), ${totalFailed} falha(s), ${totalSkipped} já enviada(s)`,
+        variant: totalFailed > 0 ? "destructive" : "default",
+      });
+      await loadClientsData();
+    } catch (e: any) {
+      console.error("Erro no disparo manual:", e);
+      toast({ title: "Erro", description: e.message || "Falha ao disparar", variant: "destructive" });
+    } finally {
+      setSendingAll(false);
+    }
+  };
+
     try {
       setPreviewLoading(clientId);
       // Para preview, força ignorar o toggle: temporariamente liga + chama dry_run + desliga (não — só chamamos com account_id e dry_run; precisa estar marcado)
