@@ -348,6 +348,10 @@ async function sendWhatsAppMessage(params: {
   text: string;
 }): Promise<{ ok: boolean; error?: string }> {
   const { evolutionUrl, evolutionKey, instanceName, groupJid, text } = params;
+  // Normaliza o JID: aceita formato "<id>-group" (antigo) ou "<id>@g.us"
+  const normalizedJid = groupJid.includes('@')
+    ? groupJid
+    : groupJid.replace(/-group$/, '') + '@g.us';
   try {
     const res = await fetch(`${evolutionUrl.replace(/\/+$/, '')}/message/sendText/${instanceName}`, {
       method: 'POST',
@@ -355,7 +359,7 @@ async function sendWhatsAppMessage(params: {
         'Content-Type': 'application/json',
         apikey: evolutionKey,
       },
-      body: JSON.stringify({ number: groupJid, text }),
+      body: JSON.stringify({ number: normalizedJid, text }),
     });
     if (!res.ok) {
       return { ok: false, error: `Evolution API ${res.status}: ${await res.text()}` };
@@ -582,13 +586,14 @@ Deno.serve(async (req) => {
         for (const campaign of eligible) {
           const { data: existing } = await supabase
             .from('campaign_report_dispatches')
-            .select('id')
+            .select('id, status')
             .eq('account_id', account.id)
             .eq('campaign_id', campaign.id)
             .eq('dispatch_date', dispatchDate)
             .maybeSingle();
 
-          if (existing && !dryRun) {
+          // Só pula se já foi enviado com sucesso. Se falhou antes, tenta de novo.
+          if (existing && existing.status === 'sent' && !dryRun) {
             console.log(`[${account.nome_cliente}] Campaign ${campaign.name} already dispatched today, skipping`);
             summary.skipped++;
             continue;
