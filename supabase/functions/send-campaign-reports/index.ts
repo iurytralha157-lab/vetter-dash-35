@@ -425,11 +425,11 @@ Deno.serve(async (req) => {
     console.log('[send-campaign-reports] Trigger:', body.trigger || 'manual', 'mode:', isWeekly ? 'weekly' : 'daily', 'targetAccount:', targetAccountId, 'dryRun:', dryRun);
 
     // 1. Buscar contas elegíveis
+    // Fonte de verdade: relatorio_config.ativo_meta (controlado pelo UI)
     let accountsQuery = supabase
       .from('accounts')
       .select('id, nome_cliente, meta_account_id, id_grupo, status, enviar_relatorio_meta')
       .eq('status', 'Ativo')
-      .eq('enviar_relatorio_meta', true)
       .not('meta_account_id', 'is', null)
       .not('id_grupo', 'is', null);
 
@@ -437,8 +437,18 @@ Deno.serve(async (req) => {
       accountsQuery = accountsQuery.eq('id', targetAccountId);
     }
 
-    const { data: accounts, error: accountsError } = await accountsQuery;
+    const { data: allAccounts, error: accountsError } = await accountsQuery;
     if (accountsError) throw new Error(`Failed to load accounts: ${accountsError.message}`);
+
+    // Filtrar apenas as que têm ativo_meta=true OU enviar_relatorio_meta=true (compat)
+    const { data: configs } = await supabase
+      .from('relatorio_config')
+      .select('client_id, ativo_meta');
+    const activeMetaIds = new Set((configs || []).filter((c: any) => c.ativo_meta).map((c: any) => c.client_id));
+
+    const accounts = (allAccounts || []).filter(
+      (a: any) => activeMetaIds.has(a.id) || a.enviar_relatorio_meta === true
+    );
 
     if (!accounts || accounts.length === 0) {
       return new Response(JSON.stringify({
