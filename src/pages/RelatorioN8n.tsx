@@ -693,6 +693,16 @@ export default function RelatorioN8n() {
                 {allGoogleInactive ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
                 {allGoogleInactive ? "Ativar Google" : "Desativar Google"}
               </Button>
+              <Button 
+                variant="default"
+                className="gap-2"
+                onClick={handleSendAllReports}
+                disabled={sendingAll}
+                aria-label="Disparar relatórios agora"
+              >
+                {sendingAll ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {sendingAll ? "Disparando..." : "Disparar Agora"}
+              </Button>
               <Button variant="outline" className="gap-2" onClick={() => loadClientsData()} aria-label="Atualizar">
                 <RefreshCw className="h-4 w-4" />
                 Atualizar
