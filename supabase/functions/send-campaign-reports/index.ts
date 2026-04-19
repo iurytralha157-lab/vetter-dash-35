@@ -582,13 +582,14 @@ Deno.serve(async (req) => {
         for (const campaign of eligible) {
           const { data: existing } = await supabase
             .from('campaign_report_dispatches')
-            .select('id')
+            .select('id, status')
             .eq('account_id', account.id)
             .eq('campaign_id', campaign.id)
             .eq('dispatch_date', dispatchDate)
             .maybeSingle();
 
-          if (existing && !dryRun) {
+          // Só pula se já foi enviado com sucesso. Se falhou antes, tenta de novo.
+          if (existing && existing.status === 'sent' && !dryRun) {
             console.log(`[${account.nome_cliente}] Campaign ${campaign.name} already dispatched today, skipping`);
             summary.skipped++;
             continue;
