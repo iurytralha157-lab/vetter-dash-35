@@ -78,6 +78,7 @@ export default function RelatorioN8n() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [sendingReport, setSendingReport] = useState<string | null>(null);
+  const [sendingAll, setSendingAll] = useState(false);
   const [previewLoading, setPreviewLoading] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewMessages, setPreviewMessages] = useState<PreviewMessage[]>([]);
