@@ -118,11 +118,11 @@ export default function RelatorioN8n() {
         .from("relatorio_config")
         .select("client_id, ativo_meta, ativo_google, horario_disparo, dias_semana");
 
-      // Buscar últimos disparos
+      // Buscar últimos disparos (tabela real onde send-campaign-reports grava)
       const { data: disparosData } = await supabase
-        .from("relatorio_disparos")
-        .select("client_id, data_disparo, status, mensagem_erro")
-        .order("data_disparo", { ascending: false });
+        .from("campaign_report_dispatches")
+        .select("account_id, sent_at, status, error_message")
+        .order("sent_at", { ascending: false });
 
       // Buscar estatísticas de leads
       const { data: leadsStats } = await supabase
@@ -136,7 +136,14 @@ export default function RelatorioN8n() {
       // Processar dados
       const processedClients: ClientReport[] = accountsData.map((account) => {
         const config = configs.find((c: any) => c.client_id === account.id);
-        const ultimoDisparo = disparos.find((d: any) => d.client_id === account.id);
+        const ultimoDisparoRaw = disparos.find((d: any) => d.account_id === account.id);
+        const ultimoDisparo = ultimoDisparoRaw
+          ? {
+              data_disparo: ultimoDisparoRaw.sent_at,
+              status: ultimoDisparoRaw.status,
+              mensagem_erro: ultimoDisparoRaw.error_message,
+            }
+          : null;
         const accountStats = stats.find((s: any) => s.client_id === account.id);
 
         return {
@@ -152,13 +159,13 @@ export default function RelatorioN8n() {
             ? {
                 ativo_meta: config.ativo_meta || false,
                 ativo_google: config.ativo_google || false,
-                horario_disparo: config.horario_disparo || "09:00:00",
+                horario_disparo: config.horario_disparo || "08:00:00",
                 dias_semana: config.dias_semana || [1, 2, 3, 4, 5],
               }
             : {
                 ativo_meta: false,
                 ativo_google: false,
-                horario_disparo: "09:00:00",
+                horario_disparo: "08:00:00",
                 dias_semana: [1, 2, 3, 4, 5],
               },
           ultimo_disparo: ultimoDisparo
@@ -231,7 +238,7 @@ export default function RelatorioN8n() {
             client_id: clientId,
             ativo_meta: newStatus,
             ativo_google: client?.config?.ativo_google || false,
-            horario_disparo: client?.config?.horario_disparo || "09:00:00",
+            horario_disparo: client?.config?.horario_disparo || "08:00:00",
             dias_semana: client?.config?.dias_semana || [1, 2, 3, 4, 5],
             updated_at: now,
           },
@@ -249,7 +256,7 @@ export default function RelatorioN8n() {
                   ...c.config,
                   ativo_meta: newStatus,
                   ativo_google: c.config?.ativo_google || false,
-                  horario_disparo: c.config?.horario_disparo || "09:00:00",
+                  horario_disparo: c.config?.horario_disparo || "08:00:00",
                   dias_semana: c.config?.dias_semana || [1, 2, 3, 4, 5],
                 },
               }
@@ -282,7 +289,7 @@ export default function RelatorioN8n() {
             client_id: clientId,
             ativo_meta: client?.config?.ativo_meta || false,
             ativo_google: newStatus,
-            horario_disparo: client?.config?.horario_disparo || "09:00:00",
+            horario_disparo: client?.config?.horario_disparo || "08:00:00",
             dias_semana: client?.config?.dias_semana || [1, 2, 3, 4, 5],
             updated_at: now,
           },
@@ -300,7 +307,7 @@ export default function RelatorioN8n() {
                   ...c.config,
                   ativo_meta: c.config?.ativo_meta || false,
                   ativo_google: newStatus,
-                  horario_disparo: c.config?.horario_disparo || "09:00:00",
+                  horario_disparo: c.config?.horario_disparo || "08:00:00",
                   dias_semana: c.config?.dias_semana || [1, 2, 3, 4, 5],
                 },
               }
@@ -476,7 +483,7 @@ export default function RelatorioN8n() {
             client_id: client.id,
             ativo_meta: newStatus,
             ativo_google: client.config?.ativo_google || false,
-            horario_disparo: client.config?.horario_disparo || "09:00:00",
+            horario_disparo: client.config?.horario_disparo || "08:00:00",
             dias_semana: client.config?.dias_semana || [1, 2, 3, 4, 5],
             updated_at: now,
           })),
@@ -495,7 +502,7 @@ export default function RelatorioN8n() {
                 ...c.config,
                 ativo_meta: newStatus,
                 ativo_google: c.config?.ativo_google || false,
-                horario_disparo: c.config?.horario_disparo || "09:00:00",
+                horario_disparo: c.config?.horario_disparo || "08:00:00",
                 dias_semana: c.config?.dias_semana || [1, 2, 3, 4, 5],
               },
             };
@@ -543,7 +550,7 @@ export default function RelatorioN8n() {
             client_id: client.id,
             ativo_meta: client.config?.ativo_meta || false,
             ativo_google: newStatus,
-            horario_disparo: client.config?.horario_disparo || "09:00:00",
+            horario_disparo: client.config?.horario_disparo || "08:00:00",
             dias_semana: client.config?.dias_semana || [1, 2, 3, 4, 5],
             updated_at: now,
           })),
@@ -561,7 +568,7 @@ export default function RelatorioN8n() {
                 ...c.config,
                 ativo_meta: c.config?.ativo_meta || false,
                 ativo_google: newStatus,
-                horario_disparo: c.config?.horario_disparo || "09:00:00",
+                horario_disparo: c.config?.horario_disparo || "08:00:00",
                 dias_semana: c.config?.dias_semana || [1, 2, 3, 4, 5],
               },
             };
@@ -858,7 +865,7 @@ export default function RelatorioN8n() {
                         <div className="flex items-center md:justify-end gap-2 text-sm">
                           <Clock className="h-4 w-4 text-text-muted" />
                           <span className="font-medium">
-                            {client.config?.horario_disparo?.slice(0, 5) || "09:00"}
+                            {client.config?.horario_disparo?.slice(0, 5) || "08:00"}
                           </span>
                         </div>
                         <div className="text-xs text-text-tertiary mt-1">
