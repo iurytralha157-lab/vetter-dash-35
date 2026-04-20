@@ -274,9 +274,6 @@ function buildWeeklyAccountMessage(params: {
     lines.push('⚠️ *ATENÇÃO:* Taxa de descarte alta. Vale revisar a segmentação ou qualificação dos leads.');
   }
 
-  lines.push('');
-  lines.push('💬 Como podemos melhorar essa semana?');
-
   return lines.join('\n');
 }
 
