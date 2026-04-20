@@ -216,37 +216,28 @@ export default function RelatorioN8n() {
       const client = clients.find((c) => c.id === clientId);
       const currentStatus = client?.config?.ativo_meta || false;
       const newStatus = !currentStatus;
+      const now = new Date().toISOString();
 
-      // 1. Sincroniza accounts.enviar_relatorio_meta (NOVO sistema interno)
       const { error: accountErr } = await supabase
         .from("accounts")
-        .update({ enviar_relatorio_meta: newStatus } as any)
+        .update({ enviar_relatorio_meta: newStatus, updated_at: now })
         .eq("id", clientId);
       if (accountErr) throw accountErr;
 
-      // 2. Mantém compatibilidade com N8N (relatorio_config.ativo_meta)
-      const { data: existingConfig } = await supabase
+      const { error: configErr } = await supabase
         .from("relatorio_config")
-        .select("id")
-        .eq("client_id", clientId)
-        .maybeSingle();
-
-      if (existingConfig) {
-        const { error } = await supabase
-          .from("relatorio_config")
-          .update({ ativo_meta: newStatus, updated_at: new Date().toISOString() })
-          .eq("client_id", clientId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("relatorio_config").insert({
-          client_id: clientId,
-          ativo_meta: newStatus,
-          ativo_google: false,
-          horario_disparo: "09:00:00",
-          dias_semana: [1, 2, 3, 4, 5],
-        });
-        if (error) throw error;
-      }
+        .upsert(
+          {
+            client_id: clientId,
+            ativo_meta: newStatus,
+            ativo_google: client?.config?.ativo_google || false,
+            horario_disparo: client?.config?.horario_disparo || "09:00:00",
+            dias_semana: client?.config?.dias_semana || [1, 2, 3, 4, 5],
+            updated_at: now,
+          },
+          { onConflict: "client_id" }
+        );
+      if (configErr) throw configErr;
 
       setClients((prev) =>
         prev.map((c) =>
@@ -282,29 +273,23 @@ export default function RelatorioN8n() {
       const client = clients.find((c) => c.id === clientId);
       const currentStatus = client?.config?.ativo_google || false;
       const newStatus = !currentStatus;
+      const now = new Date().toISOString();
 
-      const { data: existingConfig } = await supabase
+      const { error } = await supabase
         .from("relatorio_config")
-        .select("id")
-        .eq("client_id", clientId)
-        .maybeSingle();
+        .upsert(
+          {
+            client_id: clientId,
+            ativo_meta: client?.config?.ativo_meta || false,
+            ativo_google: newStatus,
+            horario_disparo: client?.config?.horario_disparo || "09:00:00",
+            dias_semana: client?.config?.dias_semana || [1, 2, 3, 4, 5],
+            updated_at: now,
+          },
+          { onConflict: "client_id" }
+        );
 
-      if (existingConfig) {
-        const { error } = await supabase
-          .from("relatorio_config")
-          .update({ ativo_google: newStatus, updated_at: new Date().toISOString() })
-          .eq("client_id", clientId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("relatorio_config").insert({
-          client_id: clientId,
-          ativo_meta: false,
-          ativo_google: newStatus,
-          horario_disparo: "09:00:00",
-          dias_semana: [1, 2, 3, 4, 5],
-        });
-        if (error) throw error;
-      }
+      if (error) throw error;
 
       setClients((prev) =>
         prev.map((c) =>
@@ -425,9 +410,10 @@ export default function RelatorioN8n() {
   const handlePreview = async (clientId: string, clientName: string) => {
     try {
       setPreviewLoading(clientId);
-      // Para preview, força ignorar o toggle: temporariamente liga + chama dry_run + desliga (não — só chamamos com account_id e dry_run; precisa estar marcado)
       const client = clients.find((c) => c.id === clientId);
-      if (!client?.enviar_relatorio_meta) {
+      const isMetaEnabled = client?.config?.ativo_meta || client?.enviar_relatorio_meta;
+
+      if (!isMetaEnabled) {
         toast({
           title: "Ative primeiro",
           description: "Ligue o switch Meta para esta conta antes de pré-visualizar",
@@ -460,9 +446,8 @@ export default function RelatorioN8n() {
 
   const handleToggleAllMeta = async () => {
     try {
-      // Filtrar apenas contas que têm Meta configurado
       const clientsWithMeta = clients.filter((c) => c.meta_account_id && String(c.meta_account_id).trim().length > 0);
-      
+
       if (clientsWithMeta.length === 0) {
         toast({ 
           title: "Aviso", 
@@ -472,28 +457,40 @@ export default function RelatorioN8n() {
         return;
       }
 
-      // Verifica se todos os que têm Meta estão desativados
       const allMetaInactive = clientsWithMeta.every((c) => !c.config?.ativo_meta);
       const newStatus = allMetaInactive;
-
+      const now = new Date().toISOString();
       const clientIds = clientsWithMeta.map(c => c.id);
 
-      const { error } = await supabase
-        .from("relatorio_config")
-        .update({ 
-          ativo_meta: newStatus,
-          updated_at: new Date().toISOString() 
-        })
-        .in('client_id', clientIds);
+      const { error: accountError } = await supabase
+        .from("accounts")
+        .update({ enviar_relatorio_meta: newStatus, updated_at: now })
+        .in("id", clientIds);
 
-      if (error) throw error;
+      if (accountError) throw accountError;
+
+      const { error: configError } = await supabase
+        .from("relatorio_config")
+        .upsert(
+          clientsWithMeta.map((client) => ({
+            client_id: client.id,
+            ativo_meta: newStatus,
+            ativo_google: client.config?.ativo_google || false,
+            horario_disparo: client.config?.horario_disparo || "09:00:00",
+            dias_semana: client.config?.dias_semana || [1, 2, 3, 4, 5],
+            updated_at: now,
+          })),
+          { onConflict: "client_id" }
+        );
+
+      if (configError) throw configError;
 
       setClients((prev) =>
         prev.map((c) => {
-          // Só atualiza se a conta tem Meta configurado
           if (clientIds.includes(c.id)) {
             return {
               ...c,
+              enviar_relatorio_meta: newStatus,
               config: {
                 ...c.config,
                 ativo_meta: newStatus,
@@ -523,7 +520,6 @@ export default function RelatorioN8n() {
 
   const handleToggleAllGoogle = async () => {
     try {
-      // Filtrar apenas contas que têm Google configurado
       const clientsWithGoogle = clients.filter((c) => c.google_ads_id && String(c.google_ads_id).trim().length > 0);
       
       if (clientsWithGoogle.length === 0) {
@@ -535,25 +531,29 @@ export default function RelatorioN8n() {
         return;
       }
 
-      // Verifica se todos os que têm Google estão desativados
       const allGoogleInactive = clientsWithGoogle.every((c) => !c.config?.ativo_google);
       const newStatus = allGoogleInactive;
-
+      const now = new Date().toISOString();
       const clientIds = clientsWithGoogle.map(c => c.id);
 
       const { error } = await supabase
         .from("relatorio_config")
-        .update({ 
-          ativo_google: newStatus,
-          updated_at: new Date().toISOString() 
-        })
-        .in('client_id', clientIds);
+        .upsert(
+          clientsWithGoogle.map((client) => ({
+            client_id: client.id,
+            ativo_meta: client.config?.ativo_meta || false,
+            ativo_google: newStatus,
+            horario_disparo: client.config?.horario_disparo || "09:00:00",
+            dias_semana: client.config?.dias_semana || [1, 2, 3, 4, 5],
+            updated_at: now,
+          })),
+          { onConflict: "client_id" }
+        );
 
       if (error) throw error;
 
       setClients((prev) =>
         prev.map((c) => {
-          // Só atualiza se a conta tem Google configurado
           if (clientIds.includes(c.id)) {
             return {
               ...c,
