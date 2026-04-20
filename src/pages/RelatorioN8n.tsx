@@ -118,11 +118,11 @@ export default function RelatorioN8n() {
         .from("relatorio_config")
         .select("client_id, ativo_meta, ativo_google, horario_disparo, dias_semana");
 
-      // Buscar últimos disparos
+      // Buscar últimos disparos (tabela real onde send-campaign-reports grava)
       const { data: disparosData } = await supabase
-        .from("relatorio_disparos")
-        .select("client_id, data_disparo, status, mensagem_erro")
-        .order("data_disparo", { ascending: false });
+        .from("campaign_report_dispatches")
+        .select("account_id, sent_at, status, error_message")
+        .order("sent_at", { ascending: false });
 
       // Buscar estatísticas de leads
       const { data: leadsStats } = await supabase
@@ -136,7 +136,14 @@ export default function RelatorioN8n() {
       // Processar dados
       const processedClients: ClientReport[] = accountsData.map((account) => {
         const config = configs.find((c: any) => c.client_id === account.id);
-        const ultimoDisparo = disparos.find((d: any) => d.client_id === account.id);
+        const ultimoDisparoRaw = disparos.find((d: any) => d.account_id === account.id);
+        const ultimoDisparo = ultimoDisparoRaw
+          ? {
+              data_disparo: ultimoDisparoRaw.sent_at,
+              status: ultimoDisparoRaw.status,
+              mensagem_erro: ultimoDisparoRaw.error_message,
+            }
+          : null;
         const accountStats = stats.find((s: any) => s.client_id === account.id);
 
         return {
