@@ -368,24 +368,12 @@ async function sendWhatsAppMessage(params: {
   }
 }
 
-async function findInstanceForGroup(supabase: any, groupJid: string): Promise<string | null> {
-  // Procura em whatsapp_groups para descobrir qual instância tem este grupo
-  const { data } = await supabase
-    .from('whatsapp_groups')
-    .select('instance_name')
-    .eq('group_jid', groupJid)
-    .limit(1)
-    .maybeSingle();
-  if (data?.instance_name) return data.instance_name;
+// Instância padrão FIXA — todos os disparos automáticos devem sair desta instância
+const DEFAULT_WHATSAPP_INSTANCE = 'nova_cd868_73o';
 
-  // Fallback: pega a primeira instância vinculada
-  const { data: anyInstance } = await supabase
-    .from('whatsapp_instances')
-    .select('instance_name')
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  return anyInstance?.instance_name || null;
+async function findInstanceForGroup(_supabase: any, _groupJid: string): Promise<string | null> {
+  // Sempre usa a instância padrão para todos os disparos
+  return DEFAULT_WHATSAPP_INSTANCE;
 }
 
 async function triggerNextBatch(params: {
