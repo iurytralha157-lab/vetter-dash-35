@@ -562,7 +562,7 @@ async function processCommand(
       responseText = await handleFeedbackReject(account, groupJid, senderJid, senderName, supabase);
     } else if (cmd.startsWith("#feedback")) {
       responseText = await handleFeedback(text, account, groupJid, senderName, senderJid, supabase);
-    } else if (cmd === "#saldo") {
+    } else if (cmd.startsWith("#saldo")) {
       responseText = await handleSaldo(account, supabase);
     } else if (cmd.startsWith("#gasto")) {
       responseText = await handleGasto(text, account, supabase);
