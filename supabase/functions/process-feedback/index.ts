@@ -322,6 +322,7 @@ Deno.serve(async (req) => {
       visita: camp.quantidade_visita,
       proposta: camp.quantidade_proposta,
       venda: camp.quantidade_venda,
+      nao_recebido: camp.quantidade_nao_recebido,
     });
 
     const totais = {
@@ -332,6 +333,7 @@ Deno.serve(async (req) => {
       visita: 0,
       proposta: 0,
       venda: 0,
+      nao_recebido: 0,
     };
 
     const invalidCampaigns: Array<{
@@ -348,17 +350,21 @@ Deno.serve(async (req) => {
       }
 
       if (camp.quantidade_recebida != null && camp.quantidade_recebida > 0) {
+        // Sum includes "não recebido" (gap entre Meta e WhatsApp)
         let subStagesSum =
           (camp.quantidade_descartado || 0) +
           (camp.quantidade_atendimento || 0) +
           (camp.quantidade_passou_corretor || 0) +
           (camp.quantidade_visita || 0) +
           (camp.quantidade_proposta || 0) +
-          (camp.quantidade_venda || 0);
+          (camp.quantidade_venda || 0) +
+          (camp.quantidade_nao_recebido || 0);
 
+        // Auto-fill gap as "não recebido" when funil é menor que recebidos
+        // (lead que o Meta registrou mas não chegou no WhatsApp)
         if (subStagesSum < camp.quantidade_recebida) {
           const gap = camp.quantidade_recebida - subStagesSum;
-          camp.quantidade_atendimento = (camp.quantidade_atendimento || 0) + gap;
+          camp.quantidade_nao_recebido = (camp.quantidade_nao_recebido || 0) + gap;
           subStagesSum += gap;
         }
 
@@ -378,6 +384,7 @@ Deno.serve(async (req) => {
       totais.visita += camp.quantidade_visita || 0;
       totais.proposta += camp.quantidade_proposta || 0;
       totais.venda += camp.quantidade_venda || 0;
+      totais.nao_recebido += camp.quantidade_nao_recebido || 0;
     }
 
     const totalNoFunil =
@@ -386,7 +393,8 @@ Deno.serve(async (req) => {
       totais.passou_corretor +
       totais.visita +
       totais.proposta +
-      totais.venda;
+      totais.venda +
+      totais.nao_recebido;
 
     // Determine if there are mixed funnel types
     const hasLancamento = campaigns.some(c => (c.tipo_funil || tipoFunil) === "lancamento");
@@ -489,6 +497,7 @@ Deno.serve(async (req) => {
         quantidade_visita: camp.quantidade_visita ?? null,
         quantidade_proposta: camp.quantidade_proposta ?? null,
         quantidade_venda: camp.quantidade_venda ?? null,
+        quantidade_nao_recebido: camp.quantidade_nao_recebido ?? null,
         processamento_status: processamentoStatus,
         processamento_erro: processamentoErro,
         ai_modelo: aiModel,
@@ -545,6 +554,7 @@ interface CampaignData {
   quantidade_visita: number | null;
   quantidade_proposta: number | null;
   quantidade_venda: number | null;
+  quantidade_nao_recebido: number | null;
 }
 
 interface AIResult {
@@ -652,6 +662,7 @@ MAPEAMENTO DE ETAPAS (CRÍTICO — leia com atenção):
 |---|---|
 | "lead recebido", "recebidos", "chegou" | quantidade_recebida |
 | "descartado", "descarte", "lixo" | quantidade_descartado |
+| "não recebido", "não chegou", "não veio mensagem", "não chegou no whatsapp", "lead que não chegou", "perdido na entrega", "sem contato" | quantidade_nao_recebido |
 | "aguardando retorno", "sem resposta", "não respondeu", "atendimento SDR", "em atendimento" (sem mencionar corretor) | quantidade_atendimento |
 | "passou para corretor", "com o corretor", "em atendimento com o corretor", "corretor atendendo", "atendimento corretor" | quantidade_passou_corretor |
 | "visita", "visitou" | quantidade_visita |
@@ -664,8 +675,13 @@ REGRA CRÍTICA sobre "corretor":
 - "atendimento SDR", "aguardando retorno", "sem resposta", "não respondeu" ou apenas "em atendimento" (SEM mencionar corretor) = quantidade_atendimento
 - NUNCA use quantidade_aguardando_retorno. Esse status não existe no funil atual e esse campo deve voltar sempre como null.
 
+REGRA sobre "não recebido" (CRÍTICO para campanhas de WhatsApp):
+- Em campanhas de WhatsApp, às vezes o lead clica no anúncio mas NUNCA envia mensagem para a equipe.
+- Esses leads aparecem no Meta mas não chegam no time. Use quantidade_nao_recebido para registrar isso.
+- Exemplos: "2 não chegaram", "3 não receberam mensagem", "1 lead não veio", "2 não chegaram pra gente".
+
 REGRA sobre leads recebidos:
-- "quantidade_recebida" é o total de leads que chegaram naquela campanha, independente do status posterior.
+- "quantidade_recebida" é o total de leads que o Meta registrou, independente do status posterior (incluindo os que não chegaram via WhatsApp).
 
 REGRA CRÍTICA de valores:
 - Extraia SOMENTE os campos explicitamente mencionados na mensagem.
@@ -674,9 +690,8 @@ REGRA CRÍTICA de valores:
 - Somente retorne um número quando ele estiver explícito na mensagem.
 
 REGRA IMPORTANTE sobre coerência:
-- Se o usuário informou "X leads recebidos" e depois deu o status de cada um, a SOMA dos status deve bater com X.
-- Se a soma dos status informados for MENOR que os leads recebidos, os restantes que NÃO foram identificados devem ser colocados como "Atendimento SDR" (quantidade_atendimento).
-- REGRA DE OURO: tudo que não for explicitamente identificado com uma etapa específica, coloca como Atendimento SDR (quantidade_atendimento).
+- Se o usuário informou "X leads recebidos" e depois deu o status de cada um, a SOMA dos status (incluindo quantidade_nao_recebido) deve bater com X.
+- Se a soma dos status informados for MENOR que os leads recebidos, os restantes que NÃO foram identificados devem ser colocados como "Atendimento SDR" (quantidade_atendimento), A NÃO SER que o usuário tenha mencionado explicitamente "não recebido" / "não chegou" — nesse caso use quantidade_nao_recebido.
 - Se a soma do funil ficar MAIOR que os leads recebidos, isso é inválido e deve ser corrigido.
 - Se nenhum campo "leads recebidos" for informado explicitamente, NÃO invente — retorne null.
 
@@ -750,6 +765,7 @@ Retorne usando a tool extract_feedback_campaigns.`;
                       quantidade_visita: { type: ["integer", "null"], description: "Visitas. null se não mencionado." },
                       quantidade_proposta: { type: ["integer", "null"], description: "Propostas. null se não mencionado." },
                       quantidade_venda: { type: ["integer", "null"], description: "Vendas. null se não mencionado." },
+                      quantidade_nao_recebido: { type: ["integer", "null"], description: "Leads que o Meta registrou mas não chegaram via WhatsApp (ex: 'não chegou', 'não veio mensagem', 'não recebido'). null se não mencionado." },
                     },
                     required: ["campanha_nome"],
                   },

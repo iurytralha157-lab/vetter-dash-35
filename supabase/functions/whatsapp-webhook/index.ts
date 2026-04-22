@@ -767,16 +767,18 @@ async function handleFeedback(
       invalidMsg += `• Proposta: *${totals.proposta || 0}*\n`;
       invalidMsg += `• Venda: *${totals.venda || 0}*\n`;
       invalidMsg += `• Descartado: *${totals.descartado || 0}*\n`;
+      invalidMsg += `• Não recebidos (não chegaram via WhatsApp): *${totals.nao_recebido || 0}*\n`;
 
       if (feedbackResult.campanhas && Array.isArray(feedbackResult.campanhas)) {
         invalidMsg += `\n📌 *Por campanha:*\n`;
         for (const c of feedbackResult.campanhas) {
-          const noFunil = (c.descartado || 0) + (c.atendimento || 0) + (c.passou_corretor || 0) + (c.visita || 0) + (c.proposta || 0) + (c.venda || 0);
+          const noFunil = (c.descartado || 0) + (c.atendimento || 0) + (c.passou_corretor || 0) + (c.visita || 0) + (c.proposta || 0) + (c.venda || 0) + (c.nao_recebido || 0);
           invalidMsg += `• ${c.nome}: recebidos *${c.recebidos || 0}* / no funil *${noFunil}*\n`;
         }
       }
 
       invalidMsg += `\n❓ *Se teve ${totals.recebidos || 0} recebidos, o funil abaixo também precisa fechar ${totals.recebidos || 0}.*\n`;
+      invalidMsg += `💡 _Dica: se algum lead clicou no anúncio mas não enviou mensagem, informe como "não recebido" ou "não chegou"._\n`;
       invalidMsg += `Revise e envie novamente com a distribuição correta.`;
       return invalidMsg;
     }
