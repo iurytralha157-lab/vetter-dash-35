@@ -765,6 +765,7 @@ Retorne usando a tool extract_feedback_campaigns.`;
                       quantidade_visita: { type: ["integer", "null"], description: "Visitas. null se não mencionado." },
                       quantidade_proposta: { type: ["integer", "null"], description: "Propostas. null se não mencionado." },
                       quantidade_venda: { type: ["integer", "null"], description: "Vendas. null se não mencionado." },
+                      quantidade_nao_recebido: { type: ["integer", "null"], description: "Leads que o Meta registrou mas não chegaram via WhatsApp (ex: 'não chegou', 'não veio mensagem', 'não recebido'). null se não mencionado." },
                     },
                     required: ["campanha_nome"],
                   },
