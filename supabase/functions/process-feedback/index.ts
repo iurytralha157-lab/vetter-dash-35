@@ -348,17 +348,21 @@ Deno.serve(async (req) => {
       }
 
       if (camp.quantidade_recebida != null && camp.quantidade_recebida > 0) {
+        // Sum includes "não recebido" (gap entre Meta e WhatsApp)
         let subStagesSum =
           (camp.quantidade_descartado || 0) +
           (camp.quantidade_atendimento || 0) +
           (camp.quantidade_passou_corretor || 0) +
           (camp.quantidade_visita || 0) +
           (camp.quantidade_proposta || 0) +
-          (camp.quantidade_venda || 0);
+          (camp.quantidade_venda || 0) +
+          (camp.quantidade_nao_recebido || 0);
 
+        // Auto-fill gap as "não recebido" when funil é menor que recebidos
+        // (lead que o Meta registrou mas não chegou no WhatsApp)
         if (subStagesSum < camp.quantidade_recebida) {
           const gap = camp.quantidade_recebida - subStagesSum;
-          camp.quantidade_atendimento = (camp.quantidade_atendimento || 0) + gap;
+          camp.quantidade_nao_recebido = (camp.quantidade_nao_recebido || 0) + gap;
           subStagesSum += gap;
         }
 
@@ -378,6 +382,7 @@ Deno.serve(async (req) => {
       totais.visita += camp.quantidade_visita || 0;
       totais.proposta += camp.quantidade_proposta || 0;
       totais.venda += camp.quantidade_venda || 0;
+      totais.nao_recebido += camp.quantidade_nao_recebido || 0;
     }
 
     const totalNoFunil =
@@ -386,7 +391,8 @@ Deno.serve(async (req) => {
       totais.passou_corretor +
       totais.visita +
       totais.proposta +
-      totais.venda;
+      totais.venda +
+      totais.nao_recebido;
 
     // Determine if there are mixed funnel types
     const hasLancamento = campaigns.some(c => (c.tipo_funil || tipoFunil) === "lancamento");
