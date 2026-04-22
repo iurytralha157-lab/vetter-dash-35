@@ -553,6 +553,7 @@ interface CampaignData {
   quantidade_visita: number | null;
   quantidade_proposta: number | null;
   quantidade_venda: number | null;
+  quantidade_nao_recebido: number | null;
 }
 
 interface AIResult {
