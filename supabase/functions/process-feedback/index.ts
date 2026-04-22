@@ -322,6 +322,7 @@ Deno.serve(async (req) => {
       visita: camp.quantidade_visita,
       proposta: camp.quantidade_proposta,
       venda: camp.quantidade_venda,
+      nao_recebido: camp.quantidade_nao_recebido,
     });
 
     const totais = {
