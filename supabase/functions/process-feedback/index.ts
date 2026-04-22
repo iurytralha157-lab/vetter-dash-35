@@ -332,6 +332,7 @@ Deno.serve(async (req) => {
       visita: 0,
       proposta: 0,
       venda: 0,
+      nao_recebido: 0,
     };
 
     const invalidCampaigns: Array<{
