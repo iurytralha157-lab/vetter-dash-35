@@ -662,6 +662,7 @@ MAPEAMENTO DE ETAPAS (CRÍTICO — leia com atenção):
 |---|---|
 | "lead recebido", "recebidos", "chegou" | quantidade_recebida |
 | "descartado", "descarte", "lixo" | quantidade_descartado |
+| "não recebido", "não chegou", "não veio mensagem", "não chegou no whatsapp", "lead que não chegou", "perdido na entrega", "sem contato" | quantidade_nao_recebido |
 | "aguardando retorno", "sem resposta", "não respondeu", "atendimento SDR", "em atendimento" (sem mencionar corretor) | quantidade_atendimento |
 | "passou para corretor", "com o corretor", "em atendimento com o corretor", "corretor atendendo", "atendimento corretor" | quantidade_passou_corretor |
 | "visita", "visitou" | quantidade_visita |
@@ -674,8 +675,13 @@ REGRA CRÍTICA sobre "corretor":
 - "atendimento SDR", "aguardando retorno", "sem resposta", "não respondeu" ou apenas "em atendimento" (SEM mencionar corretor) = quantidade_atendimento
 - NUNCA use quantidade_aguardando_retorno. Esse status não existe no funil atual e esse campo deve voltar sempre como null.
 
+REGRA sobre "não recebido" (CRÍTICO para campanhas de WhatsApp):
+- Em campanhas de WhatsApp, às vezes o lead clica no anúncio mas NUNCA envia mensagem para a equipe.
+- Esses leads aparecem no Meta mas não chegam no time. Use quantidade_nao_recebido para registrar isso.
+- Exemplos: "2 não chegaram", "3 não receberam mensagem", "1 lead não veio", "2 não chegaram pra gente".
+
 REGRA sobre leads recebidos:
-- "quantidade_recebida" é o total de leads que chegaram naquela campanha, independente do status posterior.
+- "quantidade_recebida" é o total de leads que o Meta registrou, independente do status posterior (incluindo os que não chegaram via WhatsApp).
 
 REGRA CRÍTICA de valores:
 - Extraia SOMENTE os campos explicitamente mencionados na mensagem.
@@ -684,9 +690,8 @@ REGRA CRÍTICA de valores:
 - Somente retorne um número quando ele estiver explícito na mensagem.
 
 REGRA IMPORTANTE sobre coerência:
-- Se o usuário informou "X leads recebidos" e depois deu o status de cada um, a SOMA dos status deve bater com X.
-- Se a soma dos status informados for MENOR que os leads recebidos, os restantes que NÃO foram identificados devem ser colocados como "Atendimento SDR" (quantidade_atendimento).
-- REGRA DE OURO: tudo que não for explicitamente identificado com uma etapa específica, coloca como Atendimento SDR (quantidade_atendimento).
+- Se o usuário informou "X leads recebidos" e depois deu o status de cada um, a SOMA dos status (incluindo quantidade_nao_recebido) deve bater com X.
+- Se a soma dos status informados for MENOR que os leads recebidos, os restantes que NÃO foram identificados devem ser colocados como "Atendimento SDR" (quantidade_atendimento), A NÃO SER que o usuário tenha mencionado explicitamente "não recebido" / "não chegou" — nesse caso use quantidade_nao_recebido.
 - Se a soma do funil ficar MAIOR que os leads recebidos, isso é inválido e deve ser corrigido.
 - Se nenhum campo "leads recebidos" for informado explicitamente, NÃO invente — retorne null.
 
