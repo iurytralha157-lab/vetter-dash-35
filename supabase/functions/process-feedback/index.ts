@@ -497,6 +497,7 @@ Deno.serve(async (req) => {
         quantidade_visita: camp.quantidade_visita ?? null,
         quantidade_proposta: camp.quantidade_proposta ?? null,
         quantidade_venda: camp.quantidade_venda ?? null,
+        quantidade_nao_recebido: camp.quantidade_nao_recebido ?? null,
         processamento_status: processamentoStatus,
         processamento_erro: processamentoErro,
         ai_modelo: aiModel,
