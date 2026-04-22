@@ -1763,6 +1763,7 @@ export type Database = {
           quantidade_aguardando_retorno: number | null
           quantidade_atendimento: number | null
           quantidade_descartado: number | null
+          quantidade_nao_recebido: number | null
           quantidade_passou_corretor: number | null
           quantidade_proposta: number | null
           quantidade_recebida: number | null
@@ -1792,6 +1793,7 @@ export type Database = {
           quantidade_aguardando_retorno?: number | null
           quantidade_atendimento?: number | null
           quantidade_descartado?: number | null
+          quantidade_nao_recebido?: number | null
           quantidade_passou_corretor?: number | null
           quantidade_proposta?: number | null
           quantidade_recebida?: number | null
@@ -1821,6 +1823,7 @@ export type Database = {
           quantidade_aguardando_retorno?: number | null
           quantidade_atendimento?: number | null
           quantidade_descartado?: number | null
+          quantidade_nao_recebido?: number | null
           quantidade_passou_corretor?: number | null
           quantidade_proposta?: number | null
           quantidade_recebida?: number | null
