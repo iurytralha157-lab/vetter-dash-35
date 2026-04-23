@@ -2324,10 +2324,6 @@ function formatNumber(value: number): string {
   return value.toLocaleString("pt-BR");
 }
 
-function formatDateBR(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-");
-  return `${d}/${m}/${y}`;
-}
 
 // ─── Follow-up Handler (isolated module) ───
 
