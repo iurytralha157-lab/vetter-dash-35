@@ -325,6 +325,9 @@ export function ModernAccountForm({
                                   </Button>
                                 </FormControl>
                               </PopoverTrigger>
+                              <FormDescription className="text-[10px] leading-tight text-muted-foreground mt-1">
+                                Se houver mais de uma conta vinculada ao mesmo grupo, o bot pedirá a confirmação do nome da conta no WhatsApp.
+                              </FormDescription>
                               <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                                 <Command>
                                   <CommandInput placeholder="Buscar grupo pelo nome..." />
