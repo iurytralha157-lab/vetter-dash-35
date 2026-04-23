@@ -1037,8 +1037,8 @@ async function handleFeedbackConfirm(
     const dataInicio = feedbackResult.data_inicio;
     const dataFim = feedbackResult.data_fim;
     const periodLabel = dataInicio === dataFim
-      ? dataInicio.split('-').reverse().join('/')
-      : `${dataInicio.split('-').reverse().join('/')} a ${dataFim.split('-').reverse().join('/')}`;
+      ? formatDateBR(dataInicio)
+      : `${formatDateBR(dataInicio)} a ${formatDateBR(dataFim)}`;
 
     let msg = `✅ *Feedback registrado com sucesso!*\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
