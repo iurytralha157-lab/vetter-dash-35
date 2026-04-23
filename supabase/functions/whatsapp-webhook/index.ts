@@ -819,8 +819,8 @@ async function handleFeedback(
       }
 
       const periodLabel = feedbackResult.data_inicio === feedbackResult.data_fim
-        ? feedbackResult.data_inicio.split('-').reverse().join('/')
-        : `${feedbackResult.data_inicio.split('-').reverse().join('/')} a ${feedbackResult.data_fim.split('-').reverse().join('/')}`;
+        ? formatDateBR(feedbackResult.data_inicio)
+        : `${formatDateBR(feedbackResult.data_inicio)} a ${formatDateBR(feedbackResult.data_fim)}`;
 
       let existingMsg = `⚠️ *Já existe feedback para ${periodLabel}!*\n\n`;
       existingMsg += `📊 *Dados atuais no funil:*\n`;
