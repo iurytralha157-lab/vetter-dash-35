@@ -371,7 +371,7 @@ Responda APENAS com o comando em hashtag ou IGNORAR. Nada mais.`,
           `${i + 1}. *${a.nome_cliente}*`
         ).join("\n");
         
-        const helpMsg = `📋 *Este grupo tem ${multipleAccounts.length} contas vinculadas:*\n\n${accountList}\n\n📝 Envie o comando assim:\n*${cmdLine}*\n*NOME_DA_CONTA*\n\nExemplo:\n*${cmdLine}*\n*${multipleAccounts[0].nome_cliente}*`;
+        const helpMsg = `📋 *Este grupo tem ${multipleAccounts.length} contas vinculadas:*\n\n${accountList}\n\n📝 *Identificação Necessária:*\nComo este grupo possui mais de uma conta, envie o comando seguido do nome da conta em uma nova linha.\n\nExemplo:\n*${cmdLine}*\n*${multipleAccounts[0].nome_cliente}*`;
         
         await sendEvolutionMessage(evolutionUrl, evolutionKey, instanceName, remoteJid, helpMsg);
         return new Response(JSON.stringify({ success: true, multiple_accounts: true }), {
