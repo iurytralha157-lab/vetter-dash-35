@@ -9,6 +9,17 @@ function normalizeSenderValue(value: string | null | undefined): string {
   return (value || "").trim().toLowerCase();
 }
 
+function formatDateBR(dateStr: string | null | undefined): string {
+  if (!dateStr) return "N/A";
+  try {
+    const parts = dateStr.split("-");
+    if (parts.length !== 3) return dateStr;
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  } catch (e) {
+    return dateStr || "N/A";
+  }
+}
+
 function getSenderJid(key: any): string {
   return key?.participantAlt || key?.participant || "";
 }
