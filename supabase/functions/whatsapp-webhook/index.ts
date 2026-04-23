@@ -9,6 +9,17 @@ function normalizeSenderValue(value: string | null | undefined): string {
   return (value || "").trim().toLowerCase();
 }
 
+function formatDateBR(dateStr: string | null | undefined): string {
+  if (!dateStr) return "N/A";
+  try {
+    const parts = dateStr.split("-");
+    if (parts.length !== 3) return dateStr;
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  } catch (e) {
+    return dateStr || "N/A";
+  }
+}
+
 function getSenderJid(key: any): string {
   return key?.participantAlt || key?.participant || "";
 }
@@ -808,8 +819,8 @@ async function handleFeedback(
       }
 
       const periodLabel = feedbackResult.data_inicio === feedbackResult.data_fim
-        ? feedbackResult.data_inicio.split('-').reverse().join('/')
-        : `${feedbackResult.data_inicio.split('-').reverse().join('/')} a ${feedbackResult.data_fim.split('-').reverse().join('/')}`;
+        ? formatDateBR(feedbackResult.data_inicio)
+        : `${formatDateBR(feedbackResult.data_inicio)} a ${formatDateBR(feedbackResult.data_fim)}`;
 
       let existingMsg = `⚠️ *Já existe feedback para ${periodLabel}!*\n\n`;
       existingMsg += `📊 *Dados atuais no funil:*\n`;
@@ -1026,8 +1037,8 @@ async function handleFeedbackConfirm(
     const dataInicio = feedbackResult.data_inicio;
     const dataFim = feedbackResult.data_fim;
     const periodLabel = dataInicio === dataFim
-      ? dataInicio.split('-').reverse().join('/')
-      : `${dataInicio.split('-').reverse().join('/')} a ${dataFim.split('-').reverse().join('/')}`;
+      ? formatDateBR(dataInicio)
+      : `${formatDateBR(dataInicio)} a ${formatDateBR(dataFim)}`;
 
     let msg = `✅ *Feedback registrado com sucesso!*\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -1201,8 +1212,8 @@ async function handleFeedbackUpdate(
     msg += `🏢 Conta: *${account.nome_cliente}*\n`;
 
     const periodLabel = feedbackResult.data_inicio === feedbackResult.data_fim
-      ? feedbackResult.data_inicio?.split('-').reverse().join('/')
-      : `${feedbackResult.data_inicio?.split('-').reverse().join('/')} a ${feedbackResult.data_fim?.split('-').reverse().join('/')}`;
+      ? formatDateBR(feedbackResult.data_inicio)
+      : `${formatDateBR(feedbackResult.data_inicio)} a ${formatDateBR(feedbackResult.data_fim)}`;
 
     msg += `📅 Período: *${periodLabel}*\n`;
 
