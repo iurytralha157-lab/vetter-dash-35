@@ -1212,8 +1212,8 @@ async function handleFeedbackUpdate(
     msg += `🏢 Conta: *${account.nome_cliente}*\n`;
 
     const periodLabel = feedbackResult.data_inicio === feedbackResult.data_fim
-      ? feedbackResult.data_inicio?.split('-').reverse().join('/')
-      : `${feedbackResult.data_inicio?.split('-').reverse().join('/')} a ${feedbackResult.data_fim?.split('-').reverse().join('/')}`;
+      ? formatDateBR(feedbackResult.data_inicio)
+      : `${formatDateBR(feedbackResult.data_inicio)} a ${formatDateBR(feedbackResult.data_fim)}`;
 
     msg += `📅 Período: *${periodLabel}*\n`;
 
