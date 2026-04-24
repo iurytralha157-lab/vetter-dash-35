@@ -268,12 +268,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // === RULE 1: Cap leads_recebidos to Meta total leads ===
+    // === RULE 1: Fetch Meta leads for reference (informational only) ===
     let metaTotalLeads: number | null = null;
+    const campaignMetaLeads: Record<string, number> = {};
+
     try {
       let query = supabase
         .from("campaign_history")
-        .select("leads")
+        .select("leads, campaign_name, campaign_id")
         .eq("account_id", account_id);
 
       if (dataInicio === dataFim) {
@@ -285,29 +287,21 @@ Deno.serve(async (req) => {
       const { data: campData } = await query;
       if (campData && campData.length > 0) {
         metaTotalLeads = campData.reduce((s: number, c: any) => s + (c.leads || 0), 0);
+        
+        // Map leads per campaign for more surgical validation
+        campData.forEach((c: any) => {
+          const name = c.campaign_name?.toLowerCase() || "";
+          campaignMetaLeads[name] = (campaignMetaLeads[name] || 0) + (c.leads || 0);
+        });
       }
     } catch (e) {
       console.error("[process-feedback] Meta leads query error:", e);
     }
 
-    if (metaTotalLeads !== null && metaTotalLeads > 0 && campaigns.length > 0) {
-      const totalRecebida = campaigns.reduce((s, c) => s + (c.quantidade_recebida || 0), 0);
-      if (totalRecebida > metaTotalLeads) {
-        const ratio = metaTotalLeads / totalRecebida;
-        let remaining = metaTotalLeads;
-        for (let i = 0; i < campaigns.length; i++) {
-          if (campaigns[i].quantidade_recebida != null) {
-            if (i === campaigns.length - 1) {
-              campaigns[i].quantidade_recebida = remaining;
-            } else {
-              const capped = Math.round((campaigns[i].quantidade_recebida || 0) * ratio);
-              campaigns[i].quantidade_recebida = capped;
-              remaining -= capped;
-            }
-          }
-        }
-        console.log(`[process-feedback] Capped leads_recebidos from ${totalRecebida} to ${metaTotalLeads}`);
-      }
+    // We no longer FORCE-CAP the leads to Meta total, as Meta can be delayed or wrong.
+    // Instead, we keep the user's reported numbers but we'll provide the Meta number for reference.
+    if (metaTotalLeads !== null && metaTotalLeads > 0) {
+      console.log(`[process-feedback] Meta total leads for period: ${metaTotalLeads}`);
     }
 
     // === RULE 2: Normalize + validate funnel totals ===
@@ -661,12 +655,12 @@ MAPEAMENTO DE ETAPAS (CRÍTICO — leia com atenção):
 | O que o usuário escreve | Campo correto |
 |---|---|
 | "lead recebido", "recebidos", "chegou" | quantidade_recebida |
-| "descartado", "descarte", "lixo" | quantidade_descartado |
+| "descartado", "descarte", "lixo", "fake", "inválido", "fora de perfil", "não qualificado" | quantidade_descartado |
 | "não recebido", "não chegou", "não veio mensagem", "não chegou no whatsapp", "lead que não chegou", "perdido na entrega", "sem contato" | quantidade_nao_recebido |
-| "aguardando retorno", "sem resposta", "não respondeu", "atendimento SDR", "em atendimento" (sem mencionar corretor) | quantidade_atendimento |
-| "passou para corretor", "com o corretor", "em atendimento com o corretor", "corretor atendendo", "atendimento corretor" | quantidade_passou_corretor |
-| "visita", "visitou" | quantidade_visita |
-| "proposta", "enviou proposta" | quantidade_proposta |
+| "aguardando retorno", "sem resposta", "não respondeu", "atende e não responde", "não atende", "atendimento SDR", "em atendimento" (sem mencionar corretor) | quantidade_atendimento |
+| "passou para corretor", "com o corretor", "em atendimento com o corretor", "corretor atendendo", "atendimento corretor", "qualificado", "lead bom" | quantidade_passou_corretor |
+| "visita", "visitou", "visita agendada" | quantidade_visita |
+| "proposta", "enviou proposta", "em negociação" | quantidade_proposta |
 | "venda", "vendeu", "fechou" | quantidade_venda |
 
 REGRA CRÍTICA sobre "corretor":
