@@ -56,9 +56,9 @@ Deno.serve(async (req) => {
         .from("feedback_campanha")
         .select("id")
         .eq("mensagem_hash", mensagem_hash)
-        .maybeSingle();
+        .limit(1);
 
-      if (existing) {
+      if (existing && existing.length > 0) {
         return new Response(JSON.stringify({ success: true, duplicado: true, message: "Mensagem já processada" }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
