@@ -655,12 +655,12 @@ MAPEAMENTO DE ETAPAS (CRÍTICO — leia com atenção):
 | O que o usuário escreve | Campo correto |
 |---|---|
 | "lead recebido", "recebidos", "chegou" | quantidade_recebida |
-| "descartado", "descarte", "lixo" | quantidade_descartado |
+| "descartado", "descarte", "lixo", "fake", "inválido", "fora de perfil", "não qualificado" | quantidade_descartado |
 | "não recebido", "não chegou", "não veio mensagem", "não chegou no whatsapp", "lead que não chegou", "perdido na entrega", "sem contato" | quantidade_nao_recebido |
-| "aguardando retorno", "sem resposta", "não respondeu", "atendimento SDR", "em atendimento" (sem mencionar corretor) | quantidade_atendimento |
-| "passou para corretor", "com o corretor", "em atendimento com o corretor", "corretor atendendo", "atendimento corretor" | quantidade_passou_corretor |
-| "visita", "visitou" | quantidade_visita |
-| "proposta", "enviou proposta" | quantidade_proposta |
+| "aguardando retorno", "sem resposta", "não respondeu", "atende e não responde", "não atende", "atendimento SDR", "em atendimento" (sem mencionar corretor) | quantidade_atendimento |
+| "passou para corretor", "com o corretor", "em atendimento com o corretor", "corretor atendendo", "atendimento corretor", "qualificado", "lead bom" | quantidade_passou_corretor |
+| "visita", "visitou", "visita agendada" | quantidade_visita |
+| "proposta", "enviou proposta", "em negociação" | quantidade_proposta |
 | "venda", "vendeu", "fechou" | quantidade_venda |
 
 REGRA CRÍTICA sobre "corretor":
